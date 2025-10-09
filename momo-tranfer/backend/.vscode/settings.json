@@ -1,0 +1,12 @@
+{
+  "typescript.preferences.useAliasesForRenames": false,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.suggest.autoImports": true,
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "files.exclude": {
+    "**/node_modules": false
+  }
+}

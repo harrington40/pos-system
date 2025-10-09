@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # RethinkDB Database
+  rethinkdb:
+    image: rethinkdb:2.4
+    container_name: momo-rethinkdb
+    restart: unless-stopped
+    ports:
+      - "28015:28015"  # Driver port
+      - "8080:8080"    # Admin interface
+    volumes:
+      - rethinkdb_data:/data
+    environment:
+      - RETHINKDB_PASSWORD=
+    networks:
+      - momo-network
+
+  # MQTT Broker (Eclipse Mosquitto)
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    container_name: momo-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"    # MQTT port
+      - "9001:9001"    # WebSocket port
+    volumes:
+      - ./mqtt/config:/mosquitto/config:ro
+      - ./mqtt/data:/mosquitto/data
+      - ./mqtt/log:/mosquitto/log
+    networks:
+      - momo-network
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: momo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - momo-network
+
+  # MoMo Transfer Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: momo-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"    # HTTP port
+      - "50051:50051"  # gRPC port
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - GRPC_PORT=50051
+      - RETHINKDB_HOST=rethinkdb
+      - RETHINKDB_PORT=28015
+      - RETHINKDB_DB=momo_transfer
+      - MQTT_BROKER_URL=mqtt://mqtt-broker:1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - rethinkdb
+      - mqtt-broker
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - momo-network
+
+  # MQTT Admin Interface (optional)
+  mqtt-admin:
+    image: cedalo/management-center:2
+    container_name: momo-mqtt-admin
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - CEDALO_MC_BROKER_ID=momo-broker
+      - CEDALO_MC_BROKER_NAME=MoMo MQTT Broker
+      - CEDALO_MC_BROKER_URL=mqtt://mqtt-broker:1883
+      - CEDALO_MC_USERNAME=admin
+      - CEDALO_MC_PASSWORD=admin123
+    depends_on:
+      - mqtt-broker
+    networks:
+      - momo-network
+
+volumes:
+  rethinkdb_data:
+  redis_data:
+
+networks:
+  momo-network:
+    driver: bridge

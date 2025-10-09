@@ -1,0 +1,306 @@
+syntax = "proto3";
+
+package momoTransfer;
+
+// User Service
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (UserResponse);
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+  rpc AuthenticateUser(AuthRequest) returns (AuthResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthResponse);
+  rpc GetUserProfile(GetUserRequest) returns (UserProfileResponse);
+}
+
+// Payment Service  
+service PaymentService {
+  rpc InitiatePayment(PaymentRequest) returns (PaymentResponse);
+  rpc ConfirmPayment(ConfirmPaymentRequest) returns (PaymentResponse);
+  rpc GetPaymentStatus(PaymentStatusRequest) returns (PaymentStatusResponse);
+  rpc GetPaymentHistory(PaymentHistoryRequest) returns (PaymentHistoryResponse);
+  rpc CancelPayment(CancelPaymentRequest) returns (PaymentResponse);
+  rpc GetBalance(BalanceRequest) returns (BalanceResponse);
+}
+
+// Transaction Service
+service TransactionService {
+  rpc CreateTransaction(CreateTransactionRequest) returns (TransactionResponse);
+  rpc GetTransaction(GetTransactionRequest) returns (TransactionResponse);
+  rpc ListTransactions(ListTransactionsRequest) returns (ListTransactionsResponse);
+  rpc UpdateTransactionStatus(UpdateTransactionStatusRequest) returns (TransactionResponse);
+}
+
+// Notification Service
+service NotificationService {
+  rpc SendNotification(NotificationRequest) returns (NotificationResponse);
+  rpc GetNotifications(GetNotificationsRequest) returns (GetNotificationsResponse);
+  rpc MarkAsRead(MarkAsReadRequest) returns (NotificationResponse);
+  rpc SubscribeToNotifications(SubscribeRequest) returns (stream NotificationEvent);
+}
+
+// Common Messages
+message User {
+  string id = 1;
+  string phone_number = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string email = 5;
+  string country_code = 6;
+  string currency = 7;
+  string status = 8;
+  int64 created_at = 9;
+  int64 updated_at = 10;
+  bool is_verified = 11;
+  double balance = 12;
+}
+
+message Payment {
+  string id = 1;
+  string sender_id = 2;
+  string recipient_phone = 3;
+  double amount = 4;
+  string currency = 5;
+  string status = 6;
+  string provider = 7;
+  string reference = 8;
+  string description = 9;
+  int64 created_at = 10;
+  int64 updated_at = 11;
+  string transaction_fee = 12;
+  map<string, string> metadata = 13;
+}
+
+message Transaction {
+  string id = 1;
+  string user_id = 2;
+  string type = 3;
+  double amount = 4;
+  string currency = 5;
+  string status = 6;
+  string description = 7;
+  string reference = 8;
+  int64 created_at = 9;
+  map<string, string> metadata = 10;
+}
+
+// Request Messages
+message CreateUserRequest {
+  string phone_number = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string email = 4;
+  string password = 5;
+  string country_code = 6;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string email = 4;
+}
+
+message AuthRequest {
+  string phone_number = 1;
+  string password = 2;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message PaymentRequest {
+  string sender_id = 1;
+  string recipient_phone = 2;
+  double amount = 3;
+  string currency = 4;
+  string description = 5;
+  string provider = 6;
+  map<string, string> metadata = 7;
+}
+
+message ConfirmPaymentRequest {
+  string payment_id = 1;
+  string confirmation_code = 2;
+}
+
+message PaymentStatusRequest {
+  string payment_id = 1;
+}
+
+message PaymentHistoryRequest {
+  string user_id = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  string status = 4;
+}
+
+message CancelPaymentRequest {
+  string payment_id = 1;
+  string reason = 2;
+}
+
+message BalanceRequest {
+  string user_id = 1;
+}
+
+message CreateTransactionRequest {
+  string user_id = 1;
+  string type = 2;
+  double amount = 3;
+  string currency = 4;
+  string description = 5;
+  string reference = 6;
+  map<string, string> metadata = 7;
+}
+
+message GetTransactionRequest {
+  string transaction_id = 1;
+}
+
+message ListTransactionsRequest {
+  string user_id = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  string type = 4;
+  string status = 5;
+}
+
+message UpdateTransactionStatusRequest {
+  string transaction_id = 1;
+  string status = 2;
+}
+
+message NotificationRequest {
+  string user_id = 1;
+  string title = 2;
+  string message = 3;
+  string type = 4;
+  map<string, string> data = 5;
+}
+
+message GetNotificationsRequest {
+  string user_id = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  bool unread_only = 4;
+}
+
+message MarkAsReadRequest {
+  string notification_id = 1;
+}
+
+message SubscribeRequest {
+  string user_id = 1;
+}
+
+// Response Messages
+message UserResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+}
+
+message UserProfileResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+  repeated Transaction recent_transactions = 4;
+  double total_sent = 5;
+  double total_received = 6;
+  int32 transaction_count = 7;
+}
+
+message AuthResponse {
+  bool success = 1;
+  string message = 2;
+  string access_token = 3;
+  string refresh_token = 4;
+  User user = 5;
+  int64 expires_at = 6;
+}
+
+message PaymentResponse {
+  bool success = 1;
+  string message = 2;
+  Payment payment = 3;
+}
+
+message PaymentStatusResponse {
+  bool success = 1;
+  string message = 2;
+  Payment payment = 3;
+  string provider_status = 4;
+  string provider_reference = 5;
+}
+
+message PaymentHistoryResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Payment payments = 3;
+  int32 total_count = 4;
+  int32 page = 5;
+  int32 limit = 6;
+}
+
+message BalanceResponse {
+  bool success = 1;
+  string message = 2;
+  double balance = 3;
+  string currency = 4;
+  double pending_amount = 5;
+}
+
+message TransactionResponse {
+  bool success = 1;
+  string message = 2;
+  Transaction transaction = 3;
+}
+
+message ListTransactionsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Transaction transactions = 3;
+  int32 total_count = 4;
+  int32 page = 5;
+  int32 limit = 6;
+}
+
+message NotificationResponse {
+  bool success = 1;
+  string message = 2;
+  Notification notification = 3;
+}
+
+message GetNotificationsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Notification notifications = 3;
+  int32 total_count = 4;
+  int32 unread_count = 5;
+}
+
+message NotificationEvent {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string message = 4;
+  string type = 5;
+  map<string, string> data = 6;
+  int64 created_at = 7;
+}
+
+message Notification {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string message = 4;
+  string type = 5;
+  bool is_read = 6;
+  map<string, string> data = 7;
+  int64 created_at = 8;
+}

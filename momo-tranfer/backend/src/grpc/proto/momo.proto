@@ -1,0 +1,276 @@
+syntax = "proto3";
+
+package momo;
+
+// User Service
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc AuthenticateUser(AuthenticateRequest) returns (AuthenticateResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc UpdateBalance(UpdateBalanceRequest) returns (UpdateBalanceResponse);
+  rpc VerifyUser(VerifyUserRequest) returns (VerifyUserResponse);
+}
+
+// Transaction Service
+service TransactionService {
+  rpc CreateTransaction(CreateTransactionRequest) returns (CreateTransactionResponse);
+  rpc ProcessTransaction(ProcessTransactionRequest) returns (ProcessTransactionResponse);
+  rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
+  rpc GetUserTransactions(GetUserTransactionsRequest) returns (GetUserTransactionsResponse);
+  rpc CancelTransaction(CancelTransactionRequest) returns (CancelTransactionResponse);
+}
+
+// Payment Service
+service PaymentService {
+  rpc InitiatePayment(InitiatePaymentRequest) returns (InitiatePaymentResponse);
+  rpc ConfirmPayment(ConfirmPaymentRequest) returns (ConfirmPaymentResponse);
+  rpc GetPaymentStatus(GetPaymentStatusRequest) returns (GetPaymentStatusResponse);
+}
+
+// User Messages
+message User {
+  string id = 1;
+  string phone_number = 2;
+  string email = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string country = 6;
+  string currency = 7;
+  double balance = 8;
+  bool is_verified = 9;
+  int64 created_at = 10;
+  int64 updated_at = 11;
+}
+
+message CreateUserRequest {
+  string phone_number = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string country = 5;
+  string currency = 6;
+  string pin = 7;
+}
+
+message CreateUserResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+  string error = 4;
+}
+
+message AuthenticateRequest {
+  string phone_number = 1;
+  string pin = 2;
+}
+
+message AuthenticateResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+  string access_token = 4;
+  string refresh_token = 5;
+  string error = 6;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+  string error = 4;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string country = 5;
+  string currency = 6;
+}
+
+message UpdateUserResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+  string error = 4;
+}
+
+message UpdateBalanceRequest {
+  string user_id = 1;
+  double amount = 2;
+}
+
+message UpdateBalanceResponse {
+  bool success = 1;
+  string message = 2;
+  double balance = 3;
+  string error = 4;
+}
+
+message VerifyUserRequest {
+  string user_id = 1;
+}
+
+message VerifyUserResponse {
+  bool success = 1;
+  string message = 2;
+  bool is_verified = 3;
+  string error = 4;
+}
+
+// Transaction Messages
+message Transaction {
+  string id = 1;
+  string from_user_id = 2;
+  string to_user_id = 3;
+  string recipient_phone = 4;
+  double amount = 5;
+  string currency = 6;
+  TransactionType type = 7;
+  TransactionStatus status = 8;
+  string description = 9;
+  map<string, string> metadata = 10;
+  int64 created_at = 11;
+  int64 updated_at = 12;
+}
+
+enum TransactionType {
+  SEND = 0;
+  RECEIVE = 1;
+  DEPOSIT = 2;
+  WITHDRAWAL = 3;
+}
+
+enum TransactionStatus {
+  PENDING = 0;
+  COMPLETED = 1;
+  FAILED = 2;
+  CANCELLED = 3;
+}
+
+message CreateTransactionRequest {
+  string from_user_id = 1;
+  string to_user_id = 2;
+  string recipient_phone = 3;
+  double amount = 4;
+  string currency = 5;
+  TransactionType type = 6;
+  string description = 7;
+  map<string, string> metadata = 8;
+}
+
+message CreateTransactionResponse {
+  bool success = 1;
+  string message = 2;
+  Transaction transaction = 3;
+  string error = 4;
+}
+
+message ProcessTransactionRequest {
+  string transaction_id = 1;
+}
+
+message ProcessTransactionResponse {
+  bool success = 1;
+  string message = 2;
+  Transaction transaction = 3;
+  string error = 4;
+}
+
+message GetTransactionRequest {
+  string transaction_id = 1;
+}
+
+message GetTransactionResponse {
+  bool success = 1;
+  string message = 2;
+  Transaction transaction = 3;
+  string error = 4;
+}
+
+message GetUserTransactionsRequest {
+  string user_id = 1;
+  int32 page = 2;
+  int32 limit = 3;
+}
+
+message GetUserTransactionsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Transaction transactions = 3;
+  int32 total = 4;
+  string error = 5;
+}
+
+message CancelTransactionRequest {
+  string transaction_id = 1;
+}
+
+message CancelTransactionResponse {
+  bool success = 1;
+  string message = 2;
+  Transaction transaction = 3;
+  string error = 4;
+}
+
+// Payment Messages
+message InitiatePaymentRequest {
+  string from_user_id = 1;
+  string to_user_id = 2;
+  string recipient_phone = 3;
+  double amount = 4;
+  string currency = 5;
+  string description = 6;
+  PaymentMethod method = 7;
+}
+
+enum PaymentMethod {
+  MOMO = 0;
+  BANK_TRANSFER = 1;
+  WALLET = 2;
+}
+
+message InitiatePaymentResponse {
+  bool success = 1;
+  string message = 2;
+  string payment_id = 3;
+  string transaction_id = 4;
+  PaymentStatus status = 5;
+  string error = 6;
+}
+
+message ConfirmPaymentRequest {
+  string payment_id = 1;
+  string confirmation_code = 2;
+}
+
+message ConfirmPaymentResponse {
+  bool success = 1;
+  string message = 2;
+  PaymentStatus status = 3;
+  string error = 4;
+}
+
+message GetPaymentStatusRequest {
+  string payment_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  bool success = 1;
+  string message = 2;
+  PaymentStatus status = 3;
+  string error = 4;
+}
+
+enum PaymentStatus {
+  PAYMENT_PENDING = 0;
+  PAYMENT_CONFIRMED = 1;
+  PAYMENT_FAILED = 2;
+  PAYMENT_CANCELLED = 3;
+}
