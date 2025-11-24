@@ -51,14 +51,14 @@ class MLURLClassifier {
       /conversion/i,
       /click[^a-z]/i,
     ];
-
-    this.loadSettings();
   }
 
   loadSettings() {
-    chrome.storage.sync.get(['mlEnabled'], (data) => {
-      this.mlEnabled = data.mlEnabled !== false;
-    });
+    if (chrome && chrome.storage) {
+      chrome.storage.sync.get(['mlEnabled'], (data) => {
+        if (data) this.mlEnabled = data.mlEnabled !== false;
+      });
+    }
   }
 
   analyzeURL(url) {
@@ -268,14 +268,10 @@ const ANALYTICS_DOMAINS = [
 
 const PIXEL_TRACKER_DOMAINS = [
   'pixel.facebook.com',
-  'facebook.com/tr',
   'pins.pinterest.com',
   'analytics.pinterest.com',
   'twimg.com',
-  'twitter.com/i/beacon',
-  'linkedin.com/px',
   'connect.facebook.net',
-  'reddit.com/pixel',
   'redditpixel.com',
 ];
 
@@ -288,15 +284,11 @@ const FINGERPRINTING_DOMAINS = [
 ];
 
 const SOCIAL_TRACKING_DOMAINS = [
-  'facebook.com/plugins',
   'platform.twitter.com',
-  'connect.facebook.net',
   'platform.linkedin.com',
   'apis.google.com',
   'csi.gstatic.com',
   'platform.instagram.com',
-  'snapchat.com/ads',
-  'reddit.com/api',
 ];
 
 let trackingSettings = {
@@ -339,26 +331,27 @@ let mlThreshold = 0.65; // Configurable ML confidence threshold
 // Check if URL matches pattern-based rules
 function shouldBlockByPatterns(url) {
   try {
+    if (!url || typeof url !== 'string') return false;
     const urlObj = new URL(url);
     const domain = urlObj.hostname.toLowerCase();
     const path = urlObj.pathname.toLowerCase();
 
     // Check against known ad domains
-    if (AD_DOMAINS.some(adDomain => domain.includes(adDomain))) {
+    if (AD_DOMAINS && AD_DOMAINS.some(adDomain => domain.includes(adDomain))) {
       return true;
     }
 
     // Check tracking settings and apply category-based blocking
-    if (trackingSettings.blockAnalytics && ANALYTICS_DOMAINS.some(d => domain.includes(d))) {
+    if (trackingSettings.blockAnalytics && ANALYTICS_DOMAINS && ANALYTICS_DOMAINS.some(d => domain.includes(d))) {
       return true;
     }
-    if (trackingSettings.blockPixels && PIXEL_TRACKER_DOMAINS.some(d => domain.includes(d))) {
+    if (trackingSettings.blockPixels && PIXEL_TRACKER_DOMAINS && PIXEL_TRACKER_DOMAINS.some(d => domain.includes(d))) {
       return true;
     }
-    if (trackingSettings.blockFingerprinting && FINGERPRINTING_DOMAINS.some(d => domain.includes(d))) {
+    if (trackingSettings.blockFingerprinting && FINGERPRINTING_DOMAINS && FINGERPRINTING_DOMAINS.some(d => domain.includes(d))) {
       return true;
     }
-    if (trackingSettings.blockSocialTracking && SOCIAL_TRACKING_DOMAINS.some(d => domain.includes(d))) {
+    if (trackingSettings.blockSocialTracking && SOCIAL_TRACKING_DOMAINS && SOCIAL_TRACKING_DOMAINS.some(d => domain.includes(d))) {
       return true;
     }
 
