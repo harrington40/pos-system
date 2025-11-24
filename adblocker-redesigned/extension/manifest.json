@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "AdBlocker Plus",
+  "version": "1.0.0",
+  "description": "Advanced ad blocker with smart blocking, cosmetic filtering, and notification scam prevention",
+  "permissions": [
+    "storage",
+    "webRequest",
+    "tabs",
+    "scripting",
+    "webNavigation",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/injector.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "icons": {
+    "16": "src/assets/icons/icon-16.png",
+    "48": "src/assets/icons/icon-48.png",
+    "128": "src/assets/icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "AdBlocker Plus"
+  },
+  "options_page": "src/options/options.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/ad-blocker.js",
+        "src/wasm/engine.wasm",
+        "src/popup/blocked-details.html",
+        "src/popup/blocked-details.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "minimum_chrome_version": "120"
+}

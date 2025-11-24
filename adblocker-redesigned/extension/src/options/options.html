@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AdBlocker Plus - Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 30px;
+    }
+    
+    h1 {
+      color: #667eea;
+      margin-bottom: 30px;
+      font-size: 28px;
+    }
+    
+    .section {
+      margin-bottom: 40px;
+      padding-bottom: 30px;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .section h2 {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 15px;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .stat {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 8px;
+      text-transform: uppercase;
+    }
+    
+    .list-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    input[type="text"] {
+      flex: 1;
+      padding: 10px 15px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    button {
+      padding: 10px 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #764ba2;
+    }
+    
+    .custom-lists {
+      margin-top: 20px;
+    }
+    
+    .list-item {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+    
+    .list-item input[type="checkbox"] {
+      cursor: pointer;
+    }
+    
+    .list-item span {
+      flex: 1;
+      font-size: 14px;
+      word-break: break-all;
+    }
+    
+    .list-item button {
+      background: #dc3545;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    
+    .list-item button:hover {
+      background: #c82333;
+    }
+    
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      gap: 8px;
+      margin: 10px 0;
+    }
+    
+    .checkbox-label input[type="checkbox"] {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ AdBlocker Plus Settings</h1>
+    
+    <!-- Statistics Section -->
+    <div class="section">
+      <h2>Today's Stats</h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="blockedCount">0</div>
+          <div class="stat-label">Ads Blocked</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="timeSaved">0s</div>
+          <div class="stat-label">Time Saved</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="dataSaved">0 MB</div>
+          <div class="stat-label">Data Saved</div>
+        </div>
+      </div>
+      <button onclick="resetStats()">Reset Stats</button>
+    </div>
+    
+    <!-- Whitelist & Blacklist Section -->
+    <div class="section">
+      <h2>Whitelist & Blacklist</h2>
+      
+      <h3>Whitelist (Sites to allow ads)</h3>
+      <div class="list-input">
+        <input type="text" id="newWhitelistDomain" placeholder="example.com">
+        <button onclick="addWhitelist()">Add to Whitelist</button>
+      </div>
+      
+      <div class="custom-lists" id="whitelistContainer">
+        <!-- Populated by JavaScript -->
+      </div>
+      
+      <h3 style="margin-top: 20px;">Custom Ad Domains to Block</h3>
+      <div class="list-input">
+        <input type="text" id="newCustomDomain" placeholder="ads.example.com">
+        <button onclick="addCustomDomain()">Add Custom Domain</button>
+      </div>
+      
+      <div class="custom-lists" id="customDomainsContainer">
+        <!-- Populated by JavaScript -->
+      </div>
+    </div>
+    
+      
+      <h3>Add Custom Filter List</h3>
+      <div class="list-input">
+        <input type="text" id="newListUrl" placeholder="https://example.com/filters.txt">
+        <button onclick="addCustomList()">Add List</button>
+      </div>
+      
+      <h3>Active Filter Lists</h3>
+      <div class="custom-lists" id="customListsContainer">
+        <!-- Populated by JavaScript -->
+      </div>
+    </div>
+    
+    <!-- Privacy Settings -->
+    <div class="section">
+      <h2>Privacy & Performance</h2>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="blockTrackers" checked>
+        <span>Block tracking scripts</span>
+      </label>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="blockAnalytics" checked>
+        <span>Block analytics</span>
+      </label>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="blockFonts" unchecked>
+        <span>Block third-party fonts</span>
+      </label>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="enableLogging">
+        <span>Enable debug logging (for development)</span>
+      </label>
+    </div>
+    
+    <!-- About Section -->
+    <div class="section" style="border-bottom: none;">
+      <h2>About</h2>
+      <p>
+        <strong>AdBlocker Plus v1.0.0</strong><br>
+        Advanced ad blocker with smart blocking, cosmetic filtering, and notification scam prevention.
+      </p>
+      <p style="margin-top: 10px; font-size: 12px; color: #666;">
+        © 2025 AdBlocker Plus Contributors<br>
+        Licensed under GNU General Public License v3
+      </p>
+    </div>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>

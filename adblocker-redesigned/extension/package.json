@@ -1,0 +1,38 @@
+{
+  "name": "adblock-pro-extension",
+  "version": "1.0.0",
+  "description": "Privacy-first ad blocker with Rust-powered filtering engine",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "watch": "node scripts/watch.js",
+    "lint": "eslint src/ --max-warnings 0",
+    "test": "jest",
+    "clean": "rimraf dist/"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.236",
+    "eslint": "^8.54.0",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.5",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+  },
+  "author": "AdBlock Pro Contributors",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/adblock-pro"
+  },
+  "keywords": [
+    "adblock",
+    "ad-blocker",
+    "privacy",
+    "rust",
+    "wasm",
+    "webassembly",
+    "chrome-extension",
+    "gpl"
+  ]
+}

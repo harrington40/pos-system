@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to AdBlocker Plus</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 600px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .logo-section {
+            margin-bottom: 30px;
+        }
+
+        .logo-section h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .logo-section p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .steps h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .steps {
+            text-align: left;
+            margin: 30px 0;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .step {
+            display: flex;
+            margin-bottom: 20px;
+            align-items: flex-start;
+        }
+
+        .step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .step-content h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .step-content p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .features {
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .features h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .feature-item {
+            padding: 12px;
+            background: #f9f9f9;
+            border-left: 3px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .feature-item strong {
+            color: #333;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .feature-item span {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .pin-instructions {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .pin-instructions h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+
+        .pin-instructions ol {
+            margin-left: 20px;
+            color: #555;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .pin-instructions li {
+            margin-bottom: 8px;
+        }
+
+        .pin-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 3px;
+            text-align: center;
+            line-height: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            margin: 0 3px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-section">
+            <h1>🛡️ Welcome to AdBlocker Plus</h1>
+            <p>Your privacy-focused ad blocking extension is ready!</p>
+        </div>
+
+        <div class="pin-instructions">
+            <h4>📌 Quick Setup: Pin to Toolbar</h4>
+            <p style="margin-bottom: 15px; font-size: 14px; color: #1976d2;">
+                <strong>✨ Chrome should automatically show a pin prompt!</strong> Click the pin icon when it appears.
+            </p>
+            <p style="margin-bottom: 15px; font-size: 13px; color: #666;">
+                If you don't see the prompt, or it's already dismissed, follow these steps:
+            </p>
+            <ol>
+                <li>Look for the <strong>Extensions icon</strong> <span class="pin-icon">∙∙∙</span> in your Chrome toolbar (top right)</li>
+                <li>Click it to see your installed extensions</li>
+                <li>Find <strong>AdBlocker Plus</strong> in the list</li>
+                <li>Click the <strong>Pin icon</strong> <span class="pin-icon">📌</span> next to it</li>
+                <li>The AdBlocker Plus icon will now appear in your toolbar for quick access!</li>
+            </ol>
+        </div>
+
+        <div class="features">
+            <h3>✨ Features Included</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <strong>🚫 Smart Blocking</strong>
+                    <span>Blocks 35+ major ad networks</span>
+                </div>
+                <div class="feature-item">
+                    <strong>🎨 Cosmetic Filtering</strong>
+                    <span>Hides ad elements from pages</span>
+                </div>
+                <div class="feature-item">
+                    <strong>🔔 Scam Protection</strong>
+                    <span>Blocks fake notification popups</span>
+                </div>
+                <div class="feature-item">
+                    <strong>⚙️ Advanced Settings</strong>
+                    <span>Whitelist & custom domain control</span>
+                </div>
+                <div class="feature-item">
+                    <strong>📊 Statistics</strong>
+                    <span>Track ads blocked in real-time</span>
+                </div>
+                <div class="feature-item">
+                    <strong>⚡ Fast & Lightweight</strong>
+                    <span>Minimal performance impact</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="steps">
+            <h3>Next Steps</h3>
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Pin to Toolbar</h3>
+                    <p>Follow the instructions above to pin the extension for easy access</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Visit Any Website</h3>
+                    <p>Ads will be blocked automatically across all sites</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3>Check Statistics</h3>
+                    <p>Click the extension icon to see real-time blocking stats</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h3>Customize Settings</h3>
+                    <p>Click "Options" to whitelist sites or add custom domains</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="btn btn-primary" id="optionsBtn">⚙️ Open Settings</button>
+            <button class="btn btn-secondary" id="closeBtn">Close</button>
+        </div>
+
+        <div class="footer">
+            <p>AdBlocker Plus v1.0.0 | Made with ❤️ for your privacy</p>
+        </div>
+    </div>
+
+    <script src="welcome.js"></script>
+</body>
+</html>
