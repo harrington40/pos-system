@@ -216,6 +216,43 @@
       </div>
     </div>
     
+    <!-- ML & Advanced Settings -->
+    <div class="section">
+      <h2>Machine Learning & Advanced</h2>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="enableML" checked>
+        <span>Enable ML-based ad detection</span>
+      </label>
+      <p style="font-size: 12px; color: #666; margin-left: 28px; margin-bottom: 15px;">
+        Uses pattern analysis to detect unknown ad domains. Improves blocking accuracy.
+      </p>
+      
+      <div style="margin-bottom: 20px;">
+        <label for="mlThreshold" style="display: block; margin-bottom: 8px;">
+          ML Confidence Threshold: <span id="thresholdValue" style="color: #667eea; font-weight: bold;">0.65</span>
+        </label>
+        <input type="range" id="mlThreshold" min="0.5" max="0.95" step="0.05" value="0.65" 
+               style="width: 100%; cursor: pointer; accent-color: #667eea;">
+        <p style="font-size: 12px; color: #666; margin-top: 8px;">
+          Lower = more aggressive (more false positives), Higher = more conservative
+        </p>
+      </div>
+      
+      <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+        <h3 style="font-size: 14px; margin-bottom: 10px;">ML Statistics</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+          <div>ML Blocked: <span id="mlBlockedCount" style="color: #667eea; font-weight: bold;">0</span></div>
+          <div>ML Confidence: <span id="mlAvgConfidence" style="color: #667eea; font-weight: bold;">0%</span></div>
+          <div>Cache Size: <span id="mlCacheSize" style="color: #667eea; font-weight: bold;">0</span></div>
+          <div>ML Enabled: <span id="mlStatus" style="color: #28a745; font-weight: bold;">Yes</span></div>
+        </div>
+      </div>
+      
+      <button onclick="exportMLLogs()">📥 Export ML Logs</button>
+      <button onclick="resetMLStats()" style="margin-left: 10px; background: #ffc107; color: #333;">🔄 Reset ML Stats</button>
+    </div>
+    
     <!-- Privacy Settings -->
     <div class="section">
       <h2>Privacy & Performance</h2>

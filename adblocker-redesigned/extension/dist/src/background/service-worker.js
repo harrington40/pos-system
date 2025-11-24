@@ -274,6 +274,7 @@ const WILDCARD_PATTERNS = [
 
 let customLists = [];
 let adblockEnabled = true;
+let mlThreshold = 0.65; // Configurable ML confidence threshold
 
 // Check if URL matches pattern-based rules
 function shouldBlockByPatterns(url) {
@@ -311,7 +312,7 @@ function shouldBlockURL(url) {
 
   // Fall back to ML if patterns didn't match
   const mlResult = mlClassifier.analyzeURL(url);
-  if (mlResult.isAd && mlResult.confidence > 0.65) {
+  if (mlResult.isAd && mlResult.confidence > mlThreshold) {
     return { shouldBlock: true, method: 'ml', confidence: mlResult.confidence };
   }
 
@@ -375,12 +376,20 @@ function buildBlockRules() {
 // Initialize extension
 function initializeExtension() {
   // Load settings from storage
-  chrome.storage.sync.get(['customLists', 'adblockEnabled'], (data) => {
+  chrome.storage.sync.get(['customLists', 'adblockEnabled', 'mlThreshold', 'enableML'], (data) => {
     if (data.customLists) {
       customLists = data.customLists;
     }
     if (data.adblockEnabled !== undefined) {
       adblockEnabled = data.adblockEnabled;
+    }
+    if (data.mlThreshold !== undefined) {
+      mlThreshold = data.mlThreshold;
+      console.log('[AdBlocker Plus] ML threshold loaded:', mlThreshold);
+    }
+    if (data.enableML !== undefined) {
+      mlClassifier.mlEnabled = data.enableML;
+      console.log('[AdBlocker Plus] ML enabled:', data.enableML);
     }
     console.log('[AdBlocker Plus] Service worker initialized');
   });
@@ -609,6 +618,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   else if (request.action === 'clearBlockedHistory') {
     chrome.storage.local.set({ blockedHistory: [] });
     sendResponse({ success: true });
+  }
+  else if (request.action === 'setMLThreshold') {
+    mlThreshold = request.threshold || 0.65;
+    chrome.storage.sync.set({ mlThreshold: mlThreshold });
+    console.log('[AdBlocker Plus] ML threshold set to', mlThreshold);
+    sendResponse({ success: true, mlThreshold: mlThreshold });
+  }
+  else if (request.action === 'isMLEnabled') {
+    sendResponse({ mlEnabled: mlClassifier.mlEnabled });
   }
 });
 

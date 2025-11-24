@@ -15,19 +15,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadWhitelist();
   await loadCustomDomains();
   await updateBlockedCount();
+  await loadMLSettings();
   
   // Load saved settings
   const settings = await chrome.storage.sync.get([
     'blockTrackers',
     'blockAnalytics',
     'blockFonts',
-    'enableLogging'
+    'enableLogging',
+    'enableML',
+    'mlThreshold'
   ]);
   
   document.getElementById('blockTrackers').checked = settings.blockTrackers !== false;
   document.getElementById('blockAnalytics').checked = settings.blockAnalytics !== false;
   document.getElementById('blockFonts').checked = settings.blockFonts === true;
   document.getElementById('enableLogging').checked = settings.enableLogging === true;
+  document.getElementById('enableML').checked = settings.enableML !== false;
+  document.getElementById('mlThreshold').value = settings.mlThreshold || 0.65;
+  document.getElementById('thresholdValue').textContent = (settings.mlThreshold || 0.65).toFixed(2);
 });
 
 // Load custom filter lists
@@ -243,3 +249,96 @@ document.getElementById('blockFonts').addEventListener('change', (e) => {
 document.getElementById('enableLogging').addEventListener('change', (e) => {
   chrome.storage.sync.set({ enableLogging: e.target.checked });
 });
+
+// ===================== ML SETTINGS =====================
+
+// Load and display ML statistics
+async function loadMLSettings() {
+  chrome.runtime.sendMessage({ action: 'getMLStats' }, (response) => {
+    const stats = response?.mlStats || {};
+    
+    document.getElementById('mlBlockedCount').textContent = (stats.mlBlocked || 0).toLocaleString();
+    document.getElementById('mlAvgConfidence').textContent = 
+      ((stats.mlAverageConfidence || 0) * 100).toFixed(1) + '%';
+    document.getElementById('mlCacheSize').textContent = stats.cacheSize || 0;
+    
+    // Check if ML is enabled
+    chrome.runtime.sendMessage({ action: 'isMLEnabled' }, (resp) => {
+      document.getElementById('mlStatus').textContent = resp?.mlEnabled ? 'Yes' : 'No';
+      document.getElementById('mlStatus').style.color = resp?.mlEnabled ? '#28a745' : '#dc3545';
+    });
+  });
+}
+
+// ML Threshold slider handler
+document.getElementById('mlThreshold').addEventListener('change', (e) => {
+  const value = parseFloat(e.target.value);
+  document.getElementById('thresholdValue').textContent = value.toFixed(2);
+  chrome.storage.sync.set({ mlThreshold: value }, () => {
+    // Notify service worker of threshold change
+    chrome.runtime.sendMessage({ 
+      action: 'setMLThreshold', 
+      threshold: value 
+    });
+  });
+});
+
+// ML Enable/Disable toggle
+document.getElementById('enableML').addEventListener('change', (e) => {
+  const enabled = e.target.checked;
+  chrome.storage.sync.set({ enableML: enabled }, () => {
+    chrome.runtime.sendMessage({ 
+      action: 'toggleML', 
+      enabled: enabled 
+    }, (response) => {
+      loadMLSettings();
+      alert(enabled ? 'ML detector enabled' : 'ML detector disabled');
+    });
+  });
+});
+
+// Export ML logs to CSV
+function exportMLLogs() {
+  chrome.runtime.sendMessage({ action: 'getMLStats' }, (response) => {
+    const stats = response?.mlStats || {};
+    
+    // Create CSV content
+    const csvContent = `"ML Blocker Statistics Export"\n"Generated: ${new Date().toLocaleString()}"\n\n` +
+      `"Total ML Blocks",${stats.mlBlocked || 0}\n` +
+      `"Total URLs Analyzed",${stats.mlAnalyzed || 0}\n` +
+      `"Average Confidence",${((stats.mlAverageConfidence || 0) * 100).toFixed(2)}%\n` +
+      `"Cache Size",${stats.cacheSize || 0}\n` +
+      `"Cache Hit Rate",${((stats.cacheHitRate || 0) * 100).toFixed(2)}%\n\n` +
+      `"Ad Keywords Used",28\n` +
+      `"Suspicious Patterns",11\n` +
+      `"Confidence Threshold","0.65 (configurable)"\n`;
+    
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ml-stats-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    alert('ML statistics exported successfully!');
+  });
+}
+
+// Reset ML statistics
+function resetMLStats() {
+  if (confirm('Reset all ML statistics?')) {
+    chrome.runtime.sendMessage({ action: 'resetMLStats' }, (response) => {
+      if (response?.success) {
+        loadMLSettings();
+        alert('ML statistics reset successfully!');
+      }
+    });
+  }
+}
+
+// Refresh ML stats every 5 seconds
+setInterval(loadMLSettings, 5000);
