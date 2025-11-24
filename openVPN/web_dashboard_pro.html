@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛡️ WireGuard VPN Dashboard Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+            border-radius: 25px;
+            padding: 35px;
+            margin-bottom: 35px;
+            box-shadow: 0 20px 50px rgba(102, 126, 234, 0.15), 0 8px 25px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .shield-icon {
+            font-size: 65px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .header-title h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 36px;
+            margin-bottom: 8px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.connected {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .status-badge.connected:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .status-badge.disconnected {
+            background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+            color: white;
+        }
+
+        .status-badge.disconnected:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+        }
+
+        .header-right {
+            text-align: right;
+        }
+
+        .auth-section {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .auth-section input {
+            padding: 11px 16px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .auth-section input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+        }
+
+        .auth-section input::placeholder {
+            color: #bbb;
+        }
+
+        .auth-section button {
+            padding: 11px 22px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 13px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .auth-section button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .auth-section button:active {
+            transform: translateY(-1px);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15), 0 5px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px rgba(102, 126, 234, 0.25), 0 8px 20px rgba(0, 0, 0, 0.12);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .card-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-item {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .health-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .health-healthy {
+            background: #4CAF50;
+        }
+
+        .health-degraded {
+            background: #FF9800;
+        }
+
+        .health-unhealthy {
+            background: #f44336;
+        }
+
+        .peers-section {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15), 0 5px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            margin-bottom: 30px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .peers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        .peer-card {
+            background: linear-gradient(135deg, #667eea0f 0%, #764ba20f 100%);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(5px);
+        }
+
+        .peer-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.25);
+            border-color: rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        }
+
+        .peer-name {
+            font-weight: 800;
+            color: #667eea;
+            font-size: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .peer-info {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .peer-info strong {
+            color: #333;
+        }
+
+        .flag {
+            font-size: 20px;
+        }
+
+        .chart-container {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15), 0 5px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            position: relative;
+            height: 350px;
+            margin-bottom: 30px;
+        }
+
+        .notifications-section {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15), 0 5px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .notification-item {
+            background: linear-gradient(135deg, #f5f7ff 0%, #f0f2ff 100%);
+            border-left: 5px solid #667eea;
+            padding: 18px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .notification-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.15);
+        }
+
+        .notification-item.critical {
+            border-left-color: #f44336;
+            background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+        }
+
+        .notification-item.warning {
+            border-left-color: #FF9800;
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+        }
+
+        .notification-text {
+            flex: 1;
+            color: #333;
+        }
+
+        .notification-time {
+            color: #999;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .loading {
+            color: #999;
+            text-align: center;
+            padding: 60px 40px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.15);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.1);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .create-btn {
+            padding: 13px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-bottom: 25px;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .create-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .create-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .group-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .group-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 15px;
+            font-weight: 700;
+            color: #999;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px 8px 0 0;
+        }
+
+        .tab:hover {
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .error-message {
+            color: #f44336;
+            padding: 15px;
+            background: #ffebee;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                gap: 20px;
+            }
+
+            .header-right {
+                text-align: center;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .peers-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <div class="shield-icon" id="statusIcon">🛡️</div>
+                <div class="header-title">
+                    <h1>WireGuard VPN Dashboard</h1>
+                    <span class="status-badge disconnected" id="statusBadge">Connecting...</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="auth-section">
+                    <input type="text" id="username" placeholder="Username" value="admin">
+                    <input type="password" id="password" placeholder="Password" value="admin">
+                    <button onclick="login()">Login</button>
+                    <button onclick="logout()">Logout</button>
+                    <button onclick="testAPI()" title="Test API endpoint">Test API</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="peers-section">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('overview')">📊 Overview</button>
+                <button class="tab" onclick="switchTab('peers')">👥 Peers</button>
+                <button class="tab" onclick="switchTab('analytics')">📈 Analytics</button>
+                <button class="tab" onclick="switchTab('health')">❤️ Health</button>
+                <button class="tab" onclick="switchTab('notifications')">🔔 Notifications</button>
+                <button class="tab" onclick="switchTab('groups')">🏷️ Groups</button>
+            </div>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="tab-content active">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">🔗 Network Status</div>
+                    <div class="stat-item">
+                        <div class="stat-label">Interface</div>
+                        <div class="stat-value" id="interfaceName">wg0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Status</div>
+                        <div class="stat-value" id="networkStatus">UP</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Listen Port</div>
+                        <div class="stat-value" id="listenPort">51820</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Connected Peers</div>
+                        <div class="stat-value" id="connectedPeers">0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">📊 Bandwidth</div>
+                    <div class="stat-item">
+                        <div class="stat-label">Bytes In</div>
+                        <div class="stat-value" id="bytesIn">0 B</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Bytes Out</div>
+                        <div class="stat-value" id="bytesOut">0 B</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Peers</div>
+                        <div class="stat-value" id="totalPeers">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Uptime</div>
+                        <div class="stat-value" id="uptimeSeconds">0 seconds</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">❤️ Network Health</div>
+                    <div class="stat-item">
+                        <div class="stat-label">Average Latency</div>
+                        <div class="stat-value" id="avgLatency">0 ms</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Packet Loss</div>
+                        <div class="stat-value" id="packetLoss">0%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Health Score</div>
+                        <div class="stat-value" id="healthScore">0/100</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Healthy Peers</div>
+                        <div class="stat-value" id="healthyPeers">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="margin-bottom: 20px; color: white;">📈 Bandwidth History</h3>
+                <canvas id="bandwidthChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Peers Tab -->
+        <div id="peers" class="tab-content">
+            <div class="peers-section">
+                <div class="card-title">👥 Connected Peers</div>
+                <input type="text" id="peerSearch" placeholder="Search peers..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px;">
+                <div class="peers-grid" id="peersGrid">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading peers...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="peers-section">
+                <div class="card-title">📊 Peer Statistics</div>
+                <div id="analyticsContent" style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #ddd;">
+                                <th style="text-align: left; padding: 10px;">Peer ID</th>
+                                <th style="text-align: left; padding: 10px;">Data Sent</th>
+                                <th style="text-align: left; padding: 10px;">Data Received</th>
+                                <th style="text-align: left; padding: 10px;">Connected Since</th>
+                                <th style="text-align: left; padding: 10px;">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analyticsTable">
+                            <tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Loading analytics...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Health Tab -->
+        <div id="health" class="tab-content">
+            <div class="peers-section">
+                <div class="card-title">❤️ Network Health Alerts</div>
+                <div id="healthAlerts">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading health status...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Tab -->
+        <div id="notifications" class="tab-content">
+            <div class="notifications-section">
+                <div class="card-title">🔔 Recent Notifications</div>
+                <div id="notificationsContainer">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading notifications...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Groups Tab -->
+        <div id="groups" class="tab-content">
+            <div class="peers-section">
+                <div class="card-title">🏷️ Peer Groups</div>
+                <button onclick="createNewGroup()" style="padding: 13px 28px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 25px; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); transition: all 0.3s ease;">+ Create Group</button>
+                <div id="groupsContainer">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading groups...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080';
+        let authToken = localStorage.getItem('authToken');
+        let bandwidthChart = null;
+
+        // Initialize
+        async function init() {
+            updateAuthUI();
+            
+            if (authToken) {
+                console.log('Authenticated user, loading dashboard');
+                await refreshStatus();
+                await loadHealth();
+                setInterval(refreshStatus, 5000);
+            }
+        }
+
+        // Update UI based on auth status
+        function updateAuthUI() {
+            const authSection = document.querySelector('.auth-section');
+            const mainContent = document.querySelector('.peers-section');
+            const allTabs = document.querySelectorAll('.tab-content');
+            
+            if (authToken) {
+                // Show dashboard, hide login
+                authSection.style.display = 'none';
+                mainContent.style.display = 'block';
+                
+                // Show overview tab by default
+                document.getElementById('overview').style.display = 'block';
+                document.getElementById('peers').style.display = 'none';
+                document.getElementById('analytics').style.display = 'none';
+                document.getElementById('health').style.display = 'none';
+                document.getElementById('notifications').style.display = 'none';
+                document.getElementById('groups').style.display = 'none';
+                
+                // Mark overview as active
+                document.querySelectorAll('.tab').forEach((tab, index) => {
+                    if (index === 0) {
+                        tab.classList.add('active');
+                    } else {
+                        tab.classList.remove('active');
+                    }
+                });
+            } else {
+                // Show login, hide dashboard
+                authSection.style.display = 'flex';
+                mainContent.style.display = 'none';
+                allTabs.forEach(tab => tab.style.display = 'none');
+            }
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            console.log('Switching to tab:', tabName);
+            
+            // Hide all tabs by setting display to none
+            document.getElementById('overview').style.display = 'none';
+            document.getElementById('peers').style.display = 'none';
+            document.getElementById('analytics').style.display = 'none';
+            document.getElementById('health').style.display = 'none';
+            document.getElementById('notifications').style.display = 'none';
+            document.getElementById('groups').style.display = 'none';
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            const selectedTab = document.getElementById(tabName);
+            if (selectedTab) {
+                selectedTab.style.display = 'block';
+            }
+            
+            // Add active class to clicked button
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+            
+            // Load data for the selected tab
+            if (tabName === 'peers') {
+                loadPeers();
+            } else if (tabName === 'analytics') {
+                loadAnalytics();
+            } else if (tabName === 'health') {
+                loadHealth();
+            } else if (tabName === 'notifications') {
+                loadNotifications();
+            } else if (tabName === 'groups') {
+                loadGroups();
+            }
+        }
+
+        // Login
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                alert('❌ Please enter username and password');
+                return;
+            }
+
+            try {
+                console.log('Attempting login for user:', username);
+                const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                console.log('Response status:', response.status, response.statusText);
+                console.log('Response headers:', {
+                    'content-type': response.headers.get('content-type'),
+                    'access-control-allow-origin': response.headers.get('access-control-allow-origin')
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('HTTP Error:', response.status, errorText);
+                    alert(`❌ Login failed (HTTP ${response.status}): ${errorText}`);
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.success && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('authToken', authToken);
+                    console.log('✅ Login successful, token stored');
+                    updateAuthUI();
+                    await init();
+                    alert('✅ Login successful!');
+                } else if (data.token) {
+                    // Handle case where token is returned without success flag
+                    authToken = data.token;
+                    localStorage.setItem('authToken', authToken);
+                    console.log('✅ Login successful (fallback), token stored');
+                    updateAuthUI();
+                    await init();
+                    alert('✅ Login successful!');
+                } else {
+                    alert('❌ Login failed: ' + (data.error || data.message || 'Unknown error'));
+                    console.error('Full response:', data);
+                }
+            } catch (e) {
+                console.error('Login error:', e);
+                alert('❌ Login error: ' + e.message + '\n\nCheck Developer Console (F12) for details');
+            }
+        }
+
+        // Logout
+        function logout() {
+            authToken = null;
+            localStorage.removeItem('authToken');
+            updateAuthUI();
+            alert('✅ Logged out successfully');
+        }
+
+        // Test API endpoint
+        async function testAPI() {
+            try {
+                console.log('Testing API connection...');
+                const response = await fetch(`${API_BASE}/health`);
+                const text = await response.text();
+                alert('✅ API Response: ' + text + '\n\nAPI is working! Check console for more details.');
+                console.log('API test successful:', text);
+            } catch (e) {
+                alert('❌ API Error: ' + e.message);
+                console.error('API test failed:', e);
+            }
+        }
+
+        // Refresh status
+        async function refreshStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/tools/status`);
+                const status = await response.json();
+
+                // Update badges and stats with real data
+                const peersCount = status.peers_count || 0;
+                const isConnected = status.status === 'up';
+                
+                document.getElementById('connectedPeers').textContent = peersCount;
+                document.getElementById('statusIcon').textContent = isConnected ? '🟢' : '🔴';
+                document.getElementById('statusBadge').textContent = isConnected ? 'Connected' : 'Disconnected';
+                document.getElementById('statusBadge').className = isConnected ? 'status-badge connected' : 'status-badge disconnected';
+                
+                // Update network stats
+                if (document.getElementById('networkStatus')) {
+                    document.getElementById('networkStatus').textContent = status.status.toUpperCase();
+                }
+                if (document.getElementById('interfaceName')) {
+                    document.getElementById('interfaceName').textContent = status.interface_name;
+                }
+                if (document.getElementById('listenPort')) {
+                    document.getElementById('listenPort').textContent = status.listen_port;
+                }
+                if (document.getElementById('bytesIn')) {
+                    document.getElementById('bytesIn').textContent = formatBytes(status.bytes_in || 0);
+                }
+                if (document.getElementById('bytesOut')) {
+                    document.getElementById('bytesOut').textContent = formatBytes(status.bytes_out || 0);
+                }
+                if (document.getElementById('uptimeSeconds')) {
+                    document.getElementById('uptimeSeconds').textContent = status.uptime_seconds || 0 + ' seconds';
+                }
+
+            } catch (e) {
+                console.error('Status error:', e);
+                document.getElementById('statusBadge').textContent = 'Offline';
+                document.getElementById('statusBadge').className = 'status-badge disconnected';
+            }
+        }
+
+        // Load peers
+        async function loadPeers() {
+            try {
+                console.log('Loading peers...');
+                const response = await fetch(`${API_BASE}/api/tools/peers`);
+                const data = await response.json();
+                const peers = data.peers || data || [];
+                
+                console.log('Peers data:', peers);
+                
+                const peersGrid = document.getElementById('peersGrid');
+                
+                if (peers && peers.length > 0) {
+                    peersGrid.innerHTML = peers.map((peer, index) => `
+                        <div class="peer-card">
+                            <div class="peer-name">🌐 ${peer.public_key ? peer.public_key.substring(0, 8) : peer.peer_id ? peer.peer_id.substring(0, 8) : 'Peer ' + (index + 1)}</div>
+                            <div class="peer-info">
+                                <strong>IP:</strong> ${peer.allowed_ips || 'N/A'}<br>
+                                <strong>Sent:</strong> ${formatBytes(peer.transfer_bytes_out || peer.bytes_sent || 0)}<br>
+                                <strong>Received:</strong> ${formatBytes(peer.transfer_bytes_in || peer.bytes_received || 0)}<br>
+                                <strong>Status:</strong> ${peer.last_handshake ? '🟢 Active' : '🔴 Inactive'}<br>
+                                <strong>Endpoint:</strong> ${peer.endpoint || 'Not connected'}
+                            </div>
+                        </div>
+                    `).join('');
+                    document.getElementById('totalPeers').textContent = peers.length;
+                    
+                    // Show info message
+                    if (peers.length === 1) {
+                        peersGrid.innerHTML = `
+                            <div style="grid-column: 1/-1; text-align: center; color: #999; padding: 40px;">
+                                <div style="font-size: 18px; margin-bottom: 10px;">👥 One Peer Connected</div>
+                                <div style="font-size: 14px;">This is typically the VPN server. Add more peers to build your network.</div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    peersGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #999; padding: 40px;">No peers connected</div>';
+                    document.getElementById('totalPeers').textContent = '0';
+                }
+            } catch (e) {
+                console.error('Peers error:', e);
+                document.getElementById('peersGrid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #f44336; padding: 40px;">❌ Failed to load peers</div>';
+            }
+        }
+
+        // Load analytics
+        async function loadAnalytics() {
+            try {
+                console.log('Loading analytics...');
+                const response = await fetch(`${API_BASE}/api/v1/analytics/peer-stats`);
+                const stats = await response.json() || [];
+
+                console.log('Analytics data:', stats);
+
+                const analyticsTable = document.getElementById('analyticsTable');
+                
+                if (stats && stats.length > 0) {
+                    analyticsTable.innerHTML = stats.map(stat => `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 10px;">${stat.peer_id ? stat.peer_id.substring(0, 12) : 'N/A'}</td>
+                            <td style="padding: 10px;">${formatBytes(stat.bytes_sent || 0)}</td>
+                            <td style="padding: 10px;">${formatBytes(stat.bytes_received || 0)}</td>
+                            <td style="padding: 10px;">${stat.connected_since ? new Date(stat.connected_since).toLocaleDateString() : 'N/A'}</td>
+                            <td style="padding: 10px;">${Math.floor((stat.connection_duration_secs || 0) / 3600)}h</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    // Show info message when no data
+                    analyticsTable.innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 40px; color: #999;">
+                                <div style="font-size: 18px; margin-bottom: 10px;">📊 No Analytics Data Yet</div>
+                                <div style="font-size: 14px;">Connect some peers to see bandwidth analytics</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (e) {
+                console.error('Analytics error:', e);
+                document.getElementById('analyticsTable').innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #f44336;">❌ Failed to load analytics</td></tr>';
+            }
+        }
+
+        // Load health
+        async function loadHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/health/network-health`);
+                const health = await response.json();
+
+                // Update health metrics
+                document.getElementById('avgLatency').textContent = health.avg_latency_ms?.toFixed(1) + ' ms' || '0 ms';
+                document.getElementById('packetLoss').textContent = health.avg_packet_loss_percent?.toFixed(1) + '%' || '0%';
+                
+                // Calculate health score (0-100)
+                const latencyScore = Math.max(0, 100 - (health.avg_latency_ms || 0) / 2);
+                const packetScore = Math.max(0, 100 - (health.avg_packet_loss_percent || 0) * 5);
+                const overallScore = Math.round((latencyScore + packetScore) / 2);
+                document.getElementById('healthScore').textContent = overallScore + '/100';
+                
+                // Update peer health counts
+                document.getElementById('healthyPeers').textContent = health.healthy_peers || 0;
+                document.getElementById('connectedPeers').textContent = health.total_peers || 0;
+
+                // Load health alerts
+                const healthAlerts = document.getElementById('healthAlerts');
+                const alertsResponse = await fetch(`${API_BASE}/api/v1/health/alerts`);
+                const alerts = await alertsResponse.json();
+
+                if (alerts && alerts.length > 0) {
+                    healthAlerts.innerHTML = alerts.map(alert => `
+                        <div class="notification-item ${alert.severity}">
+                            <div class="notification-text">
+                                <strong>${alert.alert_type}</strong><br>
+                                ${alert.message}
+                                <div class="notification-time">${new Date(alert.timestamp).toLocaleString()}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    healthAlerts.innerHTML = '<div style="text-align: center; color: #4CAF50; padding: 40px;">✅ All systems healthy</div>';
+                }
+            } catch (e) {
+                console.error('Health error:', e);
+                document.getElementById('healthAlerts').innerHTML = '<div class="error-message">Failed to load health status</div>';
+            }
+        }
+
+        // Load notifications
+        async function loadNotifications() {
+            try {
+                console.log('Loading notifications...');
+                const response = await fetch(`${API_BASE}/api/v1/notifications`);
+                const notifications = await response.json() || [];
+
+                console.log('Notifications data:', notifications);
+
+                const container = document.getElementById('notificationsContainer');
+                if (notifications && notifications.length > 0) {
+                    container.innerHTML = notifications.slice(0, 10).map(notif => `
+                        <div class="notification-item ${notif.severity || 'info'}">
+                            <div class="notification-text">
+                                <strong>${notif.title || 'Notification'}</strong><br>
+                                ${notif.message || 'No message'}
+                                <div class="notification-time">${notif.timestamp ? new Date(notif.timestamp).toLocaleString() : 'Just now'}</div>
+                            </div>
+                            ${notif.read ? '' : '<span style="background: #667eea; color: white; padding: 3px 8px; border-radius: 3px; font-size: 12px;">NEW</span>'}
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #999; padding: 40px;">
+                            <div style="font-size: 18px; margin-bottom: 10px;">🔔 No Notifications Yet</div>
+                            <div style="font-size: 14px;">Events and alerts will appear here</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Notifications error:', e);
+                document.getElementById('notificationsContainer').innerHTML = '<div style="text-align: center; color: #f44336; padding: 40px;">❌ Failed to load notifications</div>';
+            }
+        }
+
+        // Load groups
+        async function loadGroups() {
+            try {
+                console.log('Loading groups...');
+                const response = await fetch(`${API_BASE}/api/v1/groups`);
+                const groups = await response.json() || [];
+
+                console.log('Groups data:', groups);
+
+                const container = document.getElementById('groupsContainer');
+                if (groups && groups.length > 0) {
+                    container.innerHTML = groups.map(group => `
+                        <div class="card">
+                            <div class="card-title" style="color: ${group.color || '#667eea'};">🏷️ ${group.name}</div>
+                            <div style="color: #666; margin-bottom: 10px;">${group.description || 'No description'}</div>
+                            <div style="color: #999; font-size: 14px;">Peers in group: <strong>${group.peer_ids ? group.peer_ids.length : 0}</strong></div>
+                            <div style="margin-top: 10px;">
+                                ${group.tags ? group.tags.map(tag => `<span class="group-badge">${tag}</span>`).join('') : 'No tags'}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #999; padding: 40px;">
+                            <div style="font-size: 18px; margin-bottom: 10px;">🏷️ No Groups Created Yet</div>
+                            <div style="font-size: 14px;">Create groups to organize your peers</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Groups error:', e);
+                document.getElementById('groupsContainer').innerHTML = '<div style="text-align: center; color: #f44336; padding: 40px;">❌ Failed to load groups</div>';
+            }
+        }
+
+        function createNewGroup() {
+            const name = prompt('Group name:');
+            if (name) {
+                const description = prompt('Group description:');
+                fetch(`${API_BASE}/api/v1/groups`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description, color: '#' + Math.floor(Math.random()*16777215).toString(16) })
+                }).then(() => loadGroups());
+            }
+        }
+
+        // Utility functions
+        function formatBytes(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return size.toFixed(2) + ' ' + units[unitIndex];
+        }
+
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

@@ -8,12 +8,20 @@ mod tools;
 mod ai_orchestrator;
 mod peer_manager;
 mod config_validator;
+mod analytics;
+mod health_monitor;
+mod geolocation;
+mod auth;
+mod notifications;
+mod peer_groups;
 
 use axum::{
-    routing::{get, post, delete},
+    routing::{get, post, delete, put},
     Router,
     extract::{State, Path},
     Json,
+    http::{Method, HeaderMap},
+    middleware,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -23,6 +31,12 @@ use deepseek::DeepSeekClient;
 use ai_orchestrator::AIOrchestrator;
 use peer_manager::PeerManager;
 use config_validator::ConfigValidator;
+use analytics::AnalyticsEngine;
+use health_monitor::HealthMonitor;
+use geolocation::GeolocationService;
+use auth::AuthService;
+use notifications::NotificationService;
+use peer_groups::PeerGroupManager;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
@@ -31,6 +45,36 @@ struct AppState {
     deepseek_client: Arc<DeepSeekClient>,
     ai_orchestrator: Arc<AIOrchestrator>,
     peer_manager: Arc<tokio::sync::Mutex<PeerManager>>,
+    analytics_engine: Arc<AnalyticsEngine>,
+    health_monitor: Arc<HealthMonitor>,
+    geolocation_service: Arc<GeolocationService>,
+    auth_service: Arc<AuthService>,
+    notification_service: Arc<NotificationService>,
+    peer_group_manager: Arc<PeerGroupManager>,
+}
+
+/// CORS middleware to allow cross-origin requests from browsers
+async fn cors_middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    // Handle OPTIONS preflight requests
+    if req.method() == axum::http::Method::OPTIONS {
+        let mut response = axum::response::Response::new(axum::body::Body::empty());
+        response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+        response.headers_mut().insert("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap());
+        response.headers_mut().insert("Access-Control-Allow-Headers", "Content-Type, Authorization".parse().unwrap());
+        return response;
+    }
+
+    let mut response = next.run(req).await;
+    
+    let headers = response.headers_mut();
+    headers.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+    headers.insert("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS".parse().unwrap());
+    headers.insert("Access-Control-Allow-Headers", "Content-Type, Authorization".parse().unwrap());
+    
+    response
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,12 +114,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let peer_manager = Arc::new(tokio::sync::Mutex::new(PeerManager::new()?));
+
+    // Initialize new services
+    let analytics_engine = Arc::new(AnalyticsEngine::new(10000));
+    let health_monitor = Arc::new(HealthMonitor::new(100.0, 5.0)); // 100ms latency, 5% packet loss threshold
+    let geolocation_service = Arc::new(GeolocationService::new());
+    let auth_service = Arc::new(AuthService::new("your-secret-key-change-me".to_string(), 24));
+    let notification_service = Arc::new(NotificationService::new(1000));
+    let peer_group_manager = Arc::new(PeerGroupManager::new());
+
+    // Register default admin user (change password immediately)
+    let _ = auth_service.register_user(
+        "admin".to_string(),
+        "admin".to_string(),
+        auth::UserRole::Admin,
+    ).await;
     
     let state = AppState {
         temporal_client,
         deepseek_client,
         ai_orchestrator,
         peer_manager,
+        analytics_engine,
+        health_monitor,
+        geolocation_service,
+        auth_service,
+        notification_service,
+        peer_group_manager,
     };
 
     let app = Router::new()
@@ -114,7 +179,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/ai/plan-execution", post(plan_ai_execution))
         .route("/api/v1/ai/execute-plan", post(execute_ai_plan))
         .route("/api/v1/ai/query-status", post(query_status_with_ai))
+
+        // Analytics APIs
+        .route("/api/v1/analytics/peer-stats", get(get_peer_stats))
+        .route("/api/v1/analytics/bandwidth-history", get(get_bandwidth_history))
+        .route("/api/v1/analytics/uptime-stats", get(get_uptime_stats))
         
+        // Health Monitoring APIs
+        .route("/api/v1/health/network-health", get(get_network_health))
+        .route("/api/v1/health/alerts", get(get_health_alerts))
+        
+        // Geolocation APIs
+        .route("/api/v1/geo/peer-locations", get(get_peer_locations))
+        .route("/api/v1/geo/peer-location/:peer_id", get(get_peer_location))
+        
+        // Authentication APIs
+        .route("/api/v1/auth/login", post(login))
+        .route("/api/v1/auth/register", post(register))
+        .route("/api/v1/auth/verify", get(verify_token))
+        
+        // Notification APIs
+        .route("/api/v1/notifications", get(get_notifications))
+        .route("/api/v1/notifications/unread", get(get_unread_notifications))
+        .route("/api/v1/notifications/:id/read", post(mark_notification_read))
+        
+        // Peer Groups APIs
+        .route("/api/v1/groups", get(list_groups))
+        .route("/api/v1/groups", post(create_group))
+        .route("/api/v1/groups/:group_id", get(get_group))
+        .route("/api/v1/groups/:group_id", put(update_group))
+        .route("/api/v1/groups/:group_id", delete(delete_group))
+        .route("/api/v1/groups/:group_id/peers", post(add_peers_to_group))
+        .route("/api/v1/groups/:group_id/peers", delete(remove_peers_from_group))
+        .route("/api/v1/peers/:peer_id/metadata", get(get_peer_metadata))
+        .route("/api/v1/peers/:peer_id/metadata", post(set_peer_metadata))
+        .route("/api/v1/peers/search", get(search_peers))
+        
+        .layer(middleware::from_fn(cors_middleware))
         .with_state(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
@@ -602,4 +703,334 @@ async fn query_status_with_ai(
             }))
         }
     }
+}
+
+// ==================== Analytics Handlers ====================
+
+async fn get_peer_stats(
+    State(state): State<AppState>,
+) -> Json<Vec<analytics::PeerStats>> {
+    let stats = state.analytics_engine.get_all_peer_stats().await;
+    Json(stats)
+}
+
+async fn get_bandwidth_history(
+    State(state): State<AppState>,
+) -> Json<Vec<analytics::BandwidthSnapshot>> {
+    let history = state.analytics_engine.get_bandwidth_history(100).await;
+    Json(history)
+}
+
+async fn get_uptime_stats(
+    State(state): State<AppState>,
+) -> Json<analytics::UptimeStats> {
+    let stats = state.analytics_engine.get_uptime_stats().await;
+    Json(stats)
+}
+
+// ==================== Health Monitoring Handlers ====================
+
+async fn get_network_health(
+    State(state): State<AppState>,
+) -> Json<health_monitor::NetworkHealth> {
+    let health = state.health_monitor.get_network_health().await;
+    Json(health)
+}
+
+async fn get_health_alerts(
+    State(state): State<AppState>,
+) -> Json<Vec<health_monitor::HealthAlert>> {
+    let alerts = state.health_monitor.get_recent_alerts(50).await;
+    Json(alerts)
+}
+
+// ==================== Geolocation Handlers ====================
+
+async fn get_peer_locations(
+    State(state): State<AppState>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "message": "Peer locations endpoint",
+        "cache_size": state.geolocation_service.get_cache_size().await
+    }))
+}
+
+async fn get_peer_location(
+    State(state): State<AppState>,
+    Path(peer_id): Path<String>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "peer_id": peer_id,
+        "message": "Get specific peer location"
+    }))
+}
+
+// ==================== Authentication Handlers ====================
+
+async fn login(
+    State(state): State<AppState>,
+    Json(payload): Json<auth::LoginRequest>,
+) -> Json<serde_json::Value> {
+    match state.auth_service.authenticate(&payload.username, &payload.password).await {
+        Ok(token) => {
+            Json(serde_json::json!({
+                "success": true,
+                "token": token,
+                "username": payload.username
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn register(
+    State(state): State<AppState>,
+    Json(payload): Json<auth::RegisterRequest>,
+) -> Json<serde_json::Value> {
+    let role = match payload.role.as_str() {
+        "admin" => auth::UserRole::Admin,
+        "operator" => auth::UserRole::Operator,
+        _ => auth::UserRole::Viewer,
+    };
+
+    match state.auth_service.register_user(payload.username.clone(), payload.password, role).await {
+        Ok(_) => {
+            Json(serde_json::json!({
+                "success": true,
+                "username": payload.username
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn verify_token(
+    State(state): State<AppState>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "message": "Token verification endpoint"
+    }))
+}
+
+// ==================== Notification Handlers ====================
+
+async fn get_notifications(
+    State(state): State<AppState>,
+) -> Json<Vec<notifications::Notification>> {
+    let notifs = state.notification_service.get_notifications(50).await;
+    Json(notifs)
+}
+
+async fn get_unread_notifications(
+    State(state): State<AppState>,
+) -> Json<serde_json::Value> {
+    let unread = state.notification_service.get_unread_notifications().await;
+    let count = state.notification_service.get_unread_count().await;
+    Json(serde_json::json!({
+        "count": count,
+        "notifications": unread
+    }))
+}
+
+async fn mark_notification_read(
+    State(state): State<AppState>,
+    Path(notification_id): Path<String>,
+) -> Json<serde_json::Value> {
+    match state.notification_service.mark_as_read(&notification_id).await {
+        Ok(_) => {
+            Json(serde_json::json!({
+                "success": true,
+                "notification_id": notification_id
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": e
+            }))
+        }
+    }
+}
+
+// ==================== Peer Groups Handlers ====================
+
+async fn list_groups(
+    State(state): State<AppState>,
+) -> Json<Vec<peer_groups::PeerGroup>> {
+    let groups = state.peer_group_manager.get_all_groups().await;
+    Json(groups)
+}
+
+async fn create_group(
+    State(state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let name = payload["name"].as_str().unwrap_or("New Group").to_string();
+    let description = payload["description"].as_str().unwrap_or("").to_string();
+    let color = payload["color"].as_str().unwrap_or("#667eea").to_string();
+
+    match state.peer_group_manager.create_group(name, description, color).await {
+        Ok(group) => Json(serde_json::to_value(group).unwrap()),
+        Err(e) => {
+            Json(serde_json::json!({
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn get_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+) -> Json<serde_json::Value> {
+    match state.peer_group_manager.get_group(&group_id).await {
+        Some(group) => Json(serde_json::to_value(group).unwrap()),
+        None => {
+            Json(serde_json::json!({
+                "error": "Group not found"
+            }))
+        }
+    }
+}
+
+async fn update_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    Json(payload): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let name = payload["name"].as_str().map(|s| s.to_string());
+    let description = payload["description"].as_str().map(|s| s.to_string());
+
+    match state.peer_group_manager.update_group(&group_id, name, description, None).await {
+        Ok(group) => Json(serde_json::to_value(group).unwrap()),
+        Err(e) => {
+            Json(serde_json::json!({
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn delete_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+) -> Json<serde_json::Value> {
+    match state.peer_group_manager.delete_group(&group_id).await {
+        Ok(_) => {
+            Json(serde_json::json!({
+                "success": true
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn add_peers_to_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    Json(payload): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let peer_ids: Vec<String> = payload["peer_ids"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+
+    match state.peer_group_manager.add_peers_to_group(&group_id, peer_ids).await {
+        Ok(_) => {
+            Json(serde_json::json!({
+                "success": true
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn remove_peers_from_group(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+    Json(payload): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let peer_ids: Vec<String> = payload["peer_ids"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+
+    match state.peer_group_manager.remove_peers_from_group(&group_id, peer_ids).await {
+        Ok(_) => {
+            Json(serde_json::json!({
+                "success": true
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn get_peer_metadata(
+    State(state): State<AppState>,
+    Path(peer_id): Path<String>,
+) -> Json<serde_json::Value> {
+    match state.peer_group_manager.get_peer_metadata(&peer_id).await {
+        Some(metadata) => Json(serde_json::to_value(metadata).unwrap()),
+        None => {
+            Json(serde_json::json!({
+                "error": "Peer metadata not found"
+            }))
+        }
+    }
+}
+
+async fn set_peer_metadata(
+    State(state): State<AppState>,
+    Path(peer_id): Path<String>,
+    Json(payload): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let display_name = payload["display_name"].as_str().unwrap_or("").to_string();
+    let description = payload["description"].as_str().unwrap_or("").to_string();
+
+    match state.peer_group_manager.set_peer_metadata(peer_id, display_name, description).await {
+        Ok(metadata) => Json(serde_json::to_value(metadata).unwrap()),
+        Err(e) => {
+            Json(serde_json::json!({
+                "error": e
+            }))
+        }
+    }
+}
+
+async fn search_peers(
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Json<Vec<peer_groups::PeerMetadata>> {
+    let query = params.get("q").unwrap_or(&String::new()).clone();
+    let results = state.peer_group_manager.search_peers(&query).await;
+    Json(results)
 }
