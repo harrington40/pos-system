@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AdBlocker Plus",
+  "name": "TradeShield - Advanced Threat Protection",
   "version": "1.0.0",
-  "description": "Advanced ad blocker with smart blocking, cosmetic filtering, and notification scam prevention",
+  "description": "Enterprise-grade protection against ads, trackers, and digital threats with AI-powered detection",
   "permissions": [
     "storage",
     "webRequest",
@@ -33,7 +33,7 @@
   },
   "action": {
     "default_popup": "src/popup/popup.html",
-    "default_title": "AdBlocker Plus"
+    "default_title": "TradeShield - Advanced Threat Protection"
   },
   "options_page": "src/options/options.html",
   "web_accessible_resources": [
