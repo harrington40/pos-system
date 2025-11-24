@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settings = await chrome.storage.sync.get([
     'blockTrackers',
     'blockAnalytics',
+    'blockPixels',
+    'blockFingerprinting',
+    'blockSocialTracking',
     'blockFonts',
     'enableLogging',
     'enableML',
@@ -29,6 +32,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   document.getElementById('blockTrackers').checked = settings.blockTrackers !== false;
   document.getElementById('blockAnalytics').checked = settings.blockAnalytics !== false;
+  document.getElementById('blockPixels').checked = settings.blockPixels !== false;
+  document.getElementById('blockFingerprinting').checked = settings.blockFingerprinting !== false;
+  document.getElementById('blockSocialTracking').checked = settings.blockSocialTracking !== false;
   document.getElementById('blockFonts').checked = settings.blockFonts === true;
   document.getElementById('enableLogging').checked = settings.enableLogging === true;
   document.getElementById('enableML').checked = settings.enableML !== false;
@@ -233,6 +239,29 @@ function resetStats() {
 // Update blocked count every 5 seconds
 setInterval(updateBlockedCount, 5000);
 
+// ===================== TRACKING SETTINGS =====================
+
+// Update all tracking-related settings
+function updateTrackingSettings() {
+  const settings = {
+    blockTrackers: document.getElementById('blockTrackers').checked,
+    blockAnalytics: document.getElementById('blockAnalytics').checked,
+    blockPixels: document.getElementById('blockPixels').checked,
+    blockFingerprinting: document.getElementById('blockFingerprinting').checked,
+    blockSocialTracking: document.getElementById('blockSocialTracking').checked,
+  };
+  
+  chrome.storage.sync.set(settings, () => {
+    // Notify service worker of tracking settings change
+    chrome.runtime.sendMessage({ 
+      action: 'updateTrackingSettings', 
+      settings: settings 
+    }).catch(() => {
+      // Silently handle if service worker doesn't have the handler yet
+    });
+  });
+}
+
 // Save settings on change
 document.getElementById('blockTrackers').addEventListener('change', (e) => {
   chrome.storage.sync.set({ blockTrackers: e.target.checked });
@@ -240,6 +269,18 @@ document.getElementById('blockTrackers').addEventListener('change', (e) => {
 
 document.getElementById('blockAnalytics').addEventListener('change', (e) => {
   chrome.storage.sync.set({ blockAnalytics: e.target.checked });
+});
+
+document.getElementById('blockPixels').addEventListener('change', (e) => {
+  chrome.storage.sync.set({ blockPixels: e.target.checked });
+});
+
+document.getElementById('blockFingerprinting').addEventListener('change', (e) => {
+  chrome.storage.sync.set({ blockFingerprinting: e.target.checked });
+});
+
+document.getElementById('blockSocialTracking').addEventListener('change', (e) => {
+  chrome.storage.sync.set({ blockSocialTracking: e.target.checked });
 });
 
 document.getElementById('blockFonts').addEventListener('change', (e) => {

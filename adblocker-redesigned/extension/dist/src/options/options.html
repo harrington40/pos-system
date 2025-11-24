@@ -257,15 +257,51 @@
     <div class="section">
       <h2>Privacy & Performance</h2>
       
-      <label class="checkbox-label">
-        <input type="checkbox" id="blockTrackers" checked>
-        <span>Block tracking scripts</span>
-      </label>
+      <h3 style="font-size: 16px; margin-bottom: 15px; color: #333;">🔒 Tracking Protection</h3>
       
       <label class="checkbox-label">
-        <input type="checkbox" id="blockAnalytics" checked>
-        <span>Block analytics</span>
+        <input type="checkbox" id="blockTrackers" checked onchange="updateTrackingSettings()">
+        <span><strong>Block tracking scripts</strong></span>
       </label>
+      <p style="font-size: 12px; color: #666; margin-left: 28px; margin-bottom: 12px;">
+        Blocks common tracking domains and pixel trackers
+      </p>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="blockAnalytics" checked onchange="updateTrackingSettings()">
+        <span><strong>Block analytics</strong></span>
+      </label>
+      <p style="font-size: 12px; color: #666; margin-left: 28px; margin-bottom: 12px;">
+        Blocks Google Analytics, Matomo, and similar analytics platforms
+      </p>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="blockPixels" checked onchange="updateTrackingSettings()">
+        <span><strong>Block tracking pixels</strong></span>
+      </label>
+      <p style="font-size: 12px; color: #666; margin-left: 28px; margin-bottom: 12px;">
+        Blocks 1x1 pixel trackers and invisible beacons
+      </p>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="blockFingerprinting" checked onchange="updateTrackingSettings()">
+        <span><strong>Block fingerprinting</strong></span>
+      </label>
+      <p style="font-size: 12px; color: #666; margin-left: 28px; margin-bottom: 12px;">
+        Blocks scripts that collect device fingerprints (canvas, WebGL, etc.)
+      </p>
+      
+      <label class="checkbox-label">
+        <input type="checkbox" id="blockSocialTracking" checked onchange="updateTrackingSettings()">
+        <span><strong>Block social media tracking</strong></span>
+      </label>
+      <p style="font-size: 12px; color: #666; margin-left: 28px; margin-bottom: 15px;">
+        Blocks Facebook, Twitter, LinkedIn tracking widgets and buttons
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+      
+      <h3 style="font-size: 16px; margin-bottom: 15px; margin-top: 15px; color: #333;">⚙️ Other Settings</h3>
       
       <label class="checkbox-label">
         <input type="checkbox" id="blockFonts" unchecked>

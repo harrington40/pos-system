@@ -247,6 +247,66 @@ const AD_DOMAINS = [
   'smartadserver.com',
 ];
 
+// ============= TRACKING DOMAINS (Organized by Category) =============
+
+const ANALYTICS_DOMAINS = [
+  'analytics.google.com',
+  'google-analytics.com',
+  'googleanalytics.com',
+  'matomo.org',
+  'matomo.com',
+  'piwik.org',
+  'hotjar.com',
+  'amplitude.com',
+  'mixpanel.com',
+  'segment.com',
+  'kissmetrics.com',
+  'intercom.io',
+  'intercomcdn.com',
+  'appcenter.ms',
+];
+
+const PIXEL_TRACKER_DOMAINS = [
+  'pixel.facebook.com',
+  'facebook.com/tr',
+  'pins.pinterest.com',
+  'analytics.pinterest.com',
+  'twimg.com',
+  'twitter.com/i/beacon',
+  'linkedin.com/px',
+  'connect.facebook.net',
+  'reddit.com/pixel',
+  'redditpixel.com',
+];
+
+const FINGERPRINTING_DOMAINS = [
+  'api.maxmind.com',
+  'minfraud.maxmind.com',
+  'deviceatlas.com',
+  'wurfl.io',
+  'uaparser.com',
+];
+
+const SOCIAL_TRACKING_DOMAINS = [
+  'facebook.com/plugins',
+  'platform.twitter.com',
+  'connect.facebook.net',
+  'platform.linkedin.com',
+  'apis.google.com',
+  'csi.gstatic.com',
+  'platform.instagram.com',
+  'snapchat.com/ads',
+  'reddit.com/api',
+];
+
+let trackingSettings = {
+  blockTrackers: true,
+  blockAnalytics: true,
+  blockPixels: true,
+  blockFingerprinting: true,
+  blockSocialTracking: true,
+};
+
 // Ad-related path keywords that indicate ad/tracking requests
 const AD_PATH_KEYWORDS = [
   '/ads',
@@ -285,6 +345,20 @@ function shouldBlockByPatterns(url) {
 
     // Check against known ad domains
     if (AD_DOMAINS.some(adDomain => domain.includes(adDomain))) {
+      return true;
+    }
+
+    // Check tracking settings and apply category-based blocking
+    if (trackingSettings.blockAnalytics && ANALYTICS_DOMAINS.some(d => domain.includes(d))) {
+      return true;
+    }
+    if (trackingSettings.blockPixels && PIXEL_TRACKER_DOMAINS.some(d => domain.includes(d))) {
+      return true;
+    }
+    if (trackingSettings.blockFingerprinting && FINGERPRINTING_DOMAINS.some(d => domain.includes(d))) {
+      return true;
+    }
+    if (trackingSettings.blockSocialTracking && SOCIAL_TRACKING_DOMAINS.some(d => domain.includes(d))) {
       return true;
     }
 
@@ -376,7 +450,17 @@ function buildBlockRules() {
 // Initialize extension
 function initializeExtension() {
   // Load settings from storage
-  chrome.storage.sync.get(['customLists', 'adblockEnabled', 'mlThreshold', 'enableML'], (data) => {
+  chrome.storage.sync.get([
+    'customLists', 
+    'adblockEnabled', 
+    'mlThreshold', 
+    'enableML',
+    'blockTrackers',
+    'blockAnalytics',
+    'blockPixels',
+    'blockFingerprinting',
+    'blockSocialTracking'
+  ], (data) => {
     if (data.customLists) {
       customLists = data.customLists;
     }
@@ -391,7 +475,15 @@ function initializeExtension() {
       mlClassifier.mlEnabled = data.enableML;
       console.log('[AdBlocker Plus] ML enabled:', data.enableML);
     }
-    console.log('[AdBlocker Plus] Service worker initialized');
+    
+    // Load tracking settings
+    if (data.blockTrackers !== undefined) trackingSettings.blockTrackers = data.blockTrackers;
+    if (data.blockAnalytics !== undefined) trackingSettings.blockAnalytics = data.blockAnalytics;
+    if (data.blockPixels !== undefined) trackingSettings.blockPixels = data.blockPixels;
+    if (data.blockFingerprinting !== undefined) trackingSettings.blockFingerprinting = data.blockFingerprinting;
+    if (data.blockSocialTracking !== undefined) trackingSettings.blockSocialTracking = data.blockSocialTracking;
+    
+    console.log('[AdBlocker Plus] Service worker initialized with tracking settings:', trackingSettings);
   });
 
   // Load blocked count
@@ -627,6 +719,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   else if (request.action === 'isMLEnabled') {
     sendResponse({ mlEnabled: mlClassifier.mlEnabled });
+  }
+  else if (request.action === 'updateTrackingSettings') {
+    if (request.settings) {
+      trackingSettings = {
+        blockTrackers: request.settings.blockTrackers !== false,
+        blockAnalytics: request.settings.blockAnalytics !== false,
+        blockPixels: request.settings.blockPixels !== false,
+        blockFingerprinting: request.settings.blockFingerprinting !== false,
+        blockSocialTracking: request.settings.blockSocialTracking !== false,
+      };
+      console.log('[AdBlocker Plus] Tracking settings updated:', trackingSettings);
+    }
+    sendResponse({ success: true, trackingSettings: trackingSettings });
+  }
+  else if (request.action === 'getTrackingSettings') {
+    sendResponse({ trackingSettings: trackingSettings });
   }
 });
 
