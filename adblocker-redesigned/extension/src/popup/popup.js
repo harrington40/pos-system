@@ -28,7 +28,7 @@ function loadStats() {
         const mlContainer = document.getElementById('mlStats');
         if (mlContainer && mlStats.mlBlocked !== undefined) {
             const mlPercent = blockedCount > 0 
-                ? Math.round((mlStats.mlBlocked / (blockedCount + mlStats.mlBlocked)) * 100)
+                ? Math.round((mlStats.mlBlocked / blockedCount) * 100)
                 : 0;
             mlContainer.textContent = `ML Blocked: ${mlStats.mlBlocked} (${mlPercent}%)`;
             mlContainer.style.display = 'block';
