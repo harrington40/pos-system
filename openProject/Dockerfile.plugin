@@ -1,0 +1,7 @@
+FROM openproject/openproject:16-slim
+
+# Copy plugin into the container at the correct location
+COPY plugins/openproject-jira_like_projects /app/lib_static/plugins/openproject-jira_like_projects
+
+# OpenProject will auto-discover and load the plugin from the plugins/ directory
+# No additional bundle install needed as the plugin uses only standard Rails gems

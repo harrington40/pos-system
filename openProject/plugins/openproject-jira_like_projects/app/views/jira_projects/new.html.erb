@@ -1,0 +1,348 @@
+<div class="jira-projects-new">
+  <!-- Header Section -->
+  <div class="page-header mb-4" style="border-bottom: 2px solid #0052CC; padding-bottom: 1.5rem;">
+    <div class="container-fluid">
+      <h1 class="mb-1" style="color: #0052CC; font-weight: 600; font-size: 2rem;">
+        <%= icon_tag('add', class: 'mr-2') %>
+        Create New Project
+      </h1>
+      <p class="text-muted">Set up a new project using Jira-style configuration</p>
+    </div>
+  </div>
+
+  <div class="container-fluid px-4">
+    <div class="row">
+      <!-- Main Form Column -->
+      <div class="col-lg-8 col-xl-7">
+        <div class="card border-0 shadow-sm" style="background: #FFFFFF;">
+          <div class="card-body p-4">
+            <%= form_with(model: @project, local: true, class: "jira-project-form") do |form| %>
+
+              <!-- Error Messages -->
+              <% if @project.errors.any? %>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                  <h5 class="alert-heading">
+                    <%= icon_tag('error', class: 'mr-2') %>
+                    <%= pluralize(@project.errors.count, "error") %> prohibited this project:
+                  </h5>
+                  <ul class="mb-0">
+                    <% @project.errors.full_messages.each do |message| %>
+                      <li><%= message %></li>
+                    <% end %>
+                  </ul>
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              <% end %>
+
+              <!-- Section 1: Basic Information -->
+              <fieldset class="mb-4" style="border-bottom: 1px solid #F0F0F0; padding-bottom: 2rem;">
+                <legend class="h5 mb-3" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('description', class: 'mr-2') %>
+                  Basic Information
+                </legend>
+
+                <!-- Project Key -->
+                <div class="mb-3">
+                  <label for="project_key" class="form-label" style="font-weight: 500; color: #333;">
+                    Project Key
+                    <span class="badge bg-danger ms-2">Required</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text" style="background: #F5F5F5; border: 1px solid #DDD;">
+                      <%= icon_tag('key', class: 'me-2') %>
+                    </span>
+                    <%= form.text_field :key, 
+                        class: "form-control form-control-lg #{@project.errors[:key].any? ? 'is-invalid' : ''}", 
+                        placeholder: "e.g., PROJ, DEV, TEST",
+                        maxlength: 10,
+                        autocomplete: "off",
+                        style: "font-weight: 500; letter-spacing: 0.05em;" %>
+                  </div>
+                  <div class="form-text mt-2">
+                    2-10 uppercase letters. Used in issue keys (PROJ-1, PROJ-2, etc.)
+                  </div>
+                  <% if @project.errors[:key].any? %>
+                    <div class="invalid-feedback d-block mt-2">
+                      <%= @project.errors[:key].first %>
+                    </div>
+                  <% end %>
+                </div>
+
+                <!-- Project Name -->
+                <div class="mb-3">
+                  <label for="project_name" class="form-label" style="font-weight: 500; color: #333;">
+                    Project Name
+                    <span class="badge bg-danger ms-2">Required</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text" style="background: #F5F5F5; border: 1px solid #DDD;">
+                      <%= icon_tag('label', class: 'me-2') %>
+                    </span>
+                    <%= form.text_field :name, 
+                        class: "form-control form-control-lg #{@project.errors[:name].any? ? 'is-invalid' : ''}", 
+                        placeholder: "e.g., My Awesome Project",
+                        maxlength: 255,
+                        autocomplete: "off" %>
+                  </div>
+                  <div class="form-text mt-2">
+                    This is the display name visible throughout OpenProject
+                  </div>
+                  <% if @project.errors[:name].any? %>
+                    <div class="invalid-feedback d-block mt-2">
+                      <%= @project.errors[:name].first %>
+                    </div>
+                  <% end %>
+                </div>
+
+                <!-- Project Type -->
+                <div class="mb-3">
+                  <label for="project_type" class="form-label" style="font-weight: 500; color: #333;">
+                    Project Type
+                    <span class="badge bg-danger ms-2">Required</span>
+                  </label>
+                  <div class="row g-2">
+                    <% ["software", "business", "service_desk"].each do |type| %>
+                      <div class="col-md-4">
+                        <div class="type-selector">
+                          <input type="radio" 
+                                 name="project[project_type]" 
+                                 value="<%= type %>" 
+                                 id="project_type_<%= type %>"
+                                 class="btn-check"
+                                 <%= "checked" if @project.project_type == type %>>
+                          <label for="project_type_<%= type %>" class="btn btn-outline-primary w-100 type-label">
+                            <div class="type-icon mb-2">
+                              <% case type %>
+                                <% when "software" %>
+                                  <%= icon_tag('code', style: 'font-size: 1.5rem;') %>
+                                <% when "business" %>
+                                  <%= icon_tag('business', style: 'font-size: 1.5rem;') %>
+                                <% when "service_desk" %>
+                                  <%= icon_tag('support_agent', style: 'font-size: 1.5rem;') %>
+                              <% end %>
+                            </div>
+                            <div class="type-name" style="font-weight: 500;">
+                              <%= type.titleize %>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                  <div class="form-text mt-2">
+                    Choose the template that best fits your project's needs
+                  </div>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-0">
+                  <label for="project_description" class="form-label" style="font-weight: 500; color: #333;">
+                    Description
+                    <span class="badge bg-secondary ms-2">Optional</span>
+                  </label>
+                  <%= form.text_area :description, 
+                      class: "form-control #{@project.errors[:description].any? ? 'is-invalid' : ''}", 
+                      placeholder: "Describe your project's purpose and goals...",
+                      rows: 4,
+                      maxlength: 1000 %>
+                  <div class="form-text mt-2">
+                    Maximum 1000 characters. Markdown formatting is supported.
+                  </div>
+                  <% if @project.errors[:description].any? %>
+                    <div class="invalid-feedback d-block mt-2">
+                      <%= @project.errors[:description].first %>
+                    </div>
+                  <% end %>
+                </div>
+              </fieldset>
+
+              <!-- Section 2: Project Settings -->
+              <fieldset class="mb-4" style="border-bottom: 1px solid #F0F0F0; padding-bottom: 2rem;">
+                <legend class="h5 mb-3" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('settings', class: 'mr-2') %>
+                  Project Settings
+                </legend>
+
+                <!-- Project Lead -->
+                <div class="mb-3">
+                  <label for="project_lead_id" class="form-label" style="font-weight: 500; color: #333;">
+                    Project Lead
+                    <span class="badge bg-danger ms-2">Required</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text" style="background: #F5F5F5; border: 1px solid #DDD;">
+                      <%= icon_tag('person', class: 'me-2') %>
+                    </span>
+                    <%= form.collection_select :lead_id, 
+                        User.active.sorted, 
+                        :id, 
+                        :name,
+                        { prompt: "Select project lead..." },
+                        class: "form-select form-select-lg #{@project.errors[:lead_id].any? ? 'is-invalid' : ''}" %>
+                  </div>
+                  <div class="form-text mt-2">
+                    The person responsible for this project
+                  </div>
+                  <% if @project.errors[:lead_id].any? %>
+                    <div class="invalid-feedback d-block mt-2">
+                      <%= @project.errors[:lead_id].first %>
+                    </div>
+                  <% end %>
+                </div>
+
+                <!-- Category -->
+                <div class="mb-3">
+                  <label for="project_category" class="form-label" style="font-weight: 500; color: #333;">
+                    Category
+                    <span class="badge bg-secondary ms-2">Optional</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text" style="background: #F5F5F5; border: 1px solid #DDD;">
+                      <%= icon_tag('category', class: 'me-2') %>
+                    </span>
+                    <%= form.text_field :category, 
+                        class: "form-control form-control-lg", 
+                        placeholder: "e.g., Development, Marketing, Support" %>
+                  </div>
+                </div>
+
+                <!-- Enable Modules -->
+                <div class="mb-0">
+                  <label class="form-label" style="font-weight: 500; color: #333;">
+                    <%= icon_tag('apps', class: 'mr-2') %>
+                    Enable Modules
+                    <span class="badge bg-secondary ms-2">Optional</span>
+                  </label>
+                  <div class="row g-2 mt-2">
+                    <% ["issues", "wiki", "news", "documents"].each do |module_name| %>
+                      <div class="col-md-6">
+                        <div class="form-check">
+                          <input class="form-check-input" 
+                                 type="checkbox" 
+                                 name="enabled_modules[]" 
+                                 value="<%= module_name %>" 
+                                 id="module_<%= module_name %>"
+                                 checked>
+                          <label class="form-check-label" for="module_<%= module_name %>">
+                            <%= module_name.titleize %>
+                          </label>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                  <div class="form-text mt-2">
+                    Select the modules you want to enable for this project
+                  </div>
+                </div>
+              </fieldset>
+
+              <!-- Action Buttons -->
+              <div class="d-flex gap-2 pt-2">
+                <%= form.submit "Create Project", 
+                    class: "btn btn-primary btn-lg",
+                    style: "background: #0052CC; border: none; font-weight: 500; padding: 0.75rem 2rem;" %>
+                <%= link_to "Cancel", projects_path, 
+                    class: "btn btn-outline-secondary btn-lg",
+                    style: "font-weight: 500; padding: 0.75rem 2rem;" %>
+              </div>
+
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Column - Tips & Info -->
+      <div class="col-lg-4 col-xl-5">
+        <!-- Quick Tips Card -->
+        <div class="card border-0 shadow-sm mb-3" style="background: #F5F5F5;">
+          <div class="card-body">
+            <h6 class="card-title" style="color: #0052CC; font-weight: 600;">
+              <%= icon_tag('info', class: 'mr-2') %>
+              Quick Tips
+            </h6>
+            <ul class="list-unstyled small">
+              <li class="mb-2">
+                <strong>Project Key:</strong> Keep it short (2-10 chars). All issues will start with this key.
+              </li>
+              <li class="mb-2">
+                <strong>Project Name:</strong> Make it descriptive so team members understand the project's purpose.
+              </li>
+              <li class="mb-2">
+                <strong>Project Type:</strong> Choose based on your workflow (Software Development, Business, or Service Desk).
+              </li>
+              <li>
+                <strong>Project Lead:</strong> This person will manage the project settings and team members.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Best Practices Card -->
+        <div class="card border-0 shadow-sm mb-3" style="background: #E8F4FF;">
+          <div class="card-body">
+            <h6 class="card-title" style="color: #0052CC; font-weight: 600;">
+              <%= icon_tag('lightbulb', class: 'mr-2') %>
+              Best Practices
+            </h6>
+            <ul class="list-unstyled small">
+              <li class="mb-2">✓ Use consistent naming conventions</li>
+              <li class="mb-2">✓ Choose appropriate project type</li>
+              <li class="mb-2">✓ Enable necessary modules upfront</li>
+              <li>✓ Assign clear project leadership</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Help Card -->
+        <div class="card border-0 shadow-sm" style="background: #FFF7E6;">
+          <div class="card-body">
+            <h6 class="card-title" style="color: #F59E0B; font-weight: 600;">
+              <%= icon_tag('help', class: 'mr-2') %>
+              Need Help?
+            </h6>
+            <p class="small mb-2">Check our documentation for more information about:</p>
+            <ul class="list-unstyled small">
+              <li><a href="#" class="text-decoration-none">Project Types</a></li>
+              <li><a href="#" class="text-decoration-none">Project Setup</a></li>
+              <li><a href="#" class="text-decoration-none">Team Management</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .type-selector .btn-check:checked + .type-label {
+    background-color: #0052CC;
+    border-color: #0052CC;
+    color: white;
+  }
+
+  .type-label {
+    transition: all 0.3s ease;
+    padding: 1rem 0.5rem;
+    text-align: center;
+  }
+
+  .type-label:hover {
+    background-color: #F5F5F5;
+  }
+
+  .type-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    border-color: #0052CC;
+    box-shadow: 0 0 0 0.2rem rgba(0, 82, 204, 0.25);
+  }
+
+  .page-header {
+    background: linear-gradient(135deg, #F5F5F5 0%, #FFFFFF 100%);
+  }
+</style>

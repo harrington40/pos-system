@@ -1,0 +1,420 @@
+<div class="jira-projects-show">
+  <!-- Header Section -->
+  <div class="page-header mb-4" style="background: linear-gradient(135deg, #0052CC 0%, #003A99 100%); color: white; padding: 2rem 0;">
+    <div class="container-fluid px-4">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <div style="font-size: 2.5rem; opacity: 0.9;">
+              <%= icon_tag('folder_open', style: 'color: white;') %>
+            </div>
+            <div>
+              <h1 class="mb-0" style="font-size: 2.5rem; font-weight: 700;">
+                <%= @project.name %>
+              </h1>
+              <p class="mb-0 mt-2" style="font-size: 1.1rem; opacity: 0.9;">
+                <strong><%= @project.key %></strong> • <%= @project.project_type&.titleize %>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="btn-group" role="group">
+            <%= link_to "Edit Project", edit_project_path(@project), 
+                class: "btn btn-light",
+                style: "color: #0052CC; font-weight: 500;" %>
+            <%= link_to "Settings", project_settings_path(@project), 
+                class: "btn btn-light",
+                style: "color: #0052CC; font-weight: 500;" %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-fluid px-4">
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" role="tablist" style="border-bottom: 2px solid #F0F0F0;">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" 
+                data-bs-target="#overview" type="button" role="tab" 
+                style="color: #0052CC; font-weight: 500;">
+          <%= icon_tag('dashboard', class: 'me-2') %>
+          Overview
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="team-tab" data-bs-toggle="tab" 
+                data-bs-target="#team" type="button" role="tab"
+                style="color: #666; font-weight: 500;">
+          <%= icon_tag('group', class: 'me-2') %>
+          Team Members
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="activity-tab" data-bs-toggle="tab" 
+                data-bs-target="#activity" type="button" role="tab"
+                style="color: #666; font-weight: 500;">
+          <%= icon_tag('history', class: 'me-2') %>
+          Activity
+        </button>
+      </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Overview Tab -->
+      <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="row g-4">
+          <!-- Left Column: Project Details -->
+          <div class="col-lg-8 col-xl-9">
+            <!-- Description Card -->
+            <% if @project.description.present? %>
+              <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                  <h5 class="card-title mb-3" style="color: #0052CC; font-weight: 600;">
+                    <%= icon_tag('description', class: 'me-2') %>
+                    Project Description
+                  </h5>
+                  <div class="project-description" style="line-height: 1.6; color: #333;">
+                    <%= simple_format(@project.description) %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+
+            <!-- Project Statistics -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-4">
+                <div class="card border-0 shadow-sm" style="border-left: 4px solid #0052CC;">
+                  <div class="card-body text-center">
+                    <div style="font-size: 1.5rem; color: #0052CC; font-weight: 700;">
+                      <%= @project.issues.count %>
+                    </div>
+                    <div style="color: #666; font-size: 0.9rem; font-weight: 500; margin-top: 0.5rem;">
+                      Total Issues
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card border-0 shadow-sm" style="border-left: 4px solid #10B981;">
+                  <div class="card-body text-center">
+                    <div style="font-size: 1.5rem; color: #10B981; font-weight: 700;">
+                      <%= @project.issues.where(status: 'closed').count %>
+                    </div>
+                    <div style="color: #666; font-size: 0.9rem; font-weight: 500; margin-top: 0.5rem;">
+                      Closed Issues
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card border-0 shadow-sm" style="border-left: 4px solid #F59E0B;">
+                  <div class="card-body text-center">
+                    <div style="font-size: 1.5rem; color: #F59E0B; font-weight: 700;">
+                      <%= @project.users.count %>
+                    </div>
+                    <div style="color: #666; font-size: 0.9rem; font-weight: 500; margin-top: 0.5rem;">
+                      Team Members
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Key Information Grid -->
+            <div class="card border-0 shadow-sm mb-4">
+              <div class="card-body">
+                <h5 class="card-title mb-3" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('info', class: 'me-2') %>
+                  Key Information
+                </h5>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label style="color: #666; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">
+                        Project Key
+                      </label>
+                      <div style="color: #0052CC; font-weight: 600; font-size: 1.1rem; margin-top: 0.5rem;">
+                        <%= @project.key %>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label style="color: #666; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">
+                        Project Type
+                      </label>
+                      <div style="color: #333; font-weight: 500; margin-top: 0.5rem;">
+                        <span class="badge bg-info text-dark">
+                          <%= @project.project_type&.titleize %>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-0">
+                      <label style="color: #666; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">
+                        Created
+                      </label>
+                      <div style="color: #333; font-weight: 500; margin-top: 0.5rem;">
+                        <%= @project.created_at&.strftime("%B %d, %Y") %>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="mb-0">
+                      <label style="color: #666; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">
+                        Category
+                      </label>
+                      <div style="color: #333; font-weight: 500; margin-top: 0.5rem;">
+                        <%= @project.category.presence || "Not set" %>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Enabled Modules -->
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <h5 class="card-title mb-3" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('apps', class: 'me-2') %>
+                  Enabled Modules
+                </h5>
+                <div class="row">
+                  <% @project.enabled_modules.each do |mod| %>
+                    <div class="col-md-6 mb-2">
+                      <div style="display: flex; align-items: center; padding: 0.5rem 0;">
+                        <span style="color: #10B981; font-size: 1.2rem; margin-right: 0.5rem;">✓</span>
+                        <span style="color: #333; font-weight: 500;">
+                          <%= mod.titleize %>
+                        </span>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Sidebar -->
+          <div class="col-lg-4 col-xl-3">
+            <!-- Project Lead Card -->
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body">
+                <h6 class="card-title mb-3" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('person', class: 'me-2') %>
+                  Project Lead
+                </h6>
+                <% if @project.lead %>
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 40px; height: 40px; background: #E5E7EB; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0052CC;">
+                      <%= @project.lead.name[0].upcase %>
+                    </div>
+                    <div>
+                      <div style="font-weight: 600; color: #333;">
+                        <%= @project.lead.name %>
+                      </div>
+                      <div style="font-size: 0.85rem; color: #999;">
+                        <%= @project.lead.mail %>
+                      </div>
+                    </div>
+                  </div>
+                <% else %>
+                  <div style="color: #999; font-size: 0.9rem;">
+                    Not assigned
+                  </div>
+                <% end %>
+              </div>
+            </div>
+
+            <!-- Quick Actions Card -->
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body">
+                <h6 class="card-title mb-2" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('flash_on', class: 'me-2') %>
+                  Quick Actions
+                </h6>
+                <div class="d-grid gap-2">
+                  <%= link_to "New Issue", new_project_issue_path(@project), 
+                      class: "btn btn-sm btn-primary",
+                      style: "background: #0052CC; border: none;" %>
+                  <%= link_to "Add Member", project_members_path(@project), 
+                      class: "btn btn-sm btn-outline-primary" %>
+                  <%= link_to "View All Issues", project_issues_path(@project), 
+                      class: "btn btn-sm btn-outline-secondary" %>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status Card -->
+            <div class="card border-0 shadow-sm" style="background: #E8F4FF;">
+              <div class="card-body">
+                <h6 class="card-title mb-2" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('check_circle', class: 'me-2') %>
+                  Status
+                </h6>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="width: 10px; height: 10px; background: #10B981; border-radius: 50%; display: inline-block;"></span>
+                  <span style="color: #333; font-weight: 500;">Active</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Members Tab -->
+      <div class="tab-pane fade" id="team" role="tabpanel">
+        <div class="row">
+          <div class="col-12">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h5 class="card-title mb-0" style="color: #0052CC; font-weight: 600;">
+                    Team Members (<%= @project.users.count %>)
+                  </h5>
+                  <%= link_to "Add Member", project_members_path(@project), 
+                      class: "btn btn-sm btn-primary",
+                      style: "background: #0052CC; border: none;" %>
+                </div>
+
+                <% if @project.users.any? %>
+                  <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0" style="border: 1px solid #F0F0F0;">
+                      <thead style="background: #F9FAFB;">
+                        <tr>
+                          <th style="color: #666; font-weight: 600; border: none;">Name</th>
+                          <th style="color: #666; font-weight: 600; border: none;">Email</th>
+                          <th style="color: #666; font-weight: 600; border: none;">Role</th>
+                          <th style="color: #666; font-weight: 600; border: none;">Status</th>
+                          <th style="color: #666; font-weight: 600; border: none; text-align: center;">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% @project.users.each do |user| %>
+                          <tr>
+                            <td style="border: 1px solid #F0F0F0;">
+                              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="width: 32px; height: 32px; background: #E5E7EB; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0052CC; font-size: 0.9rem;">
+                                  <%= user.name[0].upcase %>
+                                </div>
+                                <strong style="color: #333;"><%= user.name %></strong>
+                              </div>
+                            </td>
+                            <td style="border: 1px solid #F0F0F0; color: #666;">
+                              <%= user.mail %>
+                            </td>
+                            <td style="border: 1px solid #F0F0F0;">
+                              <span class="badge bg-secondary"><%= user.role.name %></span>
+                            </td>
+                            <td style="border: 1px solid #F0F0F0;">
+                              <% if user.active? %>
+                                <span style="color: #10B981; font-weight: 500;">● Active</span>
+                              <% else %>
+                                <span style="color: #999; font-weight: 500;">● Inactive</span>
+                              <% end %>
+                            </td>
+                            <td style="border: 1px solid #F0F0F0; text-align: center;">
+                              <div class="btn-group btn-group-sm" role="group">
+                                <%= link_to "Edit", edit_project_member_path(@project, user), 
+                                    class: "btn btn-sm btn-outline-primary" %>
+                                <%= link_to "Remove", project_member_path(@project, user), 
+                                    method: :delete,
+                                    data: { confirm: "Are you sure?" },
+                                    class: "btn btn-sm btn-outline-danger" %>
+                              </div>
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% else %>
+                  <div style="text-align: center; padding: 2rem; color: #999;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">
+                      <%= icon_tag('people', style: 'font-size: 2rem;') %>
+                    </div>
+                    <p>No team members yet</p>
+                    <%= link_to "Add the first member", project_members_path(@project), 
+                        class: "btn btn-sm btn-primary",
+                        style: "background: #0052CC; border: none; margin-top: 0.5rem;" %>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Tab -->
+      <div class="tab-pane fade" id="activity" role="tabpanel">
+        <div class="row">
+          <div class="col-12">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <h5 class="card-title mb-3" style="color: #0052CC; font-weight: 600;">
+                  <%= icon_tag('history', class: 'me-2') %>
+                  Recent Activity
+                </h5>
+
+                <div class="activity-feed">
+                  <% if @project.journals.any? %>
+                    <% @project.journals.order(created_on: :desc).limit(20).each do |journal| %>
+                      <div class="activity-item mb-3 pb-3" style="border-bottom: 1px solid #F0F0F0;">
+                        <div style="display: flex; gap: 1rem;">
+                          <div style="width: 40px; height: 40px; background: #E5E7EB; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0052CC; flex-shrink: 0;">
+                            <%= journal.user.name[0].upcase %>
+                          </div>
+                          <div style="flex: 1;">
+                            <div style="margin-bottom: 0.25rem;">
+                              <strong style="color: #333;"><%= journal.user.name %></strong>
+                              <span style="color: #999; margin-left: 0.5rem;">
+                                <%= time_ago_in_words(journal.created_on) %> ago
+                              </span>
+                            </div>
+                            <div style="color: #666; font-size: 0.9rem;">
+                              <% if journal.notes.present? %>
+                                <%= truncate(journal.notes, length: 200) %>
+                              <% else %>
+                                Updated project
+                              <% end %>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    <% end %>
+                  <% else %>
+                    <div style="text-align: center; padding: 2rem; color: #999;">
+                      <p>No activity yet</p>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .nav-link.active {
+    border-bottom: 3px solid #0052CC !important;
+    background-color: transparent !important;
+  }
+
+  .nav-link:hover {
+    color: #0052CC !important;
+  }
+
+  .activity-item:last-child {
+    border-bottom: none;
+  }
+</style>
