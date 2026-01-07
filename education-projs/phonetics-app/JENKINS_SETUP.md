@@ -3,14 +3,14 @@
 This guide explains how to set up Jenkins CI/CD for the Phonetics Learning App.
 
 ## Jenkins Server Information
-- **URL**: https://jenkins.transtechologies.com:18084/
+- **URL**: https://jenkins.transtechologies.com/
 - **Pipeline**: Declarative pipeline using Jenkinsfile
 - **Based on**: HRMS Jenkins architecture (proven and hardened)
 
 ## Quick Setup
 
 ### 1. Access Jenkins Server
-1. Open https://jenkins.transtechologies.com:18084/
+1. Open https://jenkins.transtechologies.com/
 2. Login with your credentials
 
 ### 2. Create New Pipeline Job
@@ -190,7 +190,7 @@ The Jenkinsfile includes these stages:
 ### Configure GitHub Webhook
 1. Go to your GitHub repository
 2. Settings → Webhooks → Add webhook
-3. **Payload URL**: `https://jenkins.transtechologies.com:18084/github-webhook/`
+3. **Payload URL**: `https://jenkins.transtechologies.com/github-webhook/`
 4. **Content type**: `application/json`
 5. **Events**: 
    - ✓ Push events
@@ -420,7 +420,7 @@ sudo systemctl status jenkins
 sudo journalctl -u jenkins -f
 
 # Test webhook
-curl -X POST https://jenkins.transtechologies.com:18084/github-webhook/
+curl -X POST https://jenkins.transtechologies.com/github-webhook/
 ```
 
 ## Files in This Repository
