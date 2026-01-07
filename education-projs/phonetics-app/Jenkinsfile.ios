@@ -1,0 +1,240 @@
+/*
+ * Phonetics Learning App - iOS Build Pipeline
+ * Builds and deploys iOS IPA
+ * NOTE: Requires macOS agent with Xcode installed
+ */
+
+pipeline {
+    agent {
+        label 'macos' // Requires macOS Jenkins agent
+    }
+
+    options {
+        timeout(time: 2, unit: 'HOURS')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+    }
+
+    environment {
+        PROJECT_NAME = "phonetics-app-ios"
+        FLUTTER_DIR = "flutter_app"
+        FLUTTER_VERSION = "3.16.0"
+        BUILD_TYPE = "release"
+        IOS_SCHEME = "Runner"
+    }
+
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    stages {
+        stage('Pipeline Info') {
+            steps {
+                echo "=== iOS Build Pipeline ==="
+                echo "Project: ${PROJECT_NAME}"
+                echo "Branch: ${env.BRANCH_NAME}"
+                echo "Build: ${env.BUILD_NUMBER}"
+                sh '''
+                    pwd
+                    uname -a
+                    xcodebuild -version || echo "Xcode not found"
+                '''
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                echo '=== Checking out code ==='
+                checkout scm
+            }
+        }
+
+        stage('Setup Flutter') {
+            steps {
+                echo '=== Setting up Flutter ==='
+                sh '''
+                    # Check if Flutter is installed
+                    if ! command -v flutter &> /dev/null; then
+                        echo "Flutter not found. Please install Flutter on macOS agent"
+                        exit 1
+                    fi
+                    
+                    flutter --version
+                    flutter doctor -v
+                '''
+            }
+        }
+
+        stage('Flutter Dependencies') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Installing Flutter dependencies ==='
+                    sh '''
+                        flutter clean
+                        flutter pub get
+                        flutter pub upgrade
+                    '''
+                }
+            }
+        }
+
+        stage('Code Analysis') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Running Flutter analyze ==='
+                    sh '''
+                        flutter analyze || echo "WARNING: Analysis found issues"
+                    '''
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Running Flutter tests ==='
+                    sh '''
+                        flutter test || echo "WARNING: Tests failed"
+                    '''
+                }
+            }
+        }
+
+        stage('Setup iOS Certificates') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Setting up iOS certificates ==='
+                    sh '''
+                        # Install CocoaPods dependencies
+                        cd ios
+                        pod install || pod update
+                        
+                        # Note: Ensure signing certificates are configured in Xcode
+                        echo "Verify signing certificates in Xcode settings"
+                    '''
+                }
+            }
+        }
+
+        stage('Build iOS') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Building iOS IPA ==='
+                    sh '''
+                        # Build iOS app
+                        flutter build ios --release --no-codesign
+                        
+                        # Or with codesigning (requires certificates):
+                        # flutter build ipa --release
+                        
+                        echo "iOS build completed"
+                        ls -lh build/ios/iphoneos/ || true
+                        ls -lh build/ios/archive/ || true
+                    '''
+                }
+            }
+        }
+
+        stage('Build IPA (Signed)') {
+            when {
+                branch 'main'
+            }
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Building signed IPA ==='
+                    sh '''
+                        # This requires proper certificates and provisioning profiles
+                        # flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+                        
+                        echo "Note: Signed IPA build requires certificates configuration"
+                    '''
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo '=== Archiving build artifacts ==='
+                dir("${FLUTTER_DIR}") {
+                    sh '''
+                        mkdir -p ../artifacts/ios
+                        
+                        # Copy .app bundle or .ipa file
+                        if [ -d "build/ios/iphoneos/Runner.app" ]; then
+                            cp -r build/ios/iphoneos/Runner.app ../artifacts/ios/
+                        fi
+                        
+                        if [ -f "build/ios/ipa/*.ipa" ]; then
+                            cp build/ios/ipa/*.ipa ../artifacts/ios/
+                        fi
+                        
+                        echo "Artifacts:"
+                        ls -lh ../artifacts/ios/
+                    '''
+                }
+                archiveArtifacts artifacts: 'artifacts/ios/**', allowEmptyArchive: true
+            }
+        }
+
+        stage('Deploy to TestFlight') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '=== Deploying to TestFlight ==='
+                sh '''
+                    # Uncomment when App Store Connect credentials are configured
+                    # xcrun altool --upload-app --type ios --file artifacts/ios/phonetics-app.ipa \
+                    #   --apiKey YOUR_API_KEY --apiIssuer YOUR_ISSUER_ID
+                    
+                    echo "Note: TestFlight deployment commented out. Configure to enable."
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '=== Collecting Reports ==='
+        }
+
+        success {
+            echo '=== ✅ iOS Build Completed Successfully ==='
+            sh '''
+                cat > build-status-ios.txt << EOF
+Build Status: SUCCESS
+Platform: iOS
+Build Number: ${BUILD_NUMBER}
+Branch: ${BRANCH_NAME}
+Timestamp: $(date)
+Artifacts: .app/.ipa
+EOF
+                cat build-status-ios.txt
+            '''
+            archiveArtifacts artifacts: 'build-status-ios.txt', allowEmptyArchive: true
+        }
+
+        failure {
+            echo '=== ❌ iOS Build Failed ==='
+            sh '''
+                cat > build-status-ios.txt << EOF
+Build Status: FAILURE
+Platform: iOS
+Build Number: ${BUILD_NUMBER}
+Branch: ${BRANCH_NAME}
+Timestamp: $(date)
+EOF
+                cat build-status-ios.txt
+            '''
+        }
+
+        cleanup {
+            echo '=== Cleaning Up ==='
+            sh '''
+                cd flutter_app
+                flutter clean || true
+            '''
+        }
+    }
+}

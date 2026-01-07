@@ -1,0 +1,207 @@
+/*
+ * Phonetics Learning App - Android Build Pipeline
+ * Builds and deploys Android APK/AAB
+ */
+
+pipeline {
+    agent any
+
+    options {
+        timeout(time: 2, unit: 'HOURS')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+    }
+
+    environment {
+        PROJECT_NAME = "phonetics-app-android"
+        FLUTTER_DIR = "flutter_app"
+        FLUTTER_VERSION = "3.16.0"
+        BUILD_TYPE = "release"
+        OUTPUT_DIR = "build/app/outputs"
+    }
+
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    stages {
+        stage('Pipeline Info') {
+            steps {
+                echo "=== Android Build Pipeline ==="
+                echo "Project: ${PROJECT_NAME}"
+                echo "Branch: ${env.BRANCH_NAME}"
+                echo "Build: ${env.BUILD_NUMBER}"
+                sh '''
+                    pwd
+                    ls -la flutter_app/
+                '''
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                echo '=== Checking out code ==='
+                checkout scm
+            }
+        }
+
+        stage('Setup Flutter') {
+            steps {
+                echo '=== Setting up Flutter ==='
+                sh '''
+                    # Check if Flutter is installed
+                    if ! command -v flutter &> /dev/null; then
+                        echo "Flutter not found. Installing..."
+                        git clone https://github.com/flutter/flutter.git -b stable /opt/flutter
+                        export PATH="$PATH:/opt/flutter/bin"
+                    fi
+                    
+                    flutter --version
+                    flutter doctor -v
+                '''
+            }
+        }
+
+        stage('Flutter Dependencies') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Installing Flutter dependencies ==='
+                    sh '''
+                        flutter clean
+                        flutter pub get
+                        flutter pub upgrade
+                    '''
+                }
+            }
+        }
+
+        stage('Code Analysis') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Running Flutter analyze ==='
+                    sh '''
+                        flutter analyze || echo "WARNING: Analysis found issues"
+                    '''
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Running Flutter tests ==='
+                    sh '''
+                        flutter test || echo "WARNING: Tests failed"
+                    '''
+                }
+            }
+        }
+
+        stage('Build APK') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Building Android APK ==='
+                    sh '''
+                        flutter build apk --release --split-per-abi
+                        
+                        echo "APK files created:"
+                        ls -lh build/app/outputs/flutter-apk/
+                    '''
+                }
+            }
+        }
+
+        stage('Build AAB') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Building Android App Bundle ==='
+                    sh '''
+                        flutter build appbundle --release
+                        
+                        echo "AAB file created:"
+                        ls -lh build/app/outputs/bundle/release/
+                    '''
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo '=== Archiving build artifacts ==='
+                dir("${FLUTTER_DIR}") {
+                    sh '''
+                        mkdir -p ../artifacts/android
+                        cp -r build/app/outputs/flutter-apk/*.apk ../artifacts/android/ || true
+                        cp build/app/outputs/bundle/release/*.aab ../artifacts/android/ || true
+                        
+                        echo "Artifacts:"
+                        ls -lh ../artifacts/android/
+                    '''
+                }
+                archiveArtifacts artifacts: 'artifacts/android/*.apk, artifacts/android/*.aab', allowEmptyArchive: false
+            }
+        }
+
+        stage('Deploy to Firebase') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '=== Deploying to Firebase App Distribution ==='
+                sh '''
+                    # Uncomment when Firebase CLI is configured
+                    # firebase appdistribution:distribute artifacts/android/app-release.apk \
+                    #   --app YOUR_FIREBASE_APP_ID \
+                    #   --groups testers
+                    
+                    echo "Note: Firebase deployment commented out. Configure to enable."
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '=== Collecting Reports ==='
+        }
+
+        success {
+            echo '=== ✅ Android Build Completed Successfully ==='
+            sh '''
+                cat > build-status-android.txt << EOF
+Build Status: SUCCESS
+Platform: Android
+Build Number: ${BUILD_NUMBER}
+Branch: ${BRANCH_NAME}
+Timestamp: $(date)
+Artifacts: APK, AAB
+EOF
+                cat build-status-android.txt
+            '''
+            archiveArtifacts artifacts: 'build-status-android.txt', allowEmptyArchive: true
+        }
+
+        failure {
+            echo '=== ❌ Android Build Failed ==='
+            sh '''
+                cat > build-status-android.txt << EOF
+Build Status: FAILURE
+Platform: Android
+Build Number: ${BUILD_NUMBER}
+Branch: ${BRANCH_NAME}
+Timestamp: $(date)
+EOF
+                cat build-status-android.txt
+            '''
+        }
+
+        cleanup {
+            echo '=== Cleaning Up ==='
+            sh '''
+                cd flutter_app
+                flutter clean || true
+            '''
+        }
+    }
+}

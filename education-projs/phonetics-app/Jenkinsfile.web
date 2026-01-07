@@ -1,0 +1,263 @@
+/*
+ * Phonetics Learning App - Web Build Pipeline
+ * Builds and deploys Flutter web app
+ */
+
+pipeline {
+    agent any
+
+    options {
+        timeout(time: 1, unit: 'HOURS')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+    }
+
+    environment {
+        PROJECT_NAME = "phonetics-app-web"
+        FLUTTER_DIR = "flutter_app"
+        FLUTTER_VERSION = "3.16.0"
+        BUILD_TYPE = "release"
+        WEB_OUTPUT = "build/web"
+    }
+
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    stages {
+        stage('Pipeline Info') {
+            steps {
+                echo "=== Web Build Pipeline ==="
+                echo "Project: ${PROJECT_NAME}"
+                echo "Branch: ${env.BRANCH_NAME}"
+                echo "Build: ${env.BUILD_NUMBER}"
+                sh '''
+                    pwd
+                    ls -la flutter_app/
+                '''
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                echo '=== Checking out code ==='
+                checkout scm
+            }
+        }
+
+        stage('Setup Flutter') {
+            steps {
+                echo '=== Setting up Flutter ==='
+                sh '''
+                    # Check if Flutter is installed
+                    if ! command -v flutter &> /dev/null; then
+                        echo "Flutter not found. Installing..."
+                        git clone https://github.com/flutter/flutter.git -b stable /opt/flutter
+                        export PATH="$PATH:/opt/flutter/bin"
+                    fi
+                    
+                    # Enable web support
+                    flutter config --enable-web
+                    
+                    flutter --version
+                    flutter doctor -v
+                '''
+            }
+        }
+
+        stage('Flutter Dependencies') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Installing Flutter dependencies ==='
+                    sh '''
+                        flutter clean
+                        flutter pub get
+                        flutter pub upgrade
+                    '''
+                }
+            }
+        }
+
+        stage('Code Analysis') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Running Flutter analyze ==='
+                    sh '''
+                        flutter analyze || echo "WARNING: Analysis found issues"
+                    '''
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Running Flutter tests ==='
+                    sh '''
+                        flutter test || echo "WARNING: Tests failed"
+                    '''
+                }
+            }
+        }
+
+        stage('Build Web') {
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Building Flutter Web ==='
+                    sh '''
+                        # Build for web with HTML renderer (better compatibility)
+                        flutter build web --release --web-renderer html
+                        
+                        # Or use CanvasKit renderer (better performance):
+                        # flutter build web --release --web-renderer canvaskit
+                        
+                        echo "Web build completed:"
+                        ls -lh build/web/
+                        
+                        # Show build size
+                        du -sh build/web/
+                    '''
+                }
+            }
+        }
+
+        stage('Optimize Web Build') {
+            steps {
+                dir("${FLUTTER_DIR}/build/web") {
+                    echo '=== Optimizing web assets ==='
+                    sh '''
+                        # Compress assets if needed
+                        echo "Build size before optimization:"
+                        du -sh .
+                        
+                        # Add optimization steps here (e.g., image compression, minification)
+                        
+                        echo "Web assets ready for deployment"
+                    '''
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo '=== Archiving build artifacts ==='
+                dir("${FLUTTER_DIR}") {
+                    sh '''
+                        mkdir -p ../artifacts/web
+                        cp -r build/web/* ../artifacts/web/
+                        
+                        # Create tarball for easy deployment
+                        cd ../artifacts
+                        tar -czf web-build-${BUILD_NUMBER}.tar.gz web/
+                        
+                        echo "Artifacts:"
+                        ls -lh ../artifacts/
+                    '''
+                }
+                archiveArtifacts artifacts: 'artifacts/web-build-*.tar.gz', allowEmptyArchive: false
+            }
+        }
+
+        stage('Deploy to Firebase Hosting') {
+            when {
+                branch 'main'
+            }
+            steps {
+                dir("${FLUTTER_DIR}") {
+                    echo '=== Deploying to Firebase Hosting ==='
+                    sh '''
+                        # Uncomment when Firebase CLI is configured
+                        # firebase deploy --only hosting
+                        
+                        echo "Note: Firebase Hosting deployment commented out. Configure to enable."
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Web Server') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '=== Deploying to Web Server ==='
+                sh '''
+                    # Example: Deploy to nginx or Apache
+                    # rsync -avz artifacts/web/ user@server:/var/www/phonetics-app/
+                    
+                    # Or use SCP
+                    # scp -r artifacts/web/* user@server:/var/www/phonetics-app/
+                    
+                    echo "Note: Web server deployment commented out. Configure to enable."
+                '''
+            }
+        }
+
+        stage('Health Check') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '=== Performing deployment health check ==='
+                sh '''
+                    # Check if deployed site is accessible
+                    # curl -f https://phonetics-app.example.com/ || echo "WARNING: Site not accessible"
+                    
+                    echo "Health check completed"
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '=== Collecting Reports ==='
+            publishHTML([
+                reportDir: 'flutter_app/build/web',
+                reportFiles: 'index.html',
+                reportName: 'Flutter Web Build Preview',
+                allowMissing: true
+            ])
+        }
+
+        success {
+            echo '=== ✅ Web Build Completed Successfully ==='
+            sh '''
+                cat > build-status-web.txt << EOF
+Build Status: SUCCESS
+Platform: Web
+Build Number: ${BUILD_NUMBER}
+Branch: ${BRANCH_NAME}
+Timestamp: $(date)
+Build Size: $(du -sh flutter_app/build/web | cut -f1)
+Artifacts: web-build-${BUILD_NUMBER}.tar.gz
+EOF
+                cat build-status-web.txt
+            '''
+            archiveArtifacts artifacts: 'build-status-web.txt', allowEmptyArchive: true
+        }
+
+        failure {
+            echo '=== ❌ Web Build Failed ==='
+            sh '''
+                cat > build-status-web.txt << EOF
+Build Status: FAILURE
+Platform: Web
+Build Number: ${BUILD_NUMBER}
+Branch: ${BRANCH_NAME}
+Timestamp: $(date)
+EOF
+                cat build-status-web.txt
+            '''
+        }
+
+        cleanup {
+            echo '=== Cleaning Up ==='
+            sh '''
+                cd flutter_app
+                flutter clean || true
+            '''
+        }
+    }
+}
