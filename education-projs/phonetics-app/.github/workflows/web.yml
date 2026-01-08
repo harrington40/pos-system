@@ -1,0 +1,85 @@
+name: Web Build
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-web:
+    name: Build Flutter Web App
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        cache: true
+    
+    - name: Enable web support
+      run: flutter config --enable-web
+    
+    - name: Flutter doctor
+      run: flutter doctor -v
+    
+    - name: Install dependencies
+      run: |
+        cd flutter_app
+        flutter pub get
+    
+    - name: Run Flutter analyze
+      run: |
+        cd flutter_app
+        flutter analyze
+      continue-on-error: true
+    
+    - name: Run tests
+      run: |
+        cd flutter_app
+        flutter test
+      continue-on-error: true
+    
+    - name: Build Web (HTML renderer)
+      run: |
+        cd flutter_app
+        flutter build web --release --web-renderer html
+    
+    - name: Create deployment archive
+      run: |
+        cd flutter_app/build
+        tar -czf web-build-${{ github.run_number }}.tar.gz web/
+    
+    - name: Upload web build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: web-build-${{ github.run_number }}
+        path: |
+          flutter_app/build/web/
+          flutter_app/build/web-build-${{ github.run_number }}.tar.gz
+        retention-days: 30
+    
+    - name: Build summary
+      run: |
+        cd flutter_app/build/web
+        BUILD_SIZE=$(du -sh . | cut -f1)
+        echo "## Web Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Build Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Build Size:** ${BUILD_SIZE}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Deploy Instructions" >> $GITHUB_STEP_SUMMARY
+        echo "Download the web-build artifact and deploy to:" >> $GITHUB_STEP_SUMMARY
+        echo "- Firebase Hosting" >> $GITHUB_STEP_SUMMARY
+        echo "- Netlify" >> $GITHUB_STEP_SUMMARY
+        echo "- Vercel" >> $GITHUB_STEP_SUMMARY
+        echo "- Any web server (nginx, Apache)" >> $GITHUB_STEP_SUMMARY

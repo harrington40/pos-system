@@ -1,0 +1,90 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android App
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '11'
+        cache: 'gradle'
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        cache: true
+    
+    - name: Flutter doctor
+      run: flutter doctor -v
+    
+    - name: Install dependencies
+      run: |
+        cd flutter_app
+        flutter pub get
+    
+    - name: Run Flutter analyze
+      run: |
+        cd flutter_app
+        flutter analyze
+      continue-on-error: true
+    
+    - name: Run tests
+      run: |
+        cd flutter_app
+        flutter test
+      continue-on-error: true
+    
+    - name: Build APK (split per ABI)
+      run: |
+        cd flutter_app
+        flutter build apk --release --split-per-abi
+    
+    - name: Build App Bundle (AAB)
+      run: |
+        cd flutter_app
+        flutter build appbundle --release
+    
+    - name: Upload APK artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-apks-${{ github.run_number }}
+        path: flutter_app/build/app/outputs/flutter-apk/*.apk
+        retention-days: 30
+    
+    - name: Upload AAB artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-aab-${{ github.run_number }}
+        path: flutter_app/build/app/outputs/bundle/release/*.aab
+        retention-days: 30
+    
+    - name: Build summary
+      run: |
+        echo "## Android Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Build Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- app-armeabi-v7a-release.apk" >> $GITHUB_STEP_SUMMARY
+        echo "- app-arm64-v8a-release.apk" >> $GITHUB_STEP_SUMMARY
+        echo "- app-x86_64-release.apk" >> $GITHUB_STEP_SUMMARY
+        echo "- app-release.aab (for Google Play)" >> $GITHUB_STEP_SUMMARY

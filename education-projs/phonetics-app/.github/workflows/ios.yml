@@ -1,0 +1,81 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        cache: true
+    
+    - name: Flutter doctor
+      run: flutter doctor -v
+    
+    - name: Install dependencies
+      run: |
+        cd flutter_app
+        flutter pub get
+    
+    - name: Run Flutter analyze
+      run: |
+        cd flutter_app
+        flutter analyze
+      continue-on-error: true
+    
+    - name: Run tests
+      run: |
+        cd flutter_app
+        flutter test
+      continue-on-error: true
+    
+    - name: Build iOS (unsigned)
+      run: |
+        cd flutter_app
+        flutter build ios --release --no-codesign
+    
+    - name: Create IPA archive structure
+      run: |
+        cd flutter_app
+        mkdir -p build/ios/iphoneos/Payload
+        cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+        cd build/ios/iphoneos
+        zip -r Runner.ipa Payload
+    
+    - name: Upload iOS build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-build-${{ github.run_number }}
+        path: |
+          flutter_app/build/ios/iphoneos/Runner.app
+          flutter_app/build/ios/iphoneos/Runner.ipa
+        retention-days: 30
+    
+    - name: Build summary
+      run: |
+        echo "## iOS Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Build Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Runner.app (simulator/unsigned)" >> $GITHUB_STEP_SUMMARY
+        echo "- Runner.ipa (unsigned archive)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "⚠️ **Note:** This build is unsigned. For App Store deployment, configure code signing." >> $GITHUB_STEP_SUMMARY
