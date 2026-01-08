@@ -3,7 +3,7 @@
 # Run this script on your Jenkins server or use Jenkins CLI
 
 JENKINS_URL="https://jenkins.transtechologies.com"
-REPO_URL="YOUR_GIT_REPO_URL"  # Update this with your actual Git repository URL
+REPO_URL="https://github.com/harrington40/phonetics-app.git"
 BRANCH="main"
 
 echo "=========================================="
