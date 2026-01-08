@@ -6,10 +6,11 @@
 
 pipeline {
     agent {
-        label 'macos' // Requires macOS Jenkins agent
+        label 'macos' // Requires macOS Jenkins agent - SKIP if not available
     }
 
     options {
+        skipDefaultCheckout() // Skip until macOS agent is available
         timeout(time: 2, unit: 'HOURS')
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '10'))
@@ -28,7 +29,20 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 
-    stages {
+    stages {Check macOS Availability') {
+            steps {
+                script {
+                    try {
+                        sh 'uname -a | grep -i darwin'
+                        echo "✅ macOS agent available - proceeding with iOS build"
+                    } catch (Exception e) {
+                        error("❌ iOS builds require macOS with Xcode. See MACOS_AGENT_SETUP.md or use cloud macOS services.")
+                    }
+                }
+            }
+        }
+        
+        stage('
         stage('Pipeline Info') {
             steps {
                 echo "=== iOS Build Pipeline ==="
