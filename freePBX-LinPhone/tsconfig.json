@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@smart-sip/shared": ["./packages/shared/src"],
+      "@smart-sip/sip-core": ["./packages/sip-core/src"],
+      "@smart-sip/smart-routing": ["./packages/smart-routing/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build"]
+}
