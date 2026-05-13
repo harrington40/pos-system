@@ -12,5 +12,12 @@ module.exports = {
     '!**/node_modules/**'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'clover', 'html']
+  coverageReporters: ['text', 'lcov', 'clover', 'html'],
+  reporters: [
+    'default',
+    ['jest-junit', {
+      outputDirectory: 'test-results',
+      outputName: 'junit.xml'
+    }]
+  ]
 };
