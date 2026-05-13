@@ -33,7 +33,7 @@ pipeline {
         stage('Test Backend') {
             steps {
                 dir("${BACKEND_DIR}") {
-                    sh 'npm test'
+                    sh 'npm run test:ci'
                 }
             }
             post {

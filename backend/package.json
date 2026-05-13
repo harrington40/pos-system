@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest --forceExit --detectOpenHandles",
+    "test:ci": "jest --runInBand --forceExit --detectOpenHandles",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --forceExit --detectOpenHandles",
     "start": "node server.js"
