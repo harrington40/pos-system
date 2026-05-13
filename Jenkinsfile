@@ -55,7 +55,7 @@ pipeline {
             steps {
                 dir("${BACKEND_DIR}") {
                     // Verify the server module loads without errors
-                    sh 'node -e "try { require(\"./server.js\"); console.log(\"Backend module loaded successfully\"); } catch(e) { console.log(\"Backend syntax check: \" + e.message); }"'
+                    sh 'node --check server.js && echo "Backend syntax OK"'
                 }
             }
         }
