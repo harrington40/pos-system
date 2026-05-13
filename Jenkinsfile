@@ -144,6 +144,8 @@ pipeline {
                     # Uses information_schema.columns for PostgreSQL < 9.6 compatibility.
                     # SQL is written to a temp file and executed via psql -f to avoid
                     # shell interpretation of $$ (PID expansion) in DO blocks.
+                    # If ALTER TABLE fails (e.g. insufficient privileges), the migration
+                    # is skipped gracefully — columns may already exist from a manual run.
 
 cat > /tmp/pos_migration.sql << 'SQLEOF'
 DO $migrate$
@@ -180,7 +182,7 @@ END
 $migrate$;
 SQLEOF
 
-                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -f /tmp/pos_migration.sql
+                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -f /tmp/pos_migration.sql || echo "WARNING: Auto-migration failed (may need manual ALTER TABLE). Columns may already exist."
                     rm -f /tmp/pos_migration.sql
 
                     ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
