@@ -37,7 +37,7 @@ pipeline {
                 dir("${FRONTEND_DIR}") {
                     sh '''
                     export NVM_DIR="$HOME/.nvm"
-                    [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
+                    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
                     npm ci
                     '''
                 }
@@ -80,7 +80,7 @@ pipeline {
                     sh '''
                     # Use Node.js 20 if available via nvm
                     export NVM_DIR="$HOME/.nvm"
-                    [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
+                    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
                     node --version
                     npx expo export --platform web 2>&1 || echo "Frontend web build skipped"
                     '''
@@ -102,7 +102,7 @@ pipeline {
                     sh '''
                     # Use Node.js 20 if available via nvm
                     export NVM_DIR="$HOME/.nvm"
-                    [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
+                    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
                     node --version
                     npx expo prebuild --platform android --clean 2>&1 || echo "Expo prebuild skipped"
                     '''
