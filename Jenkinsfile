@@ -14,7 +14,6 @@ pipeline {
         DB_HOST = 'localhost'
         DB_NAME = 'app_releases'
         DB_USER = 'jenkins_release'
-        DB_PASS = 'StrongPasswordHere'
     }
 
     stages {
@@ -101,18 +100,18 @@ pipeline {
         }
         stage('Save Release Record') {
             steps {
-                sh '''
-                export PGPASSWORD="$DB_PASS"
+                withCredentials([string(credentialsId: 'jenkins-release-db-password', variable: 'DB_PASS')]) {
+                    sh '''
+                    ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
 
-                ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
-
-                psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
-                INSERT INTO releases
-                (app_name, platform, version, build_number, status, artifact_path, git_branch, git_commit)
-                VALUES
-                ('$APP_NAME', '$PLATFORM', '$APP_VERSION', '$BUILD_NUMBER', 'SUCCESS', '$ARTIFACT', '$BRANCH_NAME', '$GIT_COMMIT');
-                "
-                '''
+                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                    INSERT INTO releases
+                    (app_name, platform, version, build_number, status, artifact_path, git_branch, git_commit)
+                    VALUES
+                    ('$APP_NAME', '$PLATFORM', '$APP_VERSION', '$BUILD_NUMBER', 'SUCCESS', '$ARTIFACT', '$BRANCH_NAME', '$GIT_COMMIT');
+                    "
+                    '''
+                }
             }
         }
     }
