@@ -141,6 +141,36 @@ pipeline {
                 }
             }
         }
+
+        stage('Publish Release Report') {
+            steps {
+                withCredentials([string(credentialsId: 'jenkins-release-db-password', variable: 'DB_PASS')]) {
+                    dir("${BACKEND_DIR}") {
+                        sh '''
+                        mkdir -p release-reports
+                        PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                        SELECT id, app_name, platform, version, build_number, status, git_branch, git_commit, created_at
+                        FROM releases
+                        ORDER BY created_at DESC
+                        LIMIT 20;
+                        " --html > release-reports/releases.html 2>/dev/null || echo "HTML report generation skipped"
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'backend/release-reports',
+                        reportFiles: 'releases.html',
+                        reportName: 'Release History'
+                    ])
+                }
+            }
+        }
     }
 
     post {
