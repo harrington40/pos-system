@@ -95,7 +95,7 @@ pipeline {
 
         stage('Build Android APK') {
             environment {
-                ANDROID_HOME = "${env.ANDROID_HOME ?: '/root/Android/Sdk'}"
+                ANDROID_HOME = "${env.ANDROID_HOME ?: '/root/android-sdk'}"
             }
             steps {
                 dir("${FRONTEND_DIR}") {
