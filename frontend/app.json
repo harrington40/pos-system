@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "POS System",
+    "slug": "pos-system",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#151515"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "backgroundColor": "#151515"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#151515"
+      },
+      "edgeToEdgeEnabled": true,
+      "backgroundColor": "#151515"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#151515"
+    }
+  }
+}

@@ -45,13 +45,13 @@ const billSchema = new mongoose.Schema({
 
   // ── Bill Details ──
   items: [billItemSchema],
-  subtotal: { type: Number, required: true, min: 0 },
+  subtotal: { type: Number, default: 0, min: 0 },
   taxRate: { type: Number, default: 0 }, // e.g. 0.08 for 8%
   taxAmount: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
-  total: { type: Number, required: true, min: 0 },
+  total: { type: Number, default: 0, min: 0 },
   amountPaid: { type: Number, default: 0 },
-  balanceDue: { type: Number, required: true },
+  balanceDue: { type: Number, default: 0 },
 
   // ── Status Machine ──
   status: {
@@ -118,7 +118,7 @@ billSchema.pre('save', function (next) {
   this.taxAmount = this.subtotal * this.taxRate;
   this.total = this.subtotal + this.taxAmount - this.discount;
   this.balanceDue = this.total - this.amountPaid;
-  next();
+  if (typeof next === 'function') next();
 });
 
 module.exports = mongoose.model('Bill', billSchema);
