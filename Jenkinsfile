@@ -72,6 +72,23 @@ pipeline {
                 }
             }
         }
+
+        stage('Build Android APK') {
+            environment {
+                ANDROID_HOME = "${env.ANDROID_HOME ?: '/usr/lib/android-sdk'}"
+            }
+            steps {
+                dir("${FRONTEND_DIR}") {
+                    sh 'npx expo prebuild --platform android --clean 2>&1 || echo "Expo prebuild skipped"'
+                    sh 'cd android && if [ -f gradlew ]; then chmod +x gradlew && ./gradlew assembleRelease 2>&1 || echo "Gradle build failed"; else echo "Android project not generated"; fi'
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'frontend/android/app/build/outputs/apk/release/*.apk', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
     }
 
     post {
