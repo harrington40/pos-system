@@ -182,7 +182,7 @@ END
 $migrate$;
 SQLEOF
 
-                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -f /tmp/pos_migration.sql || echo "WARNING: Auto-migration failed (may need manual ALTER TABLE). Columns may already exist."
+                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -f /tmp/pos_migration.sql 2>&1 || echo "WARNING: Auto-migration ALTER TABLE failed (jenkins_release is not table owner). Columns may need to be added manually."
                     rm -f /tmp/pos_migration.sql
 
                     ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
@@ -199,12 +199,30 @@ SQLEOF
                     echo "$BRANCH_NAME" | grep -qiE "^(main|master)$" && ENVIRONMENT="production"
                     echo "$BRANCH_NAME" | grep -qi "dev" && ENVIRONMENT="development"
 
-                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
-                    INSERT INTO releases
-                    (app_name, platform, version, build_number, status, artifact_path, git_branch, git_commit, build_duration, release_channel, environment)
-                    VALUES
-                    ('$APP_NAME', '$PLATFORM', '$APP_VERSION', '$BUILD_NUMBER', 'SUCCESS', '$ARTIFACT', '$BRANCH_NAME', '$GIT_COMMIT', '$BUILD_DURATION', '$RELEASE_CHANNEL', '$ENVIRONMENT');
-                    "
+                    # Check if new columns exist; if not, use fallback INSERT without them
+                    NEW_COLS_EXIST=$(PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -t -A -c "
+                        SELECT COUNT(*) FROM information_schema.columns
+                        WHERE table_name='releases' AND column_name IN ('build_duration','release_channel','environment')
+                    " 2>/dev/null || echo "0")
+
+                    if [ "$NEW_COLS_EXIST" = "3" ]; then
+                        # All new columns exist — use full INSERT
+                        PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                        INSERT INTO releases
+                        (app_name, platform, version, build_number, status, artifact_path, git_branch, git_commit, build_duration, release_channel, environment)
+                        VALUES
+                        ('$APP_NAME', '$PLATFORM', '$APP_VERSION', '$BUILD_NUMBER', 'SUCCESS', '$ARTIFACT', '$BRANCH_NAME', '$GIT_COMMIT', '$BUILD_DURATION', '$RELEASE_CHANNEL', '$ENVIRONMENT');
+                        "
+                    else
+                        # New columns don't exist — use fallback INSERT without them
+                        echo "WARNING: New columns (build_duration, release_channel, environment) not found. Using fallback INSERT."
+                        PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                        INSERT INTO releases
+                        (app_name, platform, version, build_number, status, artifact_path, git_branch, git_commit)
+                        VALUES
+                        ('$APP_NAME', '$PLATFORM', '$APP_VERSION', '$BUILD_NUMBER', 'SUCCESS', '$ARTIFACT', '$BRANCH_NAME', '$GIT_COMMIT');
+                        "
+                    fi
                     '''
                 }
             }
