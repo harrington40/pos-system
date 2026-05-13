@@ -141,12 +141,47 @@ pipeline {
                 withCredentials([string(credentialsId: 'jenkins-release-db-password', variable: 'DB_PASS')]) {
                     sh '''
                     # --- Auto-migration: ensure new columns exist ---
-                    for col in "build_duration VARCHAR(20) DEFAULT ''" "release_channel VARCHAR(50) DEFAULT 'stable'" "environment VARCHAR(50) DEFAULT 'production'"; do
-                        col_name=$(echo "$col" | awk '{print $1}')
-                        PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
-                            ALTER TABLE releases ADD COLUMN IF NOT EXISTS $col;
-                        " 2>/dev/null || true
-                    done
+                    # Uses information_schema.columns for PostgreSQL < 9.6 compatibility
+                    # Each column is a separate DO block to avoid dynamic SQL quoting issues
+
+                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                    DO \$\$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name='releases' AND column_name='build_duration'
+                        ) THEN
+                            ALTER TABLE releases ADD COLUMN build_duration VARCHAR(20) DEFAULT '';
+                        END IF;
+                    END
+                    \$\$;
+                    "
+
+                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                    DO \$\$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name='releases' AND column_name='release_channel'
+                        ) THEN
+                            ALTER TABLE releases ADD COLUMN release_channel VARCHAR(50) DEFAULT 'stable';
+                        END IF;
+                    END
+                    \$\$;
+                    "
+
+                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                    DO \$\$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name='releases' AND column_name='environment'
+                        ) THEN
+                            ALTER TABLE releases ADD COLUMN environment VARCHAR(50) DEFAULT 'production';
+                        END IF;
+                    END
+                    \$\$;
+                    "
 
                     ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
 
