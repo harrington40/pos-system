@@ -1,10 +1,20 @@
 pipeline {
     agent any
 
+    parameters {
+        string(name: 'APP_NAME', defaultValue: 'pos-system', description: 'Application name for release tracking')
+        choice(name: 'PLATFORM', choices: ['web', 'android', 'ios'], description: 'Target platform')
+        string(name: 'APP_VERSION', defaultValue: '1.0.0', description: 'Release version number')
+    }
+
     environment {
         NODE_VERSION = '20.x'
         BACKEND_DIR = 'backend'
         FRONTEND_DIR = 'frontend'
+        DB_HOST = 'localhost'
+        DB_NAME = 'app_releases'
+        DB_USER = 'jenkins_release'
+        DB_PASS = 'StrongPasswordHere'
     }
 
     stages {
@@ -87,6 +97,22 @@ pipeline {
                 success {
                     archiveArtifacts artifacts: 'frontend/android/app/build/outputs/apk/release/*.apk', fingerprint: true, allowEmptyArchive: true
                 }
+            }
+        }
+        stage('Save Release Record') {
+            steps {
+                sh '''
+                export PGPASSWORD="$DB_PASS"
+
+                ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
+
+                psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                INSERT INTO releases
+                (app_name, platform, version, build_number, status, artifact_path, git_branch, git_commit)
+                VALUES
+                ('$APP_NAME', '$PLATFORM', '$APP_VERSION', '$BUILD_NUMBER', 'SUCCESS', '$ARTIFACT', '$BRANCH_NAME', '$GIT_COMMIT');
+                "
+                '''
             }
         }
     }
