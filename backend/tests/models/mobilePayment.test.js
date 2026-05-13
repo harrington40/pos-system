@@ -69,6 +69,8 @@ describe('MobilePayment Model', () => {
 
     it('should enforce unique transactionRef', async () => {
       await MobilePayment.create(validPaymentData);
+      // Ensure the unique index is built before attempting duplicate
+      await MobilePayment.createIndexes();
       await expect(MobilePayment.create(validPaymentData)).rejects.toThrow();
     });
 

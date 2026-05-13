@@ -58,6 +58,8 @@ describe('Order Model', () => {
 
     it('should enforce unique receiptNumber', async () => {
       await Order.create(validOrderData);
+      // Ensure the unique index is built before attempting duplicate
+      await Order.createIndexes();
       await expect(Order.create(validOrderData)).rejects.toThrow();
     });
 

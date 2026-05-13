@@ -153,6 +153,8 @@ describe('Bill Model', () => {
   describe('Indexes', () => {
     it('should enforce unique billNumber', async () => {
       await Bill.create(validBillData);
+      // Ensure the unique index is built before attempting duplicate
+      await Bill.createIndexes();
       await expect(Bill.create(validBillData)).rejects.toThrow();
     });
   });

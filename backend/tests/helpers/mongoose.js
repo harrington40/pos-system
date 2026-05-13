@@ -20,10 +20,6 @@ async function connect() {
   }
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(uri);
-    // Ensure all indexes are created before tests run.
-    // In mongodb-memory-server, indexes are built asynchronously,
-    // so we must wait for them to avoid unique constraint test failures.
-    await mongoose.connection.syncIndexes();
   }
 }
 
