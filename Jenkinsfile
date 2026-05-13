@@ -107,6 +107,18 @@ pipeline {
                     npx expo prebuild --platform android --clean 2>&1 || echo "Expo prebuild skipped"
                     '''
                     sh '''
+                    # Source nvm and set PATH so Gradle's createBundleReleaseJsAndAssets
+                    # uses Node.js 20 instead of the system Node.js 18
+                    export NVM_DIR="$HOME/.nvm"
+                    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
+                    # Prepend nvm's Node.js 20 bin directory to PATH so that when Gradle
+                    # spawns 'node' for createBundleReleaseJsAndAssets, it finds v20
+                    NVM_BIN="$(which node 2>/dev/null || true)"
+                    if [ -n "$NVM_BIN" ]; then
+                        NVM_BIN_DIR="$(dirname "$NVM_BIN")"
+                        export PATH="$NVM_BIN_DIR:$PATH"
+                    fi
+                    node --version
                     cd android
                     if [ -f gradlew ]; then
                         # Set Android SDK location from ANDROID_HOME
