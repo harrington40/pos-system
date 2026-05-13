@@ -1217,7 +1217,8 @@ DEOF
                                 [ "$env_name" = "staging" ] && env_icon="🧪"
                                 [ "$env_name" = "production" ] && env_icon="🚀"
 
-                                env_display=$(echo "$env_name" | sed 's/^./\u&/')
+                                # Capitalize first letter (use awk to avoid sed \u which confuses Groovy parser)
+                                env_display=$(echo "$env_name" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
 
                                 cat >> release-reports/deploy-dashboard.html << SWIMEOF
     <div class="swimlane env-${env_name}">
@@ -1288,7 +1289,8 @@ SWIMEOF
                                 env_icon="🛠"
                                 [ "$env_name" = "staging" ] && env_icon="🧪"
                                 [ "$env_name" = "production" ] && env_icon="🚀"
-                                env_display=$(echo "$env_name" | sed 's/^./\u&/')
+                                # Capitalize first letter (use awk to avoid sed \u which confuses Groovy parser)
+                                env_display=$(echo "$env_name" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
                                 cat >> release-reports/deploy-dashboard.html << SWIMEOF
     <div class="swimlane env-${env_name}">
       <div class="swimlane-header">
