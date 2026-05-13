@@ -832,6 +832,653 @@ HTMLEOF
                 }
             }
         }
+        stage('Publish Deploy Dashboard') {
+            steps {
+                withCredentials([string(credentialsId: 'jenkins-release-db-password', variable: 'DB_PASS')]) {
+                    dir("${BACKEND_DIR}") {
+                        sh '''
+                        mkdir -p release-reports
+
+                        # Query deployment data — latest release per environment per platform
+                        PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -A -F"," -c "
+                        SELECT DISTINCT ON (environment, platform)
+                            id, app_name, platform, version, build_number, status, git_branch, git_commit, created_at, build_duration, release_channel, environment
+                        FROM releases
+                        WHERE environment IN ('development','staging','production')
+                        ORDER BY environment, platform, created_at DESC;
+                        " > release-reports/deploy-dashboard.csv 2>/dev/null || echo "Dashboard CSV export skipped"
+
+                        # Also get all releases for history view
+                        PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -A -F"," -c "
+                        SELECT id, app_name, platform, version, build_number, status, environment, created_at, build_duration, release_channel
+                        FROM releases
+                        ORDER BY created_at DESC
+                        LIMIT 30;
+                        " > release-reports/deploy-history.csv 2>/dev/null || echo "History CSV export skipped"
+
+                        # Generate Deploy Dashboard HTML
+                        cat > release-reports/deploy-dashboard.html << 'DEOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deploy Dashboard - POS System</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    min-height: 100vh;
+    padding: 40px 20px;
+    color: #e0e0e0;
+  }
+  .container {
+    max-width: 1300px;
+    margin: 0 auto;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 40px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 35px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header .badge {
+    background: rgba(0,210,255,0.15);
+    color: #00d2ff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid rgba(0,210,255,0.3);
+  }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  /* ---- Environment Swimlanes ---- */
+  .swimlanes { display: flex; flex-direction: column; gap: 20px; margin-bottom: 40px; }
+  .swimlane {
+    background: rgba(255,255,255,0.04);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .swimlane::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+  }
+  .swimlane.env-production::before { background: linear-gradient(90deg, #e91e63, #f06292); }
+  .swimlane.env-staging::before { background: linear-gradient(90deg, #ffc107, #ffd54f); }
+  .swimlane.env-development::before { background: linear-gradient(90deg, #607d8b, #90a4ae); }
+  .swimlane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .swimlane-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .swimlane-title h2 { font-size: 20px; font-weight: 700; color: #fff; }
+  .swimlane-title .env-icon { font-size: 24px; }
+  .swimlane-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .deploy-card {
+    background: rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .deploy-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  }
+  .deploy-card .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .deploy-card .platform-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .deploy-card .version-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .deploy-card .card-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    color: #999;
+  }
+  .deploy-card .card-details span { display: flex; align-items: center; gap: 3px; }
+  .deploy-card .empty-card {
+    color: #555;
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+  }
+
+  /* ---- Pipeline Flow Diagram ---- */
+  .pipeline-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    background: rgba(255,255,255,0.03);
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .pipeline-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 20px;
+    position: relative;
+  }
+  .pipeline-step .step-icon { font-size: 28px; }
+  .pipeline-step .step-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+  }
+  .pipeline-step .step-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e0e0e0;
+  }
+  .pipeline-step.active .step-value { color: #00d2ff; }
+  .pipeline-arrow {
+    font-size: 20px;
+    color: #555;
+    padding: 0 4px;
+  }
+  .pipeline-step.completed .step-icon { opacity: 1; }
+  .pipeline-step.completed .step-label { color: #00c853; }
+  .pipeline-step.current .step-icon { animation: pulse 1.5s infinite; }
+  .pipeline-step.current .step-label { color: #00d2ff; }
+  .pipeline-step.pending .step-icon { opacity: 0.4; }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+  }
+
+  /* ---- Release History Table ---- */
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .table-wrapper {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(15,12,41,0.97);
+    backdrop-filter: blur(10px);
+    padding: 14px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #00d2ff;
+    border-bottom: 2px solid rgba(0,210,255,0.2);
+    white-space: nowrap;
+  }
+  td {
+    padding: 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.03);
+    color: #c0c0c0;
+    vertical-align: middle;
+  }
+  td:last-child { border-right: none; }
+  tr:hover td { background: rgba(255,255,255,0.04); }
+  table, th, td { border: 1px solid rgba(255,255,255,0.06); }
+  thead th { border-bottom: 2px solid rgba(0,210,255,0.25); }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .status-success { background: rgba(0,200,83,0.15); color: #00c853; border: 1px solid rgba(0,200,83,0.3); }
+  .status-failed { background: rgba(255,82,82,0.15); color: #ff5252; border: 1px solid rgba(255,82,82,0.3); }
+
+  .env-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .env-production { background: rgba(233,30,99,0.15); color: #f06292; border: 1px solid rgba(233,30,99,0.2); }
+  .env-staging { background: rgba(255,193,7,0.15); color: #ffd54f; border: 1px solid rgba(255,193,7,0.2); }
+  .env-development { background: rgba(96,125,139,0.15); color: #90a4ae; border: 1px solid rgba(96,125,139,0.2); }
+
+  .channel-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .channel-production { background: rgba(0,200,83,0.15); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
+  .channel-stable { background: rgba(33,150,243,0.15); color: #64b5f6; border: 1px solid rgba(33,150,243,0.2); }
+  .channel-rc { background: rgba(255,152,0,0.15); color: #ffb74d; border: 1px solid rgba(255,152,0,0.2); }
+  .channel-beta { background: rgba(156,39,176,0.15); color: #ce93d8; border: 1px solid rgba(156,39,176,0.2); }
+  .channel-dev { background: rgba(255,87,34,0.15); color: #ff8a65; border: 1px solid rgba(255,87,34,0.2); }
+
+  .footer {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: #555;
+  }
+
+  @media (max-width: 768px) {
+    body { padding: 20px 10px; }
+    .container { padding: 20px; }
+    .header { flex-direction: column; align-items: flex-start; }
+    .header h1 { font-size: 22px; }
+    .swimlane-cards { grid-template-columns: 1fr; }
+    .pipeline-flow { flex-direction: column; }
+    .pipeline-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>🚀 Deploy Dashboard</h1>
+      <span class="badge">POS System</span>
+    </div>
+    <div class="header-right">
+      <span class="badge" id="envCount">0 environments</span>
+    </div>
+  </div>
+
+  <!-- Pipeline Flow -->
+  <div class="pipeline-flow" id="pipelineFlow">
+    <div class="pipeline-step completed">
+      <span class="step-icon">✅</span>
+      <span class="step-label">Build</span>
+      <span class="step-value">Complete</span>
+    </div>
+    <span class="pipeline-arrow">→</span>
+    <div class="pipeline-step" id="stepDev">
+      <span class="step-icon">🛠</span>
+      <span class="step-label">Development</span>
+      <span class="step-value" id="stepDevVal">—</span>
+    </div>
+    <span class="pipeline-arrow">→</span>
+    <div class="pipeline-step" id="stepStaging">
+      <span class="step-icon">🧪</span>
+      <span class="step-label">Staging</span>
+      <span class="step-value" id="stepStagingVal">—</span>
+    </div>
+    <span class="pipeline-arrow">→</span>
+    <div class="pipeline-step" id="stepProduction">
+      <span class="step-icon">🚀</span>
+      <span class="step-label">Production</span>
+      <span class="step-value" id="stepProdVal">—</span>
+    </div>
+  </div>
+
+  <!-- Environment Swimlanes -->
+  <div class="swimlanes" id="swimlanes">
+DEOF
+
+                        # Generate environment swimlanes from CSV
+                        if [ -f release-reports/deploy-dashboard.csv ]; then
+                            # Group by environment
+                            for env_name in "development" "staging" "production"; do
+                                env_icon="🛠"
+                                [ "$env_name" = "staging" ] && env_icon="🧪"
+                                [ "$env_name" = "production" ] && env_icon="🚀"
+
+                                env_display=$(echo "$env_name" | sed 's/^./\u&/')
+
+                                cat >> release-reports/deploy-dashboard.html << SWIMEOF
+    <div class="swimlane env-${env_name}">
+      <div class="swimlane-header">
+        <div class="swimlane-title">
+          <span class="env-icon">${env_icon}</span>
+          <h2>${env_display}</h2>
+        </div>
+        <span class="env-tag env-${env_name}">${env_name}</span>
+      </div>
+      <div class="swimlane-cards">
+SWIMEOF
+
+                                # Filter rows for this environment
+                                grep -i ",${env_name}$" release-reports/deploy-dashboard.csv | while IFS=',' read -r id app platform version build status branch commit created duration channel env; do
+                                    id=$(echo "$id" | tr -d '"')
+                                    app=$(echo "$app" | tr -d '"')
+                                    platform=$(echo "$platform" | tr -d '"')
+                                    version=$(echo "$version" | tr -d '"')
+                                    build=$(echo "$build" | tr -d '"')
+                                    status=$(echo "$status" | tr -d '"')
+                                    branch=$(echo "$branch" | tr -d '"')
+                                    commit_short=$(echo "$commit" | tr -d '"' | head -c 8)
+                                    created=$(echo "$created" | tr -d '"' | head -c 10)
+                                    duration=$(echo "$duration" | tr -d '"')
+                                    channel=$(echo "$channel" | tr -d '"')
+                                    env=$(echo "$env" | tr -d '"')
+
+                                    [ -z "$channel" ] && channel="stable"
+                                    [ -z "$duration" ] && duration="-"
+
+                                    plat_icon="🌐"
+                                    [ "$platform" = "android" ] && plat_icon="📱"
+                                    [ "$platform" = "ios" ] && plat_icon="🍎"
+
+                                    status_dot="✅"
+                                    echo "$status" | grep -qi "fail" && status_dot="❌"
+
+                                    channel_class="channel-${channel}"
+
+                                    cat >> release-reports/deploy-dashboard.html << CARDEOF
+        <div class="deploy-card">
+          <div class="card-top">
+            <span class="platform-badge">${plat_icon} ${platform}</span>
+            <span class="status-badge status-$(echo "$status" | tr '[:upper:]' '[:lower:]')">${status_dot}</span>
+          </div>
+          <div class="version-text">v${version}</div>
+          <div class="card-details">
+            <span>🔢 #${build}</span>
+            <span>📂 <span class="channel-tag ${channel_class}">${channel}</span></span>
+            <span>🌿 ${branch}</span>
+            <span>📅 ${created}</span>
+            <span>⏱ ${duration}</span>
+          </div>
+        </div>
+CARDEOF
+                                done
+
+                                # Close swimlane
+                                cat >> release-reports/deploy-dashboard.html << SWIMEOF
+      </div>
+    </div>
+SWIMEOF
+                            done
+                        else
+                            # No data — show empty swimlanes
+                            for env_name in "development" "staging" "production"; do
+                                env_icon="🛠"
+                                [ "$env_name" = "staging" ] && env_icon="🧪"
+                                [ "$env_name" = "production" ] && env_icon="🚀"
+                                env_display=$(echo "$env_name" | sed 's/^./\u&/')
+                                cat >> release-reports/deploy-dashboard.html << SWIMEOF
+    <div class="swimlane env-${env_name}">
+      <div class="swimlane-header">
+        <div class="swimlane-title">
+          <span class="env-icon">${env_icon}</span>
+          <h2>${env_display}</h2>
+        </div>
+        <span class="env-tag env-${env_name}">${env_name}</span>
+      </div>
+      <div class="swimlane-cards">
+        <div class="deploy-card">
+          <div class="empty-card">No releases deployed yet</div>
+        </div>
+      </div>
+    </div>
+SWIMEOF
+                            done
+                        fi
+
+                        # Release History Table section
+                        cat >> release-reports/deploy-dashboard.html << 'DEOF'
+  </div>
+
+  <div class="section-title">📋 Recent Release Activity</div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>App</th>
+          <th>Platform</th>
+          <th>Version</th>
+          <th>Build</th>
+          <th>Channel</th>
+          <th>Environment</th>
+          <th>Status</th>
+          <th>Duration</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+DEOF
+
+                        # Generate history table rows
+                        if [ -f release-reports/deploy-history.csv ]; then
+                            tail -n +2 release-reports/deploy-history.csv | while IFS=',' read -r id app platform version build status env created duration channel; do
+                                id=$(echo "$id" | tr -d '"')
+                                app=$(echo "$app" | tr -d '"')
+                                platform=$(echo "$platform" | tr -d '"')
+                                version=$(echo "$version" | tr -d '"')
+                                build=$(echo "$build" | tr -d '"')
+                                status=$(echo "$status" | tr -d '"')
+                                env=$(echo "$env" | tr -d '"')
+                                created=$(echo "$created" | tr -d '"' | head -c 10)
+                                duration=$(echo "$duration" | tr -d '"')
+                                channel=$(echo "$channel" | tr -d '"')
+
+                                [ -z "$channel" ] && channel="stable"
+                                [ -z "$duration" ] && duration="-"
+                                [ -z "$env" ] && env="staging"
+
+                                plat_icon="🌐"
+                                [ "$platform" = "android" ] && plat_icon="📱"
+                                [ "$platform" = "ios" ] && plat_icon="🍎"
+
+                                status_dot="✅"
+                                echo "$status" | grep -qi "fail" && status_dot="❌"
+
+                                status_class="status-success"
+                                echo "$status" | grep -qi "fail" && status_class="status-failed"
+
+                                env_class="env-${env}"
+                                channel_class="channel-${channel}"
+
+                                cat >> release-reports/deploy-dashboard.html << ROWEOF
+        <tr>
+          <td>${id}</td>
+          <td><strong>${app}</strong></td>
+          <td>${plat_icon} ${platform}</td>
+          <td><strong style="color:#fff;">${version}</strong></td>
+          <td>#${build}</td>
+          <td><span class="channel-tag ${channel_class}">${channel}</span></td>
+          <td><span class="env-tag ${env_class}">${env}</span></td>
+          <td><span class="status-badge ${status_class}">${status_dot} ${status}</span></td>
+          <td>${duration}</td>
+          <td>${created}</td>
+        </tr>
+ROWEOF
+                            done
+                        else
+                            cat >> release-reports/deploy-dashboard.html << 'EMPTYEOF'
+        <tr>
+          <td colspan="10" style="text-align:center;padding:40px;color:#666;">
+            <h2 style="font-size:18px;margin-bottom:8px;color:#888;">No releases recorded yet</h2>
+            <p>Releases will appear here after the pipeline runs successfully.</p>
+          </td>
+        </tr>
+EMPTYEOF
+                        fi
+
+                        # Close HTML
+                        cat >> release-reports/deploy-dashboard.html << 'DEOF'
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <span>Generated by Jenkins Pipeline &bull; POS System &bull; Deploy Dashboard</span>
+    <span class="pipeline-info">Build <strong>${BUILD_NUMBER}</strong> &bull; <span id="genTime"></span></span>
+  </div>
+</div>
+
+<script>
+// Set generation timestamp
+document.getElementById('genTime').textContent = new Date().toISOString().replace('T', ' ').substr(0, 19);
+
+// Update pipeline flow with data from swimlane cards
+(function() {
+  // Check which environments have cards
+  const swimlanes = document.querySelectorAll('.swimlane');
+  let envCount = 0;
+  swimlanes.forEach(function(sl) {
+    const cards = sl.querySelectorAll('.deploy-card');
+    const hasData = cards.length > 0 && !sl.querySelector('.empty-card');
+    if (hasData) envCount++;
+  });
+  document.getElementById('envCount').textContent = envCount + ' environments';
+
+  // Try to get latest version per environment from cards
+  const devCards = document.querySelector('.swimlane.env-development')?.querySelectorAll('.deploy-card');
+  const stagingCards = document.querySelector('.swimlane.env-staging')?.querySelectorAll('.deploy-card');
+  const prodCards = document.querySelector('.swimlane.env-production')?.querySelectorAll('.deploy-card');
+
+  function getLatestVersion(cards) {
+    if (!cards || cards.length === 0) return null;
+    const firstCard = cards[0];
+    if (firstCard.querySelector('.empty-card')) return null;
+    const verEl = firstCard.querySelector('.version-text');
+    return verEl ? verEl.textContent.trim() : null;
+  }
+
+  const devVer = getLatestVersion(devCards);
+  const stagingVer = getLatestVersion(stagingCards);
+  const prodVer = getLatestVersion(prodCards);
+
+  if (devVer) {
+    document.getElementById('stepDevVal').textContent = devVer;
+    document.getElementById('stepDev').classList.add('completed');
+  } else {
+    document.getElementById('stepDev').classList.add('pending');
+  }
+
+  if (stagingVer) {
+    document.getElementById('stepStagingVal').textContent = stagingVer;
+    document.getElementById('stepStaging').classList.add('completed');
+  } else {
+    document.getElementById('stepStaging').classList.add('pending');
+  }
+
+  if (prodVer) {
+    document.getElementById('stepProdVal').textContent = prodVer;
+    document.getElementById('stepProduction').classList.add('completed');
+  } else {
+    document.getElementById('stepProduction').classList.add('pending');
+  }
+
+  // Mark current stage (the furthest along with data)
+  if (prodVer) {
+    document.getElementById('stepProduction').classList.add('current');
+  } else if (stagingVer) {
+    document.getElementById('stepStaging').classList.add('current');
+  } else if (devVer) {
+    document.getElementById('stepDev').classList.add('current');
+  }
+})();
+</script>
+</body>
+</html>
+DEOF
+
+                        echo "Deploy Dashboard generated successfully"
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'backend/release-reports',
+                        reportFiles: 'deploy-dashboard.html',
+                        reportName: 'Deploy Dashboard'
+                    ])
+                }
+            }
+        }
     }
 
     post {
