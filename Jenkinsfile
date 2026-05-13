@@ -14,6 +14,7 @@ pipeline {
         DB_HOST = 'localhost'
         DB_NAME = 'app_releases'
         DB_USER = 'jenkins_release'
+        NVM_DIR = "${env.HOME}/.nvm"
     }
 
     stages {
@@ -34,7 +35,11 @@ pipeline {
         stage('Install Frontend Dependencies') {
             steps {
                 dir("${FRONTEND_DIR}") {
-                    sh 'npm ci'
+                    sh '''
+                    export NVM_DIR="$HOME/.nvm"
+                    [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
+                    npm ci
+                    '''
                 }
             }
         }
@@ -72,7 +77,13 @@ pipeline {
         stage('Build Frontend (Web)') {
             steps {
                 dir("${FRONTEND_DIR}") {
-                    sh 'npx expo export --platform web 2>&1 || echo "Frontend web build skipped (Expo export requires interactive terminal)"'
+                    sh '''
+                    # Use Node.js 20 if available via nvm
+                    export NVM_DIR="$HOME/.nvm"
+                    [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
+                    node --version
+                    npx expo export --platform web 2>&1 || echo "Frontend web build skipped"
+                    '''
                 }
             }
             post {
@@ -84,12 +95,28 @@ pipeline {
 
         stage('Build Android APK') {
             environment {
-                ANDROID_HOME = "${env.ANDROID_HOME ?: '/usr/lib/android-sdk'}"
+                ANDROID_HOME = "${env.ANDROID_HOME ?: '/root/Android/Sdk'}"
             }
             steps {
                 dir("${FRONTEND_DIR}") {
-                    sh 'npx expo prebuild --platform android --clean 2>&1 || echo "Expo prebuild skipped"'
-                    sh 'cd android && if [ -f gradlew ]; then chmod +x gradlew && ./gradlew assembleRelease 2>&1 || echo "Gradle build failed"; else echo "Android project not generated"; fi'
+                    sh '''
+                    # Use Node.js 20 if available via nvm
+                    export NVM_DIR="$HOME/.nvm"
+                    [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh" && nvm use 20 2>/dev/null || true
+                    node --version
+                    npx expo prebuild --platform android --clean 2>&1 || echo "Expo prebuild skipped"
+                    '''
+                    sh '''
+                    cd android
+                    if [ -f gradlew ]; then
+                        # Set Android SDK location from ANDROID_HOME
+                        echo "sdk.dir=${ANDROID_HOME}" > local.properties
+                        chmod +x gradlew
+                        ./gradlew assembleRelease 2>&1 || echo "Gradle build failed"
+                    else
+                        echo "Android project not generated"
+                    fi
+                    '''
                 }
             }
             post {
