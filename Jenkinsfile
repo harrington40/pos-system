@@ -140,6 +140,14 @@ pipeline {
                 }
                 withCredentials([string(credentialsId: 'jenkins-release-db-password', variable: 'DB_PASS')]) {
                     sh '''
+                    # --- Auto-migration: ensure new columns exist ---
+                    for col in "build_duration VARCHAR(20) DEFAULT ''" "release_channel VARCHAR(50) DEFAULT 'stable'" "environment VARCHAR(50) DEFAULT 'production'"; do
+                        col_name=$(echo "$col" | awk '{print $1}')
+                        PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
+                            ALTER TABLE releases ADD COLUMN IF NOT EXISTS $col;
+                        " 2>/dev/null || true
+                    done
+
                     ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
 
                     # Determine release channel based on branch
