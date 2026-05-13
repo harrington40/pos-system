@@ -141,47 +141,47 @@ pipeline {
                 withCredentials([string(credentialsId: 'jenkins-release-db-password', variable: 'DB_PASS')]) {
                     sh '''
                     # --- Auto-migration: ensure new columns exist ---
-                    # Uses information_schema.columns for PostgreSQL < 9.6 compatibility
-                    # Each column is a separate DO block to avoid dynamic SQL quoting issues
+                    # Uses information_schema.columns for PostgreSQL < 9.6 compatibility.
+                    # SQL is written to a temp file and executed via psql -f to avoid
+                    # shell interpretation of $$ (PID expansion) in DO blocks.
 
-                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
-                    DO \$\$
-                    BEGIN
-                        IF NOT EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name='releases' AND column_name='build_duration'
-                        ) THEN
-                            ALTER TABLE releases ADD COLUMN build_duration VARCHAR(20) DEFAULT '';
-                        END IF;
-                    END
-                    \$\$;
-                    "
+cat > /tmp/pos_migration.sql << 'SQLEOF'
+DO $migrate$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name='releases' AND column_name='build_duration'
+    ) THEN
+        ALTER TABLE releases ADD COLUMN build_duration VARCHAR(20) DEFAULT '';
+    END IF;
+END
+$migrate$;
 
-                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
-                    DO \$\$
-                    BEGIN
-                        IF NOT EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name='releases' AND column_name='release_channel'
-                        ) THEN
-                            ALTER TABLE releases ADD COLUMN release_channel VARCHAR(50) DEFAULT 'stable';
-                        END IF;
-                    END
-                    \$\$;
-                    "
+DO $migrate$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name='releases' AND column_name='release_channel'
+    ) THEN
+        ALTER TABLE releases ADD COLUMN release_channel VARCHAR(50) DEFAULT 'stable';
+    END IF;
+END
+$migrate$;
 
-                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "
-                    DO \$\$
-                    BEGIN
-                        IF NOT EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name='releases' AND column_name='environment'
-                        ) THEN
-                            ALTER TABLE releases ADD COLUMN environment VARCHAR(50) DEFAULT 'production';
-                        END IF;
-                    END
-                    \$\$;
-                    "
+DO $migrate$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name='releases' AND column_name='environment'
+    ) THEN
+        ALTER TABLE releases ADD COLUMN environment VARCHAR(50) DEFAULT 'production';
+    END IF;
+END
+$migrate$;
+SQLEOF
+
+                    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -f /tmp/pos_migration.sql
+                    rm -f /tmp/pos_migration.sql
 
                     ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
 
