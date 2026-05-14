@@ -88,7 +88,7 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'frontend/dist/**/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'frontend/dist/**/*', fingerprint: true
                 }
             }
         }
@@ -133,7 +133,7 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'frontend/android/app/build/outputs/apk/release/*.apk', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'frontend/android/app/build/outputs/apk/release/*.apk', fingerprint: true
                 }
             }
         }
