@@ -96,18 +96,34 @@ pipeline {
         stage('Package Artifacts') {
             steps {
                 script {
-                    // Install zip if not available
-                    sh 'which zip || apt-get update && apt-get install -y zip 2>/dev/null || true'
+                    // Ensure zip tool is available
+                    sh '''
+                    if ! command -v zip &>/dev/null; then
+                        echo "zip not found, attempting to install..."
+                        if command -v apt-get &>/dev/null; then
+                            apt-get update -qq && apt-get install -y -qq zip 2>&1 || true
+                        elif command -v yum &>/dev/null; then
+                            yum install -y zip 2>&1 || true
+                        elif command -v apk &>/dev/null; then
+                            apk add zip 2>&1 || true
+                        else
+                            echo "WARNING: Could not install zip. ZIP creation will fail."
+                        fi
+                    fi
+                    command -v zip && echo "zip is available" || echo "zip is NOT available"
+                    '''
+
+                    // Create build output directory at workspace root
+                    sh 'mkdir -p build'
 
                     // Create ZIP of web build
                     dir("${FRONTEND_DIR}") {
                         sh '''
                         if [ -d dist ] && [ "$(ls -A dist 2>/dev/null)" ]; then
                             echo "Creating web build ZIP..."
-                            cd dist
-                            zip -r ../../build/web-build-${BUILD_NUMBER}.zip . -x ".*" 2>&1 || echo "Web ZIP creation failed"
-                            cd ..
-                            ls -lh ../build/web-build-${BUILD_NUMBER}.zip 2>/dev/null || true
+                            mkdir -p ../../build
+                            (cd dist && zip -r ../../build/web-build-${BUILD_NUMBER}.zip . -x ".*") 2>&1 || echo "Web ZIP creation failed"
+                            ls -lh ../../build/web-build-${BUILD_NUMBER}.zip 2>/dev/null || true
                         else
                             echo "No web dist directory found, skipping web ZIP"
                         fi
@@ -121,9 +137,7 @@ pipeline {
                         if [ -d "$APK_DIR" ] && [ "$(ls -A "$APK_DIR"/*.apk 2>/dev/null)" ]; then
                             echo "Creating Android APK ZIP..."
                             mkdir -p ../../build
-                            cd "$APK_DIR"
-                            zip -j ../../../../../build/android-apk-${BUILD_NUMBER}.zip *.apk 2>&1 || echo "Android APK ZIP creation failed"
-                            cd ../../../..
+                            (cd "$APK_DIR" && zip -j ../../../../build/android-apk-${BUILD_NUMBER}.zip *.apk) 2>&1 || echo "Android APK ZIP creation failed"
                             ls -lh ../../build/android-apk-${BUILD_NUMBER}.zip 2>/dev/null || true
                         else
                             echo "No APK files found, skipping Android ZIP"
@@ -134,9 +148,7 @@ pipeline {
                     // Create combined release ZIP with all artifacts
                     dir("${FRONTEND_DIR}") {
                         sh '''
-                        mkdir -p ../../build
                         echo "Creating combined release ZIP..."
-                        # Collect all artifacts into a staging directory
                         RELEASE_DIR="../../build/release-${BUILD_NUMBER}"
                         mkdir -p "$RELEASE_DIR"
 
@@ -152,12 +164,10 @@ pipeline {
                             cp "$APK_DIR"/*.apk "$RELEASE_DIR/android/" 2>/dev/null || true
                         fi
 
-                        # Create the combined ZIP
-                        cd ../../build
-                        zip -r "release-${BUILD_NUMBER}.zip" "release-${BUILD_NUMBER}" 2>&1 || echo "Combined release ZIP creation failed"
-                        rm -rf "release-${BUILD_NUMBER}"
-                        ls -lh "release-${BUILD_NUMBER}.zip" 2>/dev/null || true
-                        cd "${FRONTEND_DIR}"
+                        # Create the combined ZIP from the build directory
+                        (cd ../../build && zip -r "release-${BUILD_NUMBER}.zip" "release-${BUILD_NUMBER}") 2>&1 || echo "Combined release ZIP creation failed"
+                        rm -rf "$RELEASE_DIR"
+                        ls -lh ../../build/release-${BUILD_NUMBER}.zip 2>/dev/null || true
                         '''
                     }
                 }
