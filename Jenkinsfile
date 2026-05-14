@@ -93,6 +93,83 @@ pipeline {
             }
         }
 
+        stage('Package Artifacts') {
+            steps {
+                script {
+                    // Install zip if not available
+                    sh 'which zip || apt-get update && apt-get install -y zip 2>/dev/null || true'
+
+                    // Create ZIP of web build
+                    dir("${FRONTEND_DIR}") {
+                        sh '''
+                        if [ -d dist ] && [ "$(ls -A dist 2>/dev/null)" ]; then
+                            echo "Creating web build ZIP..."
+                            cd dist
+                            zip -r ../../build/web-build-${BUILD_NUMBER}.zip . -x ".*" 2>&1 || echo "Web ZIP creation failed"
+                            cd ..
+                            ls -lh ../build/web-build-${BUILD_NUMBER}.zip 2>/dev/null || true
+                        else
+                            echo "No web dist directory found, skipping web ZIP"
+                        fi
+                        '''
+                    }
+
+                    // Create ZIP of Android APK
+                    dir("${FRONTEND_DIR}") {
+                        sh '''
+                        APK_DIR="android/app/build/outputs/apk/release"
+                        if [ -d "$APK_DIR" ] && [ "$(ls -A "$APK_DIR"/*.apk 2>/dev/null)" ]; then
+                            echo "Creating Android APK ZIP..."
+                            mkdir -p ../../build
+                            cd "$APK_DIR"
+                            zip -j ../../../../../build/android-apk-${BUILD_NUMBER}.zip *.apk 2>&1 || echo "Android APK ZIP creation failed"
+                            cd ../../../..
+                            ls -lh ../../build/android-apk-${BUILD_NUMBER}.zip 2>/dev/null || true
+                        else
+                            echo "No APK files found, skipping Android ZIP"
+                        fi
+                        '''
+                    }
+
+                    // Create combined release ZIP with all artifacts
+                    dir("${FRONTEND_DIR}") {
+                        sh '''
+                        mkdir -p ../../build
+                        echo "Creating combined release ZIP..."
+                        # Collect all artifacts into a staging directory
+                        RELEASE_DIR="../../build/release-${BUILD_NUMBER}"
+                        mkdir -p "$RELEASE_DIR"
+
+                        # Copy web build if exists
+                        if [ -d dist ] && [ "$(ls -A dist 2>/dev/null)" ]; then
+                            cp -r dist "$RELEASE_DIR/web" 2>/dev/null || true
+                        fi
+
+                        # Copy APK if exists
+                        APK_DIR="android/app/build/outputs/apk/release"
+                        if [ -d "$APK_DIR" ] && [ "$(ls -A "$APK_DIR"/*.apk 2>/dev/null)" ]; then
+                            mkdir -p "$RELEASE_DIR/android"
+                            cp "$APK_DIR"/*.apk "$RELEASE_DIR/android/" 2>/dev/null || true
+                        fi
+
+                        # Create the combined ZIP
+                        cd ../../build
+                        zip -r "release-${BUILD_NUMBER}.zip" "release-${BUILD_NUMBER}" 2>&1 || echo "Combined release ZIP creation failed"
+                        rm -rf "release-${BUILD_NUMBER}"
+                        ls -lh "release-${BUILD_NUMBER}.zip" 2>/dev/null || true
+                        cd "${FRONTEND_DIR}"
+                        '''
+                    }
+                }
+            }
+            post {
+                success {
+                    // Archive the ZIP files
+                    archiveArtifacts artifacts: 'build/*.zip', fingerprint: true
+                }
+            }
+        }
+
         stage('Build Android APK') {
             environment {
                 ANDROID_HOME = "${env.ANDROID_HOME ?: '/root/android-sdk'}"
@@ -197,7 +274,16 @@ SQLEOF
                     PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -f /tmp/pos_migration.sql 2>&1 || echo "WARNING: Auto-migration ALTER TABLE failed (jenkins_release is not table owner). Columns may need to be added manually."
                     rm -f /tmp/pos_migration.sql
 
-                    ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
+                    # Use the combined release ZIP if it exists, otherwise fall back to platform-specific ZIP
+                    if [ -f "build/release-${BUILD_NUMBER}.zip" ]; then
+                        ARTIFACT="build/release-${BUILD_NUMBER}.zip"
+                    elif [ -f "build/web-build-${BUILD_NUMBER}.zip" ]; then
+                        ARTIFACT="build/web-build-${BUILD_NUMBER}.zip"
+                    elif [ -f "build/android-apk-${BUILD_NUMBER}.zip" ]; then
+                        ARTIFACT="build/android-apk-${BUILD_NUMBER}.zip"
+                    else
+                        ARTIFACT="build/${APP_NAME}-${PLATFORM}-${APP_VERSION}.zip"
+                    fi
 
                     # Determine release channel based on branch
                     RELEASE_CHANNEL="stable"
