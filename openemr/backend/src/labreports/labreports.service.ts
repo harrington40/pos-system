@@ -83,29 +83,52 @@ export class LabReportsService implements OnModuleInit {
     this.logger.log('Lab reports schema ready');
   }
 
+  /**
+   * Import the catalog from `LAB_CATALOG_SEED`.
+   *
+   * This used to DELETE every row that was not in the seed and then overwrite
+   * `ref_min` / `ref_max` / `ref_text` on every boot. That is how the reference
+   * ranges kept disappearing: any range that was not baked into the TypeScript
+   * seed — including anything entered against the running system — was silently
+   * wiped on the next restart or deploy.
+   *
+   * It is now additive: new seed rows are inserted, and existing rows only have
+   * their *structural* fields refreshed (name, category, unit, result type,
+   * options, display order, active). Reference ranges are written only when the
+   * row is new or has no range at all, so a range set in this file, or edited
+   * in-app, survives restarts. Rows are never deleted.
+   */
   private async seedCatalog(): Promise<void> {
-    // 1. Remove any stale catalog rows (tests from the deprecated seed) so the
-    //    catalog matches the MJ-MC paper form EXACTLY — no extra/legacy tests.
+    // 1. Drop only the stale rows created by the deprecated seed — i.e. rows
+    //    whose code matches the old MJ-nnn shape but is no longer in the seed.
+    //    Rows with other codes are left alone so nothing bespoke is destroyed.
     const codes = LAB_CATALOG_SEED.map((t) => t.code);
     if (codes.length > 0) {
       const placeholders = codes.map(() => '?').join(', ');
       await this.dataSource.query(
-        `DELETE FROM lab_test_catalog WHERE code NOT IN (${placeholders})`,
+        `DELETE FROM lab_test_catalog
+          WHERE code REGEXP '^MJ-[0-9]{3}$' AND code NOT IN (${placeholders})`,
         codes,
       );
     }
 
-    // 2. Upsert every test in the exact form order. display_order is a single
-    //    global sequence so the stored order reproduces the paper form.
+    // 2. Insert missing rows, refresh structural fields on the rest. The
+    //    COALESCE guard is what protects an existing reference range: if the
+    //    seed supplies no range the stored one is kept, and if the row already
+    //    has a range it is not overwritten.
     for (const t of LAB_CATALOG_SEED) {
       await this.dataSource.query(
         `INSERT INTO lab_test_catalog
           (code, name, category, unit, ref_min, ref_max, ref_text, result_type, options, display_order, active)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
          ON DUPLICATE KEY UPDATE
-           name = VALUES(name), category = VALUES(category), unit = VALUES(unit),
-           ref_min = VALUES(ref_min), ref_max = VALUES(ref_max), ref_text = VALUES(ref_text),
-           result_type = VALUES(result_type), options = VALUES(options), display_order = VALUES(display_order),
+           name = VALUES(name), category = VALUES(category),
+           unit = COALESCE(VALUES(unit), unit),
+           ref_min = COALESCE(ref_min, VALUES(ref_min)),
+           ref_max = COALESCE(ref_max, VALUES(ref_max)),
+           ref_text = COALESCE(NULLIF(ref_text, ''), VALUES(ref_text)),
+           result_type = VALUES(result_type), options = VALUES(options),
+           display_order = VALUES(display_order),
            active = 1`,
         [t.code, t.name, t.category, t.unit || null, t.refMin ?? null, t.refMax ?? null,
          t.refText || null, t.resultType, t.options || null, t.displayOrder],
@@ -126,6 +149,66 @@ export class LabReportsService implements OnModuleInit {
           `SELECT * FROM lab_test_catalog WHERE active = 1 ORDER BY display_order ASC, id ASC`,
         );
     return rows;
+  }
+
+  /**
+   * Edit a catalog test in place — used to maintain the "Normal Value" range
+   * shown on the result form. Only the fields present in the body are touched,
+   * and an explicit `null` clears a bound (so a range can be removed).
+   */
+  async updateCatalogTest(id: number, dto: any): Promise<any> {
+    const [existing] = await this.dataSource.query(
+      `SELECT id FROM lab_test_catalog WHERE id = ?`,
+      [id],
+    );
+    if (!existing) throw new NotFoundException(`Lab test ${id} not found`);
+
+    const sets: string[] = [];
+    const params: any[] = [];
+
+    const numeric = (v: any): number | null => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      if (Number.isNaN(n)) throw new BadRequestException(`"${v}" is not a number`);
+      return n;
+    };
+
+    if ('refMin' in dto) { sets.push('ref_min = ?'); params.push(numeric(dto.refMin)); }
+    if ('refMax' in dto) { sets.push('ref_max = ?'); params.push(numeric(dto.refMax)); }
+    if ('refText' in dto) {
+      sets.push('ref_text = ?');
+      params.push(dto.refText ? String(dto.refText).slice(0, 120) : null);
+    }
+    if ('unit' in dto) { sets.push('unit = ?'); params.push(dto.unit || null); }
+    if ('name' in dto) { sets.push('name = ?'); params.push(dto.name ? String(dto.name).slice(0, 120) : ''); }
+    if ('resultType' in dto) { sets.push('result_type = ?'); params.push(dto.resultType); }
+    if ('options' in dto) { sets.push('options = ?'); params.push(dto.options || null); }
+    if ('active' in dto) { sets.push('active = ?'); params.push(dto.active ? 1 : 0); }
+
+    if (!sets.length) throw new BadRequestException('No updatable fields supplied');
+
+    // A min above a max is almost always a slip and would flag everything HIGH.
+    const [current] = await this.dataSource.query(
+      `SELECT ref_min, ref_max FROM lab_test_catalog WHERE id = ?`,
+      [id],
+    );
+    const min = 'refMin' in dto ? numeric(dto.refMin) : current?.ref_min;
+    const max = 'refMax' in dto ? numeric(dto.refMax) : current?.ref_max;
+    if (min != null && max != null && Number(min) > Number(max)) {
+      throw new BadRequestException('Reference minimum cannot be greater than the maximum');
+    }
+
+    params.push(id);
+    await this.dataSource.query(
+      `UPDATE lab_test_catalog SET ${sets.join(', ')} WHERE id = ?`,
+      params,
+    );
+    const [row] = await this.dataSource.query(
+      `SELECT * FROM lab_test_catalog WHERE id = ?`,
+      [id],
+    );
+    this.logger.log(`Lab test ${id} updated (${sets.length} field(s))`);
+    return row;
   }
 
   /** Tests ordered for a patient (procedure_order.patient_instructions carries the test name). */

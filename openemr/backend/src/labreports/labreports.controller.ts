@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -14,6 +14,17 @@ export class LabReportsController {
   @Roles('admin', 'physician', 'nurse', 'lab_tech')
   getCatalog(@Query('category') category?: string) {
     return this.labReports.getCatalog(category);
+  }
+
+  /**
+   * Update a catalog test's reference range (and wording). Admin-only, so the
+   * thresholds can be maintained in the app instead of editing the seed and
+   * redeploying — the reseed no longer overwrites an existing range.
+   */
+  @Patch('lab/catalog/:id')
+  @Roles('admin')
+  updateCatalogTest(@Param('id') id: string, @Body() dto: any) {
+    return this.labReports.updateCatalogTest(+id, dto);
   }
 
   // ── Ordered tests for a patient ──────────────────────────────────

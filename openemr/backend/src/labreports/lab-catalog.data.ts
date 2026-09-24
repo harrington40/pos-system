@@ -10,6 +10,15 @@
  *
  * Fields with blanks on the paper form are modelled as result fields; values
  * shown in parentheses on the form are stored as the reference text.
+ *
+ * The `t(...)` arguments are `(name, category, resultType, unit?, refText?,
+ * refMin?, refMax?)`. Supplying numeric `refMin`/`refMax` — not just `refText` —
+ * is what lets the result form flag a value LOW/HIGH; `refText` alone only
+ * controls what the "Normal Value" column prints.
+ *
+ * The RESULT sheets (Blood Biochemistry, Complete Hemogram, serology, Urine
+ * Chemistry) carry extra measurements that never appeared on the request form;
+ * they are appended in the RESULT-SHEET PANELS block at the bottom.
  */
 
 export interface CatalogSeed {
@@ -75,11 +84,11 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   // ============================================================
   // HAEMATOLOGY/ IMMUNO-HAEMATOLOGY
   // ============================================================
-  t('HB Hemoglobin', HAEMATOLOGY, 'NUMERIC', 'g/dl'),
+  t('HB Hemoglobin', HAEMATOLOGY, 'NUMERIC', 'g/dl', '12.0 – 18.0', 12, 18),
   t('CBC Complete blood count', HAEMATOLOGY, 'TEXT'),
-  t('WBC white Blood Cells', HAEMATOLOGY, 'NUMERIC', 'x10^9/l'),
-  t('Malaria Smear', HAEMATOLOGY, 'TEXT'),
-  t('Sickle Cells Identification (rapid)', HAEMATOLOGY, 'TEXT'),
+  t('WBC white Blood Cells', HAEMATOLOGY, 'NUMERIC', 'x10^9/l', '4.0 – 10', 4, 10),
+  t('Malaria Smear', HAEMATOLOGY, 'TEXT', undefined, 'Negative'),
+  t('Sickle Cells Identification (rapid)', HAEMATOLOGY, 'TEXT', undefined, 'Negative'),
   t('ABO& Rh) Blood Group', HAEMATOLOGY, 'BLOOD_GROUP'),
   t('ESR', HAEMATOLOGY, 'NUMERIC', 'mm/hr'),
   t('Malaria RDT', HAEMATOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
@@ -88,23 +97,23 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   // IMMUNOLOGY & SEROLOGY
   // ============================================================
   t('Widal panel', IMMUNOLOGY, 'TEXT'),
-  t('Salmonella typhi O Ag', IMMUNOLOGY, 'TEXT'),
-  t('Salmonella typhi H Ag', IMMUNOLOGY, 'TEXT'),
+  t('Salmonella typhi O Ag', IMMUNOLOGY, 'TEXT', undefined, '1/100 Negative'),
+  t('Salmonella typhi H Ag', IMMUNOLOGY, 'TEXT', undefined, '1/100 Negative'),
   t('Salmonella typhi AO Ag', IMMUNOLOGY, 'TEXT'),
   t('Salmonella typhi BO Ag', IMMUNOLOGY, 'TEXT'),
   t('Salmonella typhi CH Ag', IMMUNOLOGY, 'TEXT'),
   t('Salmonella typhi AH Ag', IMMUNOLOGY, 'TEXT'),
-  t('Syphilis', IMMUNOLOGY, 'POSITIVE_NEGATIVE'),
+  t('Syphilis', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
   t('Chlamydia (Ag) Swab', IMMUNOLOGY, 'TEXT'),
   t('Filariasis (IgG+IgM)', IMMUNOLOGY, 'TEXT'),
-  t('Helicobacter pylori (IgG+IgM)', IMMUNOLOGY, 'TEXT'),
-  t('Hepatitis B Virus (screening)', IMMUNOLOGY, 'TEXT'),
+  t('Helicobacter pylori (IgG+IgM)', IMMUNOLOGY, 'TEXT', undefined, 'Negative'),
+  t('Hepatitis B Virus (screening)', IMMUNOLOGY, 'TEXT', undefined, 'Negative'),
   t('HBsAg', IMMUNOLOGY, 'TEXT'),
   t('HBsAb', IMMUNOLOGY, 'TEXT'),
   t('HBcAb', IMMUNOLOGY, 'TEXT'),
   t('HBeAb', IMMUNOLOGY, 'TEXT'),
   t('HBeAg', IMMUNOLOGY, 'TEXT'),
-  t('Hepatitis C Virus (IgM+IgG)', IMMUNOLOGY, 'TEXT'),
+  t('Hepatitis C Virus (IgM+IgG)', IMMUNOLOGY, 'TEXT', undefined, 'Negative'),
   t('Human Immunodeficiency Virus (HIV1+2)', IMMUNOLOGY, 'TEXT'),
   t('Determine', IMMUNOLOGY, 'TEXT'),
   t('SD Bioline', IMMUNOLOGY, 'TEXT'),
@@ -113,17 +122,18 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   // ============================================================
   // BIOCHEMISTRY — GLUCOSE METABOLISM/DIABETES
   // ============================================================
-  t('Fasting Blood Glucose', BIO_GLUCOSE, 'NUMERIC', 'mg/dl'),
-  t('Random Blood Glucose', BIO_GLUCOSE, 'NUMERIC', 'mg/dl'),
+  t('Fasting Blood Glucose', BIO_GLUCOSE, 'NUMERIC', 'mg/dl', '70 – 110', 70, 110),
+  t('Random Blood Glucose', BIO_GLUCOSE, 'NUMERIC', 'mg/dl', '70 – 140', 70, 140),
   t('HbA1c', BIO_GLUCOSE, 'TEXT'),
   t('OGTT', BIO_GLUCOSE, 'TEXT'),
   t('LH', BIO_GLUCOSE, 'TEXT'),
 
   // BIOCHEMISTRY — LIPID METABOLISM PANEL
-  t('Cholesterol', BIO_LIPID, 'NUMERIC'),
-  t('Triglycerides', BIO_LIPID, 'NUMERIC'),
-  t('HDL Cholesterol', BIO_LIPID, 'NUMERIC'),
-  t('LDL Cholesterol', BIO_LIPID, 'NUMERIC'),
+  t('Cholesterol', BIO_LIPID, 'NUMERIC', 'mg/dl', '130 – 200', 130, 200),
+  t('Triglycerides', BIO_LIPID, 'NUMERIC', 'mg/dl', '60 – 170', 60, 170),
+  t('HDL Cholesterol', BIO_LIPID, 'NUMERIC', 'mg/dl', '40 – 60', 40, 60),
+  // The form prints a bare "100mg/dl"; read as a ceiling so a high LDL flags.
+  t('LDL Cholesterol', BIO_LIPID, 'NUMERIC', 'mg/dl', '≤ 100', null, 100),
 
   // BIOCHEMISTRY — HEART DISEASE PANEL
   t('CK & CK-MB', BIO_HEART, 'TEXT'),
@@ -133,29 +143,40 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('CTnT', BIO_HEART, 'TEXT'),
 
   // BIOCHEMISTRY — LIVER FUNCTION TESTS
-  t('SGOT/AST', BIO_LIVER, 'NUMERIC'),
-  t('SGPT/ALT', BIO_LIVER, 'NUMERIC'),
+  t('SGOT/AST', BIO_LIVER, 'NUMERIC', 'IU/L', '0 – 37', 0, 37),
+  t('SGPT/ALT', BIO_LIVER, 'NUMERIC', 'IU/L', '0 – 49', 0, 49),
   t('ALP', BIO_LIVER, 'NUMERIC'),
   t('Bilirubin (Total & Direct)', BIO_LIVER, 'TEXT'),
-  t('Calcium', BIO_LIVER, 'NUMERIC'),
-  t('Total Serum protein/Albumin', BIO_LIVER, 'TEXT'),
+  t('Calcium', BIO_LIVER, 'NUMERIC', 'mg/dl', '8.4 – 11.5', 8.4, 11.5),
+  // The form prints 600 – 800mg/dl; conventional total protein is 6.0–8.3 g/dL
+  // (= 6000–8300 mg/dl), so the printed figure looks 10x low. Kept as printed for
+  // display, and left non-numeric so it cannot mis-flag.
+  t('Total Serum protein/Albumin', BIO_LIVER, 'TEXT', 'mg/dl', '600 – 800'),
 
   // BIOCHEMISTRY — KIDNEY FUNCTION TEST
   t('Creatinine – Creatinine Kinase', BIO_KIDNEY, 'TEXT'),
-  t('Urea', BIO_KIDNEY, 'NUMERIC'),
+  t('Creatinine', BIO_KIDNEY, 'NUMERIC', 'mg/dl', '0.6 – 1.5', 0.6, 1.5),
+  t('Urea', BIO_KIDNEY, 'NUMERIC', 'mg/dl', '7 – 20', 7, 20),
   t('BUN', BIO_KIDNEY, 'NUMERIC'),
-  t('Uric Acid', BIO_KIDNEY, 'NUMERIC'),
+  t('Uric Acid', BIO_KIDNEY, 'NUMERIC', 'mg/dl', '3.4 – 5.7', 3.4, 5.7),
 
   // BIOCHEMISTRY — ELECTROLYTES PANEL
-  t('Sodium Na+', BIO_ELECTRO, 'NUMERIC'),
-  t('Potassium K+', BIO_ELECTRO, 'NUMERIC'),
-  t('Chloride Cl-', BIO_ELECTRO, 'NUMERIC'),
-  t('Calcium Ca++', BIO_ELECTRO, 'NUMERIC'),
+  // Sodium is printed as 230 – 240mg/dl. Serum sodium is ~135–145 mmol/L
+  // (~310–330 mg/dL), so the printed figure is on the wrong scale; a normal
+  // result of 140 would flag LOW on every patient. Displayed verbatim, no bounds.
+  t('Sodium Na+', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '230 – 240'),
+  // Potassium/Chloride are labelled mg/dl on the form but the printed numbers are
+  // the correct mmol/L values, so the bounds are safe to flag against.
+  t('Potassium K+', BIO_ELECTRO, 'NUMERIC', 'mmol/L', '3.5 – 5.0', 3.5, 5.0),
+  t('Chloride Cl-', BIO_ELECTRO, 'NUMERIC', 'mmol/L', '98 – 106', 98, 106),
+  t('Calcium Ca++', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '8.4 – 11.5', 8.4, 11.5),
+  t('Magnesium', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '1.7 – 2.2', 1.7, 2.2),
+  t('Phosphorus', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '3.0 – 4.5', 3.0, 4.5),
 
   // BIOCHEMISTRY — PANCREATIC FUNCTION PANEL
   t('Lipase', BIO_PANCREAS, 'NUMERIC'),
   t('Amylase', BIO_PANCREAS, 'NUMERIC'),
-  t('Bilirubin Total', BIO_PANCREAS, 'NUMERIC'),
+  t('Bilirubin Total', BIO_PANCREAS, 'NUMERIC', 'mg/dl', '0.2 – 1.3', 0.2, 1.3),
   t('Bilirubin Direct', BIO_PANCREAS, 'NUMERIC'),
 
   // BIOCHEMISTRY — THYROID FUNCTION TESTS
@@ -168,7 +189,7 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('PSA, total', BIO_TUMOR, 'NUMERIC'),
   t('PSA free', BIO_TUMOR, 'NUMERIC'),
   t('CEA', BIO_TUMOR, 'NUMERIC'),
-  t('AFP', BIO_TUMOR, 'NUMERIC'),
+  t('AFP', BIO_TUMOR, 'NUMERIC', 'ng/ml', '< 10', null, 10),
 
   // ============================================================
   // PAGE 2
@@ -258,6 +279,51 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('WBC', STOOL_MICRO, 'TEXT', '/HPF'),
   t('RBC', STOOL_MICRO, 'TEXT', '/HPF'),
   t('Parasite (O/P)', STOOL_MICRO, 'TEXT'),
+
+  // ============================================================
+  // RESULT-SHEET PANELS
+  // ------------------------------------------------------------
+  // The panels below appear on the printed RESULT sheets (Blood
+  // Biochemistry / Complete Hemogram / serology / Urine Chemistry) but
+  // were never on the request form, so they had no catalog rows and no
+  // reference ranges at all. Appended at the end so the request form's
+  // display order is left untouched.
+  // ============================================================
+
+  // COMPLETE HEMOGRAM
+  // `WBC Count (giga/1)` 4 – 10 is covered by 'WBC white Blood Cells' above.
+  t('LYM (%)', HAEMATOLOGY, 'NUMERIC', '%', '20 – 40', 20, 40),
+  t('Mid (%)', HAEMATOLOGY, 'NUMERIC', '%', '0 – 8', 0, 8),
+  t('GR (%)', HAEMATOLOGY, 'NUMERIC', '%', '50 – 70', 50, 70),
+  t('Lym (#)', HAEMATOLOGY, 'NUMERIC', 'x10^9/l', '0.8 – 4', 0.8, 4),
+  t('Mid (#)', HAEMATOLOGY, 'NUMERIC', 'x10^9/l', '0 – 0.8', 0, 0.8),
+  t('GR (#)', HAEMATOLOGY, 'NUMERIC', 'x10^9/l', '1.8 – 6.3', 1.8, 6.3),
+  t('RBC Count', HAEMATOLOGY, 'NUMERIC', 'x10^12/l', '3.5 – 5.5', 3.5, 5.5),
+  // The hemogram prints HGB 11 – 16 while the serology sheet prints 12.0 – 18.0
+  // on 'HB Hemoglobin' above; both sheets are reproduced rather than merged.
+  t('HGB', HAEMATOLOGY, 'NUMERIC', 'g/dl', '11 – 16', 11, 16),
+  t('HCT (%)', HAEMATOLOGY, 'NUMERIC', '%', '33 – 48', 33, 48),
+  t('M.C.V (fl)', HAEMATOLOGY, 'NUMERIC', 'fl', '80 – 100', 80, 100),
+  t('M.C.H. (pg)', HAEMATOLOGY, 'NUMERIC', 'pg', '27 – 34', 27, 34),
+  t('M.C.H.C (g/dl)', HAEMATOLOGY, 'NUMERIC', 'g/dl', '32 – 36', 32, 36),
+  // A minimum of 0 is meaningless (effectively a ceiling), kept as printed.
+  t('RDW-CV (%)', HAEMATOLOGY, 'NUMERIC', '%', '0 – 16', 0, 16),
+  t('RDW-SD (fl)', HAEMATOLOGY, 'NUMERIC', 'fl', '37 – 55', 37, 55),
+  t('MPV (fl)', HAEMATOLOGY, 'NUMERIC', 'fl', '7 – 12', 7, 12),
+  t('PCT (%)', HAEMATOLOGY, 'NUMERIC', '%', '0.1 – 0.282', 0.1, 0.282),
+  t('PDW (%)', HAEMATOLOGY, 'NUMERIC', '%', '8 – 18', 8, 18),
+  t('PLCR (%)', HAEMATOLOGY, 'NUMERIC', '%', '13 – 43', 13, 43),
+  t('PLCC (L)', HAEMATOLOGY, 'NUMERIC', 'x10^9/l', '10 – 100', 10, 100),
+
+  // BIO-MEDICAL ANALYSIS LABORATORY (serology sheet) — extras
+  t('Spot Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
+  t('Cold Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
+  t('Skin Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
+  t('Stool Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
+  t('MTT', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
+
+  // URINE CHEMISTRY — the form lists SEDIMENT under VISUAL ANALYSIS
+  t('Sediment', URINE_MACRO, 'TEXT'),
 ];
 
 export const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];

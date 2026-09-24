@@ -70,6 +70,41 @@ export default function LabResultFormPage() {
   const [labNo, setLabNo] = useState('');
   const [toast, setToast] = useState('');
 
+  /**
+   * The "Normal Value" thresholds come from lab_test_catalog. Admins can correct
+   * them here; the catalog reseed no longer overwrites an existing range, so a
+   * change made in the app survives restarts.
+   */
+  const isAdmin = user?.role === 'admin';
+  const [editRanges, setEditRanges] = useState(false);
+  const [rangeDraft, setRangeDraft] = useState<Record<number, { min: string; max: string; text: string }>>({});
+
+  const draftFor = (t: any) =>
+    rangeDraft[t.id] ?? {
+      min: t.ref_min != null ? String(t.ref_min) : '',
+      max: t.ref_max != null ? String(t.ref_max) : '',
+      text: t.ref_text || '',
+    };
+
+  const saveRange = useMutation({
+    mutationFn: async (t: any) => {
+      const d = rangeDraft[t.id];
+      if (!d) return null;
+      const body: any = {
+        refText: d.text,
+        refMin: d.min === '' ? null : d.min,
+        refMax: d.max === '' ? null : d.max,
+      };
+      const r = await nestClient.patch(`/lab/catalog/${t.id}`, body);
+      return r.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lab-catalog'] });
+      setToast('Normal value saved');
+    },
+    onError: (e: any) => setToast(e?.response?.data?.message || 'Could not save the normal value'),
+  });
+
   const { data: patients = [] } = useQuery({
     queryKey: ['lab-patient-search', patientSearch],
     queryFn: async () => {
@@ -279,9 +314,22 @@ export default function LabResultFormPage() {
         <>
           <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <span className="small text-muted">{visibleTests.length} tests selected / shown</span>
-            <div className="form-check form-switch">
-              <input className="form-check-input" type="checkbox" id="showAll" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
-              <label className="form-check-label small" htmlFor="showAll">Show All Tests</label>
+            <div className="d-flex align-items-center gap-3">
+              {isAdmin && (
+                <button
+                  type="button"
+                  className={`btn btn-sm rounded-pill ${editRanges ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => { setEditRanges(v => !v); setRangeDraft({}); }}
+                  title="Correct the normal-value / threshold ranges stored for each test"
+                >
+                  <i className="bi bi-sliders me-1"></i>
+                  {editRanges ? 'Done editing normal values' : 'Edit normal values'}
+                </button>
+              )}
+              <div className="form-check form-switch">
+                <input className="form-check-input" type="checkbox" id="showAll" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
+                <label className="form-check-label small" htmlFor="showAll">Show All Tests</label>
+              </div>
             </div>
           </div>
 
@@ -306,7 +354,31 @@ export default function LabResultFormPage() {
                             <td className="fw-semibold">{t.name}</td>
                             <td style={{ minWidth: 140 }}>{renderInput(t)}</td>
                             <td>{t.unit || '—'}</td>
-                            <td>{refText(t)}</td>
+                            <td>
+                              {editRanges ? (() => {
+                                const d = draftFor(t);
+                                const setD = (patch: Partial<typeof d>) =>
+                                  setRangeDraft({ ...rangeDraft, [t.id]: { ...d, ...patch } });
+                                return (
+                                  <div className="d-flex align-items-center gap-1" style={{ minWidth: 210 }}>
+                                    <input className="form-control form-control-sm" style={{ width: 52 }} placeholder="min"
+                                      value={d.min} onChange={e => setD({ min: e.target.value })} />
+                                    <span className="text-muted small">–</span>
+                                    <input className="form-control form-control-sm" style={{ width: 52 }} placeholder="max"
+                                      value={d.max} onChange={e => setD({ max: e.target.value })} />
+                                    <input className="form-control form-control-sm" style={{ width: 92 }} placeholder="text"
+                                      title="Printed normal value (overrides min–max in the display)"
+                                      value={d.text} onChange={e => setD({ text: e.target.value })} />
+                                    <button type="button" className="btn btn-sm btn-outline-success py-0 px-1"
+                                      disabled={saveRange.isPending}
+                                      title="Save this normal value"
+                                      onClick={() => saveRange.mutate(t)}>
+                                      <i className="bi bi-check-lg"></i>
+                                    </button>
+                                  </div>
+                                );
+                              })() : refText(t)}
+                            </td>
                             <td>{values[t.id] ? <span className={`badge ${flagBadge(computeFlag(t, values[t.id]))}`}>{computeFlag(t, values[t.id])}</span> : '—'}</td>
                             <td><input className="form-control form-control-sm" value={comments[t.id] || ''} onChange={e => setComments({ ...comments, [t.id]: e.target.value })} /></td>
                           </tr>
