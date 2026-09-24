@@ -65,6 +65,10 @@ export default function LabResultFormPage() {
   const [values, setValues] = useState<Record<number, string>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   const [showAll, setShowAll] = useState(false);
+  /** Explicit open/closed overrides for the category folders (see `catFolders`). */
+  const [catOpen, setCatOpen] = useState<Record<string, boolean>>({});
+  /** Quick-find across every test, whatever the folder state. */
+  const [testSearch, setTestSearch] = useState('');
   const [tab, setTab] = useState<'form' | 'history'>('form');
   const [reportId, setReportId] = useState<number | null>(null);
   const [labNo, setLabNo] = useState('');
@@ -173,6 +177,68 @@ export default function LabResultFormPage() {
     const list = (catalog as any[]).filter(t => showAll || selectedTests[t.id]);
     return list;
   }, [catalog, selectedTests, showAll]);
+
+  /**
+   * The catalog is 155 tests across ~20 sections, which makes one very long
+   * page. Each section is presented as a folder instead, and the defaults are
+   * chosen so the technician only sees what the order actually needs:
+   *
+   *  - "Show all" off  -> a folder is listed only when it holds a selected test.
+   *  - "Show all" on   -> every folder is listed.
+   *  - A folder opens when it holds a selected test, otherwise it stays shut and
+   *    just reports its counts. Clicking a header pins it open/shut; the search
+   *    box overrides everything and opens only the folders that match.
+   */
+  const needles = useMemo(
+    () => testSearch.trim().toLowerCase().split(/\s+/).filter(Boolean),
+    [testSearch],
+  );
+
+  const catFolders = useMemo(() => {
+    const rows: {
+      cat: string;
+      tests: any[];
+      total: number;
+      selected: number;
+      open: boolean;
+      matched: number;
+    }[] = [];
+
+    for (const [cat, all] of Object.entries(grouped)) {
+      const selected = all.filter((t: any) => selectedTests[t.id]).length;
+
+      // Search matches across the whole section, ignoring the selected filter.
+      const matched = needles.length
+        ? all.filter((t: any) =>
+            needles.every((n: string) =>
+              `${t.name} ${t.code} ${t.unit || ''} ${t.ref_text || ''}`.toLowerCase().includes(n),
+            ),
+          )
+        : [];
+
+      if (needles.length) {
+        if (!matched.length) continue;
+      } else if (!showAll && !selected) {
+        continue; // nothing ordered in this section — keep the page short
+      }
+
+      const tests = needles.length ? matched : all.filter((t: any) => showAll || selectedTests[t.id]);
+
+      rows.push({
+        cat,
+        tests,
+        total: all.length,
+        selected,
+        matched: matched.length,
+        open: needles.length ? true : (catOpen[cat] ?? selected > 0),
+      });
+    }
+    return rows;
+  }, [grouped, selectedTests, showAll, needles, catOpen]);
+
+  const openFolders = catFolders.filter(f => f.open).length;
+  const setAllFolders = (open: boolean) =>
+    setCatOpen(Object.fromEntries(catFolders.map(f => [f.cat, open])));
 
   const saveReport = useMutation({
     mutationFn: async (verify: boolean) => {
@@ -312,9 +378,21 @@ export default function LabResultFormPage() {
 
       {tab === 'form' ? (
         <>
-          <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <span className="small text-muted">{visibleTests.length} tests selected / shown</span>
-            <div className="d-flex align-items-center gap-3">
+          <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <span className="small text-muted">
+              <i className="bi bi-folder2-open me-1"></i>
+              {catFolders.length} section{catFolders.length === 1 ? '' : 's'} · {openFolders} open
+              <span className="ms-2">{visibleTests.length} tests shown</span>
+            </span>
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <button type="button" className="btn btn-sm btn-outline-secondary rounded-pill"
+                onClick={() => setAllFolders(true)} disabled={!catFolders.length}>
+                <i className="bi bi-arrows-expand me-1"></i>Expand all
+              </button>
+              <button type="button" className="btn btn-sm btn-outline-secondary rounded-pill"
+                onClick={() => setAllFolders(false)} disabled={!catFolders.length}>
+                <i className="bi bi-arrows-collapse me-1"></i>Collapse all
+              </button>
               {isAdmin && (
                 <button
                   type="button"
@@ -326,21 +404,67 @@ export default function LabResultFormPage() {
                   {editRanges ? 'Done editing normal values' : 'Edit normal values'}
                 </button>
               )}
-              <div className="form-check form-switch">
+              <div className="form-check form-switch mb-0">
                 <input className="form-check-input" type="checkbox" id="showAll" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
                 <label className="form-check-label small" htmlFor="showAll">Show All Tests</label>
               </div>
             </div>
           </div>
 
+          {/* Quick-find: opens only the sections that match, whatever the folder state */}
+          <div className="input-group input-group-sm mb-3" style={{ maxWidth: 420 }}>
+            <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
+            <input
+              className="form-control"
+              placeholder="Find a test (name, code, unit or normal value)…"
+              value={testSearch}
+              onChange={e => setTestSearch(e.target.value)}
+            />
+            {testSearch && (
+              <button className="btn btn-outline-secondary" type="button" onClick={() => setTestSearch('')} title="Clear">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            )}
+          </div>
+
           {!selectedPid ? (
             <div className="text-center text-muted py-5"><i className="bi bi-person-search fs-1 d-block mb-2"></i>Select a patient to begin result entry.</div>
-          ) : Object.keys(grouped).map(cat => {
-            const tests = grouped[cat].filter(t => showAll || selectedTests[t.id]);
-            if (!tests.length) return null;
+          ) : catFolders.length === 0 ? (
+            <div className="text-center text-muted py-5">
+              <i className="bi bi-folder2 fs-1 d-block mb-2"></i>
+              {needles.length ? 'No test matches that search.' : 'No tests are selected for this patient yet.'}
+              {!needles.length && !showAll && <div className="small mt-2">Turn on “Show All Tests” to pick any test from the catalog.</div>}
+            </div>
+          ) : catFolders.map(folder => {
+            const { cat, tests, total, selected, open } = folder;
+            const picked = needles.length ? [] : grouped[cat].filter((t: any) => selectedTests[t.id]);
             return (
-              <div className="card border-0 shadow-sm mb-3" key={cat} style={{ borderRadius: '16px' }}>
-                <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small text-uppercase">{cat}</h6></div>
+              <div className="card border-0 shadow-sm mb-2" key={cat} style={{ borderRadius: '16px' }}>
+                <button
+                  type="button"
+                  className="card-header bg-white py-2 d-flex align-items-center gap-2 w-100 border-0 text-start"
+                  style={{ borderRadius: '16px', cursor: 'pointer' }}
+                  onClick={() => setCatOpen({ ...catOpen, [cat]: !open })}
+                  aria-expanded={open}
+                >
+                  <i className={`bi bi-chevron-${open ? 'down' : 'right'} text-muted small`} style={{ width: 12 }}></i>
+                  <i className="bi bi-folder-fill" style={{ color: selected ? '#ffc107' : '#c8ced6' }}></i>
+                  <span className="mb-0 fw-bold small text-uppercase flex-grow-1">{cat}</span>
+                  {selected > 0 && (
+                    <span className="badge rounded-pill bg-primary" style={{ fontSize: '0.62rem' }}>{selected} selected</span>
+                  )}
+                  <span className="badge rounded-pill bg-light text-dark border" style={{ fontSize: '0.62rem' }}>
+                    {needles.length ? `${tests.length} match` : total}
+                  </span>
+                </button>
+                {!open && picked.length > 0 && (
+                  <div className="px-3 pb-2 text-muted" style={{ fontSize: '0.7rem' }}>
+                    <i className="bi bi-check2-circle me-1"></i>
+                    {picked.slice(0, 4).map((t: any) => t.name).join(', ')}
+                    {picked.length > 4 ? ` +${picked.length - 4} more` : ''}
+                  </div>
+                )}
+                {open && (
                 <div className="card-body p-0">
                   <div className="table-responsive">
                     <table className="table table-sm table-hover mb-0 align-middle">
@@ -387,13 +511,18 @@ export default function LabResultFormPage() {
                     </table>
                   </div>
                 </div>
+                )}
               </div>
             );
           })}
 
           {selectedPid && (
             <div className="d-flex gap-2 justify-content-end mt-3 flex-wrap">
-              <button className="btn btn-outline-secondary rounded-pill" onClick={() => window.print()}><i className="bi bi-printer me-1"></i>Print</button>
+              <button className="btn btn-outline-secondary rounded-pill"
+                onClick={() => { setAllFolders(true); setTestSearch(''); setTimeout(() => window.print(), 150); }}
+                title="Prints every section, so collapsed folders are opened first">
+                <i className="bi bi-printer me-1"></i>Print
+              </button>
               <button className="btn btn-primary rounded-pill px-4" disabled={saveReport.isPending} onClick={() => saveReport.mutate(false)}>
                 <i className="bi bi-save me-1"></i>Save Draft
               </button>
