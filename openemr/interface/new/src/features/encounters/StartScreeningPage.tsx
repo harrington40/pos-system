@@ -16,6 +16,20 @@ interface VitalForm {
   o2_sat: string; weight: string; height: string; pain: string;
 }
 
+/**
+ * Vitals that must be recorded before a screening can be completed. Triage is
+ * the only point where they are captured, so a blank set here means the chart
+ * has no baseline at all. Weight/height and pain are optional.
+ */
+const REQUIRED_VITALS: { key: keyof VitalForm; label: string }[] = [
+  { key: 'bp_systolic', label: 'Systolic BP' },
+  { key: 'bp_diastolic', label: 'Diastolic BP' },
+  { key: 'pulse', label: 'Pulse' },
+  { key: 'temp', label: 'Temperature' },
+  { key: 'resp', label: 'Respirations' },
+  { key: 'o2_sat', label: 'SpO\u2082' },
+];
+
 interface Prescription {
   drug: string; dosage: string; frequency: string; duration: string; instructions: string;
 }
@@ -384,6 +398,8 @@ export default function StartScreeningPage() {
 
   // Validation
   const [showValidation, setShowValidation] = useState(false);
+  /** Required vitals that blocked completion, surfaced in the alert. */
+  const [missingVitalsNotice, setMissingVitalsNotice] = useState<string[]>([]);
 
   // Note sharing + chart notes panel
   const [shareWithNursing, setShareWithNursing] = useState(true);
@@ -556,7 +572,21 @@ export default function StartScreeningPage() {
     savePrescriptions.isPending || saveLabOrders.isPending || saveSoap.isPending ||
     saveClinicalNote.isPending || autoBill.isPending;
 
+  /** Required vitals that are still blank, so we can name them in the UI. */
+  const missingVitals = useMemo(
+    () => REQUIRED_VITALS.filter((v) => !String(vitals[v.key] ?? '').trim()).map((v) => v.label),
+    [vitals],
+  );
+
   const handleComplete = async () => {
+    // Vitals come first: triage is the only place they are taken, so completing
+    // the screening without them would leave the chart with no baseline.
+    if (missingVitals.length > 0) {
+      setMissingVitalsNotice(missingVitals);
+      setShowVitals(true);
+      return;
+    }
+
     const hasSomething = symptoms.length > 0 || selectedLabs.length > 0 ||
       selectedMeds.length > 0 || selectedImaging.length > 0 || clinicalNote.length > 0 ||
       Object.values(vitals).some(v => v !== '');
@@ -566,6 +596,7 @@ export default function StartScreeningPage() {
       return;
     }
 
+    setMissingVitalsNotice([]);
     setShowValidation(false);
     try {
       const encResult = await createEncounter.mutateAsync();
@@ -802,6 +833,23 @@ export default function StartScreeningPage() {
           </button>
         </div>
       </div>
+
+      {missingVitalsNotice.length > 0 && (
+        <div className="alert alert-warning py-2 mb-2 small d-flex align-items-start gap-2" style={{ borderRadius: '8px' }}>
+          <i className="bi bi-heart-pulse-fill fs-6"></i>
+          <div className="flex-grow-1">
+            <strong>Cannot complete — vitals are missing</strong>
+            <br />
+            <span>Record: {missingVitalsNotice.join(', ')}</span>
+            <br />
+            <span className="text-muted">Vitals are taken at triage, so a screening cannot be completed without them.</span>
+          </div>
+          <button type="button" className="btn btn-sm btn-warning rounded-pill align-self-center"
+            onClick={() => setShowVitals(true)}>
+            <i className="bi bi-pencil-square me-1"></i>Record now
+          </button>
+        </div>
+      )}
 
       {showValidation && (
         <div className="alert alert-danger py-2 mb-2 small" style={{ borderRadius: '8px' }}>

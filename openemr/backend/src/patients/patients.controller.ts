@@ -86,8 +86,12 @@ export class PatientsController {
   async update(
     @Param('id') id: string,
     @Body() dto: Partial<CreatePatientDto>,
+    @Req() req: any,
   ) {
-    await this.patientsService.update(parseInt(id, 10), dto);
+    // Pass the caller's role through: the service gates date-of-birth / name /
+    // sex edits after 30 days, and without this an administrator was blocked
+    // too — the tab enabled the fields while the API rejected the save.
+    await this.patientsService.update(parseInt(id, 10), dto, req?.user?.role === 'admin');
     return { message: 'updated' };
   }
 

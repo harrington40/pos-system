@@ -81,6 +81,12 @@ export default function NurseAideDashboardPage() {
   // New patient intake (triage) — nurse aide collects demographics + vitals for a new patient.
   const [showIntake, setShowIntake] = useState(false);
   const [intakeForm, setIntakeForm] = useState<any>({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
+  /** Likely-existing patients that blocked this admit. */
+  const [intakeDuplicates, setIntakeDuplicates] = useState<any[]>([]);
+  /** Deliberate opt-in to create a second chart for a possible duplicate. */
+  const [intakeOverride, setIntakeOverride] = useState(false);
+  /** Existing chart chosen instead of creating a new one. */
+  const [intakeTarget, setIntakeTarget] = useState<{ pid: number; public_id?: string } | null>(null);
   const [intakeResult, setIntakeResult] = useState('');
 
   // ── Nurse dashboard: all active ward patients + shared notes ────────────
@@ -193,23 +199,14 @@ export default function NurseAideDashboardPage() {
 
   const intakeMutation = useMutation({
     mutationFn: async () => {
-      // Duplicate check — reuse the existing patient record instead of creating a copy.
-      const dups = await nestClient.get('/patients/check-duplicate', {
-        params: {
-          fname: intakeForm.fname.trim(),
-          lname: intakeForm.lname.trim(),
-          DOB: intakeForm.DOB || undefined,
-          phone: intakeForm.phone_contact || undefined,
-        },
-      });
-
       let pid: number;
       let publicId: string | null = null;
       let isExisting = false;
 
-      if (dups.data?.length) {
-        pid = dups.data[0].pid;
-        publicId = dups.data[0].public_id || null;
+      if (intakeTarget) {
+        // The nurse explicitly chose an existing chart for this person.
+        pid = intakeTarget.pid;
+        publicId = intakeTarget.public_id || null;
         isExisting = true;
       } else {
         const created = await nestClient.post('/patients', {
@@ -249,10 +246,38 @@ export default function NurseAideDashboardPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['nurse-dashboard'] });
       setIntakeForm({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
+      setIntakeDuplicates([]);
+      setIntakeOverride(false);
+      setIntakeTarget(null);
       setIntakeResult('');
       setShowIntake(false);
     },
   });
+
+  /**
+   * Admitting checks for an existing record first. A likely duplicate blocks the
+   * admit and shows the matches, so a second chart is only ever created when the
+   * override switch is deliberately turned on (or the existing chart is chosen).
+   */
+  const handleAdmit = async () => {
+    setIntakeDuplicates([]);
+    if (intakeOverride || intakeTarget) { intakeMutation.mutate(); return; }
+    try {
+      const r = await nestClient.get('/patients/check-duplicate', {
+        params: {
+          fname: intakeForm.fname.trim(),
+          lname: intakeForm.lname.trim(),
+          DOB: intakeForm.DOB || undefined,
+          phone: intakeForm.phone_contact || undefined,
+        },
+      });
+      const hits = Array.isArray(r.data) ? r.data : [];
+      if (hits.length) { setIntakeDuplicates(hits); return; }
+    } catch {
+      // If the check itself fails, fall through and admit rather than block care.
+    }
+    intakeMutation.mutate();
+  };
 
   const submitVitals = () => {
     const w = Number(vitalsForm.weight);
@@ -396,6 +421,54 @@ export default function NurseAideDashboardPage() {
                         <div className="col-md-4"><label className="form-label small mb-0">Street *</label><input className="form-control form-control-sm" placeholder="House no, street" value={intakeForm.street} onChange={e => setIntakeForm({ ...intakeForm, street: e.target.value })} /></div>
                         <div className="col-md-3"><label className="form-label small mb-0">City *</label><CitySelect value={intakeForm.city} onChange={v => setIntakeForm({ ...intakeForm, city: v })} className="form-select-sm" /></div>
                       </div>
+
+                      {/* Duplicate guard — a second chart is only created when the
+                          override is switched on deliberately. */}
+                      {intakeDuplicates.length > 0 && (
+                        <div className="alert alert-warning mt-3 mb-0 py-2">
+                          <div className="fw-semibold small mb-2">
+                            <i className="bi bi-shield-exclamation me-1"></i>
+                            Admit blocked — this patient may already be on file
+                          </div>
+                          {intakeDuplicates.map((d: any) => (
+                            <div key={d.id} className="d-flex align-items-center justify-content-between border-bottom py-1 small">
+                              <div>
+                                <strong>{d.fname} {d.lname}</strong>
+                                <div className="text-muted">
+                                  DOB: {d.DOB || '—'} · Phone: {d.phone_contact || '—'} · {d.public_id || '—'}
+                                </div>
+                              </div>
+                              <button className="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                onClick={() => { setIntakeTarget({ pid: d.pid, public_id: d.public_id }); setIntakeOverride(false); setIntakeDuplicates([]); }}
+                                title="Record this visit's vitals on the existing chart">
+                                Use Existing <i className="bi bi-arrow-right ms-1"></i>
+                              </button>
+                            </div>
+                          ))}
+                          <div className="form-check form-switch mt-2 mb-1">
+                            <input className="form-check-input" type="checkbox" role="switch"
+                              id="intake-override-duplicate" checked={intakeOverride}
+                              onChange={(e) => { setIntakeOverride(e.target.checked); if (e.target.checked) setIntakeTarget(null); }} />
+                            <label className="form-check-label small fw-semibold" htmlFor="intake-override-duplicate">
+                              Override — admit as a new patient anyway
+                            </label>
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                            Only override if you are sure this is a different person (shared phone
+                            number, common name). Otherwise use the existing chart so no duplicate is created.
+                          </div>
+                        </div>
+                      )}
+
+                      {intakeTarget && (
+                        <div className="alert alert-info mt-3 mb-0 py-2 small d-flex align-items-center gap-2">
+                          <i className="bi bi-link-45deg"></i>
+                          Recording this visit on the existing chart #{intakeTarget.public_id || intakeTarget.pid}.
+                          <button className="btn btn-sm btn-outline-secondary rounded-pill ms-auto"
+                            onClick={() => setIntakeTarget(null)}>Change</button>
+                        </div>
+                      )}
+
                       <hr className="my-3" />
                       <div className="small fw-semibold text-muted mb-2"><i className="bi bi-heart-pulse me-1 text-danger"></i>Vitals</div>
                       <div className="row g-2">
@@ -424,8 +497,8 @@ export default function NurseAideDashboardPage() {
                     {!intakeResult && (
                       <div className="modal-footer">
                         <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setShowIntake(false)}>Cancel</button>
-                        <button className="btn btn-info btn-sm rounded-pill text-white" onClick={() => intakeMutation.mutate()} disabled={!intakeForm.fname.trim() || !intakeForm.lname.trim() || isInvalidLiberiaNationalNumber(intakeForm.phone_contact) || intakeMutation.isPending}>
-                          {intakeMutation.isPending ? 'Admitting…' : <><i className="bi bi-person-check me-1"></i>Admit Patient & Record Vitals</>}
+                        <button className="btn btn-info btn-sm rounded-pill text-white" onClick={handleAdmit} disabled={!intakeForm.fname.trim() || !intakeForm.lname.trim() || isInvalidLiberiaNationalNumber(intakeForm.phone_contact) || intakeMutation.isPending}>
+                          {intakeMutation.isPending ? 'Admitting…' : <><i className="bi bi-person-check me-1"></i>{intakeTarget ? 'Admit to Existing Chart' : 'Admit Patient & Record Vitals'}</>}
                         </button>
                       </div>
                     )}
@@ -478,7 +551,7 @@ export default function NurseAideDashboardPage() {
                 <i className="bi bi-arrow-left-circle fs-1 d-block mb-3"></i>
                 <h5>Select a patient to begin care</h5>
                 <p className="small">Vitals, labs, medications, care plan, and notes are all available here.</p>
-                <button className="btn btn-info btn-lg rounded-pill text-white mt-3 px-5 py-3" onClick={() => setShowIntake(true)}>
+                <button className="btn btn-info btn-lg rounded-pill text-white mt-3 px-5 py-3" onClick={() => { setShowIntake(true); setIntakeDuplicates([]); setIntakeOverride(false); setIntakeTarget(null); }}>
                   <i className="bi bi-person-plus me-2 fs-5"></i>New Patient Intake
                 </button>
               </div>

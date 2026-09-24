@@ -23,6 +23,11 @@ export default function PatientSearchPage() {
   const [form, setForm] = useState(emptyForm);
   const [step, setStep] = useState(1);
   const [duplicates, setDuplicates] = useState<any[]>([]);
+  /**
+   * Registering a second record for someone who already exists is blocked by
+   * default; this has to be switched on deliberately on the form.
+   */
+  const [overrideDuplicate, setOverrideDuplicate] = useState(false);
   const [checkingDup, setCheckingDup] = useState(false);
   const firstRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +62,7 @@ export default function PatientSearchPage() {
     },
   });
 
-  const openModal = () => { setShowModal(true); setStep(1); setForm(emptyForm); setDuplicates([]); setTimeout(() => firstRef.current?.focus(), 100); };
+  const openModal = () => { setShowModal(true); setStep(1); setForm(emptyForm); setDuplicates([]); setOverrideDuplicate(false); setTimeout(() => firstRef.current?.focus(), 100); };
   const nextStep = () => { if (form.fname && form.lname) setStep(2); };
   const prevStep = () => setStep(1);
 
@@ -81,6 +86,8 @@ export default function PatientSearchPage() {
   const handleSubmit = () => {
     if (!form.fname || !form.lname) return;
     if (isInvalidLiberiaNationalNumber(form.phone_contact)) return;
+    // Blocked unless the registrar has explicitly switched the override on.
+    if (overrideDuplicate) { newPatient.mutate(form); return; }
     checkDuplicates();
   };
   const update = (k: string, v: string) => setForm(f => ({...f, [k]: v}));
@@ -260,8 +267,8 @@ export default function PatientSearchPage() {
               {duplicates.length > 0 && (
                 <div className="alert alert-warning p-3 rounded-3">
                   <div className="fw-semibold mb-2">
-                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
-                    A patient with matching details may already exist
+                    <i className="bi bi-shield-exclamation me-1"></i>
+                    Registration blocked — this patient may already be on file
                   </div>
                   {duplicates.map((d: any) => (
                     <div key={d.id} className="d-flex align-items-center justify-content-between border-bottom py-2 small">
@@ -275,8 +282,18 @@ export default function PatientSearchPage() {
                       </button>
                     </div>
                   ))}
-                  <div className="text-muted mt-2" style={{ fontSize: '0.75rem' }}>
-                    If this is a new patient, choose "Register New Patient" below.
+                  <div className="form-check form-switch mt-3 mb-1">
+                    <input className="form-check-input" type="checkbox" role="switch"
+                      id="override-duplicate" checked={overrideDuplicate}
+                      onChange={(e) => setOverrideDuplicate(e.target.checked)} />
+                    <label className="form-check-label small fw-semibold" htmlFor="override-duplicate">
+                      Override — register as a new patient anyway
+                    </label>
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                    Only use the override when you are sure this is a different person
+                    (for example a shared phone number or a common name). Leave it off to
+                    open the existing chart instead of creating a duplicate.
                   </div>
                 </div>
               )}

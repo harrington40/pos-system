@@ -1,4 +1,4 @@
- import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+ import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { withChartStatus } from './chart-completeness.util';
@@ -490,17 +490,24 @@ export class PatientsService {
       if (key === column || !resolved.has(column)) resolved.set(column, value);
     }
 
-    // Check 30-day edit window for demographic fields
-    const demographicFields = ['fname', 'lname', 'mname', 'DOB', 'sex'];
-    const isEditingDemographics = demographicFields.some(f => resolved.has(f));
-    if (isEditingDemographics && !isAdmin) {
+    // Check 30-day edit window for identity fields. Address, phone and provider
+    // are deliberately excluded: they are the details needed to *complete* a
+    // chart, so they must stay editable on the whole existing register.
+    const identityFields = ['fname', 'lname', 'mname', 'DOB', 'sex'];
+    const isEditingIdentity = identityFields.some(f => resolved.has(f));
+    if (isEditingIdentity && !isAdmin) {
       const [patient] = await this.dataSource.query(
         `SELECT regdate FROM patient_data WHERE id = ?`, [id],
       );
       if (patient?.regdate) {
         const daysSinceReg = Math.floor((Date.now() - new Date(patient.regdate).getTime()) / (1000 * 60 * 60 * 24));
         if (daysSinceReg > 30) {
-          throw new Error('Demographic edits require admin approval after 30 days from registration.');
+          // A readable reason, not a bare Error → 500 that the UI could only
+          // report as "Save failed" with no explanation.
+          throw new ForbiddenException(
+            `Name, date of birth and sex cannot be changed ${daysSinceReg} days after registration. ` +
+              `An administrator can still make this change.`,
+          );
         }
       }
     }
