@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { patientChartPath } from '../../utils/patientChart';
 import nestClient from '../../api/nest-client';
 import { useMessagingSocket, MessagingEvent } from '../../hooks/useMessagingSocket';
 import { useAuth } from '../../hooks/useAuth';
@@ -28,6 +30,7 @@ type Filter = 'all' | 'unread' | 'priority' | 'read';
 
 export default function MessagesPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const canWrite = user?.role === 'physician' || user?.role === 'admin';
   const [form, setForm] = useState({ title: '', body: '', pid: '', recipientId: '', messageType: 'clinic', priority: 'NORMAL' });
@@ -339,11 +342,16 @@ export default function MessagesPage() {
                   <div className="px-3 pb-3 pt-1 bg-white" style={{ borderLeft: '4px solid transparent' }}>
                     <div className="p-3 bg-light rounded-3" style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', lineHeight: 1.5 }}>{m.body || '(no body)'}</div>
                     <div className="d-flex gap-2 mt-2">
-                      {m.pid ? (
-                        <a className="btn btn-sm btn-outline-primary rounded-pill" href={`/patients/${m.pid}`}>
-                          <i className="bi bi-person me-1"></i>Open Patient Chart
-                        </a>
-                      ) : null}
+                      {(() => {
+                        // pid may be 0 for system notices — never link those to /patients/0.
+                        const href = patientChartPath(m.patientId, m.patientPid, m.pid);
+                        if (!href) return null;
+                        return (
+                          <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={() => navigate(href)}>
+                            <i className="bi bi-person me-1"></i>Open Patient Chart
+                          </button>
+                        );
+                      })()}
                       {isNew && <button className="btn btn-sm btn-outline-success rounded-pill" onClick={() => markRead.mutate(m.id)}><i className="bi bi-envelope-check me-1"></i>Mark read</button>}
                       <button className="btn btn-sm btn-outline-danger rounded-pill" onClick={() => deleteMsg.mutate(m.id)}><i className="bi bi-trash me-1"></i>Delete</button>
                     </div>

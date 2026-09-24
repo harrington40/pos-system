@@ -108,7 +108,26 @@ export default function PatientDetailPage() {
   const { data: avatarData } = useQuery({ queryKey: ['patient-avatar', id], queryFn: async () => { try { const r = await nestClient.get(`/avatars/${id}`); return r.data; } catch { return null; } }, enabled: !!id });
 
   if (isLoading) return <div className="text-center py-5"><div className="spinner-grow text-primary" style={{ width: '3rem', height: '3rem' }} /><p className="text-muted mt-2">Loading chart...</p></div>;
-  if (error || !patient) return <div className="text-center py-5"><i className="bi bi-exclamation-triangle fs-1 text-danger"></i><h5>Failed to load</h5><button className="btn btn-outline-primary rounded-pill mt-2" onClick={() => navigate('/patients')}>Back</button></div>;
+  if (error || !patient) {
+    // Distinguish "no patient reference at all" from "that patient is gone" so a
+    // broken link (e.g. /patients/0) reads clearly instead of a bare failure.
+    const numericId = Number(id);
+    const invalidId = !id || !Number.isFinite(numericId) || numericId <= 0;
+    return (
+      <div className="text-center py-5">
+        <i className="bi bi-exclamation-triangle fs-1 text-danger"></i>
+        <h5>{invalidId ? 'No patient selected' : 'Patient not found'}</h5>
+        <p className="text-muted small mb-0">
+          {invalidId
+            ? 'This link did not contain a valid patient reference.'
+            : `The chart for patient #${id} could not be loaded.`}
+        </p>
+        <button className="btn btn-outline-primary rounded-pill mt-3" onClick={() => navigate('/patients')}>
+          <i className="bi bi-arrow-left me-1"></i>Back to patients
+        </button>
+      </div>
+    );
+  }
 
   const initials = `${patient.fname?.[0] || ''}${patient.lname?.[0] || ''}`;
   const age = patient.dob ? Math.floor((Date.now() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;

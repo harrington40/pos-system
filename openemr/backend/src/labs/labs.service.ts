@@ -36,6 +36,8 @@ export interface LabOrderWithStatus {
   patientId: number;
   patientName: string;
   patientPid: number;
+  /** Canonical `patient_data.id` — use this to link to the patient chart. */
+  chartId: number | null;
   encounterId: number;
   dateOrdered: string;
   orderStatus: string;
@@ -124,7 +126,7 @@ export class LabsService {
     const rows = await this.dataSource.query(
       `SELECT po.procedure_order_id as id, po.patient_id as patientId,
         CONCAT(pd.fname,' ',pd.lname) as patientName,
-        pd.pid as patientPid, po.encounter_id as encounterId,
+        pd.pid as patientPid, pd.id as chartId, po.encounter_id as encounterId,
         po.date_ordered as dateOrdered, po.order_status as orderStatus,
         po.order_priority as orderPriority,
         po.patient_instructions as instructions, po.clinical_hx as clinicalHx,
@@ -565,10 +567,14 @@ export class LabsService {
         4000,
       );
 
+      // NOTE: `pid` must be the real patient pid — writing 0 here produced
+      // notifications that no longer resolved to a patient, so the dashboard
+      // "View" action navigated to /patients/0 and the chart failed to load.
+      const patientPid = Number(patient_id) > 0 ? Number(patient_id) : 0;
       await this.dataSource.query(
         `INSERT INTO pnotes (date, title, body, pid, user, groupname, assigned_to, message_status)
-         VALUES (NOW(), ?, ?, 0, 'lab-system', 'Default', ?, 'New')`,
-        [title, body, String(providerId)],
+         VALUES (NOW(), ?, ?, ?, 'lab-system', 'Default', ?, 'New')`,
+        [title, body, patientPid, String(providerId)],
       );
 
       this.logger.log(`Notification sent to provider ${providerId} for order ${orderId}`);
@@ -583,7 +589,7 @@ export class LabsService {
     const rows = await this.dataSource.query(
       `SELECT po.procedure_order_id as id, po.patient_id as patientId,
         CONCAT(pd.fname,' ',pd.lname) as patientName,
-        pd.pid as patientPid, po.encounter_id as encounterId,
+        pd.pid as patientPid, pd.id as chartId, po.encounter_id as encounterId,
         po.date_ordered as dateOrdered, po.order_status as orderStatus,
         po.order_priority as orderPriority,
         po.patient_instructions as instructions, po.clinical_hx as clinicalHx,
@@ -828,6 +834,8 @@ export class LabsService {
   async getProviderLabNotifications(providerId: number) {
     const notifications = await this.dataSource.query(
       `SELECT p.id, p.date, p.title, p.body, p.pid, p.message_status AS messageStatus,
+              pd.id  AS patientId,
+              pd.pid AS patientPid,
               CONCAT(COALESCE(pd.fname,''),' ',COALESCE(pd.lname,'')) AS patientName
        FROM pnotes p
        LEFT JOIN patient_data pd ON pd.pid = p.pid
@@ -839,6 +847,7 @@ export class LabsService {
 
     const readyOrders = await this.dataSource.query(
       `SELECT po.procedure_order_id AS id, po.patient_id AS patientPid,
+              pd.id AS patientId,
               CONCAT(COALESCE(pd.fname,''),' ',COALESCE(pd.lname,'')) AS patientName,
               po.patient_instructions AS instructions, po.order_status AS orderStatus,
               po.date_ordered AS dateOrdered, po.provider_id AS providerId,
@@ -916,7 +925,7 @@ export class LabsService {
     const rows = await this.dataSource.query(
       `SELECT po.procedure_order_id as id, po.patient_id as patientId,
         CONCAT(pd.fname,' ',pd.lname) as patientName,
-        pd.pid as patientPid, po.encounter_id as encounterId,
+        pd.pid as patientPid, pd.id as chartId, po.encounter_id as encounterId,
         po.date_ordered as dateOrdered, po.order_status as orderStatus,
         po.order_priority as orderPriority,
         po.patient_instructions as instructions, po.clinical_hx as clinicalHx,
@@ -1116,6 +1125,7 @@ export class LabsService {
       patientId: r.patientId,
       patientName: r.patientName,
       patientPid: r.patientPid,
+      chartId: r.chartId ?? null,
       encounterId: r.encounterId,
       dateOrdered: r.dateOrdered,
       orderStatus: status,

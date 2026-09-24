@@ -9,6 +9,7 @@ import { useMessagingSocket, MessagingEvent } from '../../hooks/useMessagingSock
 import { canViewFinancials, maskFinancial } from '../../utils/permissions';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
 import { formatDateOnly } from '../../utils/date';
+import { chartPatientId } from '../../utils/patientChart';
 
 export default function ProviderDashboardPage() {
   const { user } = useAuth();
@@ -16,6 +17,9 @@ export default function ProviderDashboardPage() {
   const queryClient = useQueryClient();
   const [expandedPatient, setExpandedPatient] = useState<number | null>(null);
   const [patientSearch, setPatientSearch] = useState('');
+  // Lab notification card: which patient row is expanded, and whether to show all.
+  const [labNotifyExpanded, setLabNotifyExpanded] = useState<string | null>(null);
+  const [labNotifyShowAll, setLabNotifyShowAll] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['provider-dashboard'],
@@ -63,6 +67,50 @@ export default function ProviderDashboardPage() {
     mutationFn: (id: number) => nestClient.post(`/provider/lab-notifications/${id}/ack`, {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['provider-lab-notifications'] }),
   });
+
+  // Smart display: collapse the raw notification list into one compact row per
+  // patient so the card stays short instead of listing every result notice.
+  const labNotifyGroups = useMemo(() => {
+    // Older notices were written with pid = 0, so they have no patient row to
+    // join against. Fall back to the name embedded in the title and group by
+    // that, so they collapse into one row per patient instead of one row each.
+    const nameFromTitle = (t: unknown): string => {
+      const m = String(t || '').match(/Lab Results Ready:\s*(.+?)\s+—/);
+      return m ? m[1].trim() : '';
+    };
+
+    const map = new Map<string, any>();
+    for (const n of labNotifications) {
+      const chartId = Number(n.patientId ?? n.patientPid ?? n.pid) || 0;
+      const name = n.patientName || nameFromTitle(n.title) || 'Unlinked notice';
+      const key = chartId > 0 ? `id:${chartId}` : `name:${name.toLowerCase()}`;
+      let g = map.get(key);
+      if (!g) {
+        g = {
+          key,
+          chartId,
+          name,
+          items: [] as any[],
+          unread: 0,
+          latest: n.date,
+          critical: false,
+        };
+        map.set(key, g);
+      }
+      g.items.push(n);
+      if (String(n.messageStatus || '').toLowerCase() !== 'done') g.unread += 1;
+      if (/critical|⚠️/i.test(String(n.title || ''))) g.critical = true;
+      if (n.date && (!g.latest || String(n.date) > String(g.latest))) g.latest = n.date;
+    }
+    return Array.from(map.values()).sort((a: any, b: any) =>
+      String(b.latest || '').localeCompare(String(a.latest || '')),
+    );
+  }, [labNotifications]);
+
+  /** Keep an expanded group readable — cap the visible notices. */
+  const LAB_NOTICE_LIMIT = 6;
+
+  const visibleLabGroups = labNotifyShowAll ? labNotifyGroups : labNotifyGroups.slice(0, 3);
 
   // Pharmacy notification — prescriptions billed but not yet paid/cleared.
   const { data: pharmacyRx = [] } = useQuery({
@@ -275,7 +323,7 @@ export default function ProviderDashboardPage() {
               {todayAppointments?.length > 0 ? (
                 todayAppointments.map((apt: any) => (
                   <div key={apt.pc_eid} className={`d-flex align-items-center gap-3 px-3 py-3 border-bottom ${apt.pc_apptstatus === 'Checkout' ? 'bg-light opacity-50' : ''}`}
-                    style={{ cursor: 'pointer' }} onClick={() => navigate(`/patients/${apt.patient_id ?? apt.pc_pid}`)}>
+                    style={{ cursor: 'pointer' }} onClick={() => { const cid = chartPatientId(apt.patient_id, apt.pc_pid); if (cid) navigate(`/patients/${cid}`); }}>
                     <div className="text-center flex-shrink-0" style={{ width: '55px' }}>
                       <div className="fw-bold small">{apt.pc_startTime?.substring(0, 5)}</div>
                       {apt.pc_endTime && <small className="text-muted">{apt.pc_endTime.substring(0, 5)}</small>}
@@ -552,49 +600,88 @@ export default function ProviderDashboardPage() {
                 {labUnread > 0 && <span className="badge bg-danger rounded-pill ms-2">{labUnread} new</span>}
               </h6>
               <span className="badge bg-primary rounded-pill">
-                {labReadyOrders.length} order{labReadyOrders.length !== 1 ? 's' : ''} validated
+                {labNotifyGroups.length} patient{labNotifyGroups.length !== 1 ? 's' : ''} · {labReadyOrders.length} validated
               </span>
             </div>
             <div className="card-body p-0">
-              {labNotifications.length === 0 && (
+              {labNotifyGroups.length === 0 && (
                 <div className="text-center text-muted small py-3">No lab notifications yet</div>
               )}
-              {labNotifications.map((n: any) => {
-                const isNew = String(n.messageStatus || '').toLowerCase() !== 'done';
+              {visibleLabGroups.map((g: any) => {
+                const open = labNotifyExpanded === g.key;
                 return (
-                  <div key={n.id} className="d-flex align-items-start gap-3 px-3 py-2 border-bottom"
-                    style={{ background: isNew ? '#0d6efd0a' : 'transparent' }}>
-                    <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 mt-1"
-                      style={{ width: '32px', height: '32px', backgroundColor: isNew ? '#dc354520' : '#6c757d20' }}>
-                      <i className={`bi bi-droplet ${isNew ? 'text-danger' : 'text-secondary'}`}></i>
-                    </div>
-                    <div className="flex-grow-1 min-w-0">
-                      <div className={`small ${isNew ? 'fw-bold' : 'fw-semibold text-muted'}`}>{n.title}</div>
-                      <small className="text-muted d-block text-truncate" style={{ fontSize: '0.65rem' }}>
-                        {String(n.body || '').split('\n')[0]}
-                      </small>
-                      <small className="text-muted" style={{ fontSize: '0.6rem' }}>
-                        {n.date ? new Date(n.date).toLocaleString() : ''}
-                        {n.patientName ? ` · ${n.patientName}` : ''}
-                      </small>
-                    </div>
-                    <div className="d-flex flex-column gap-1 flex-shrink-0">
-                      <button className="btn btn-primary btn-sm rounded-pill py-0 px-2" style={{ fontSize: '0.65rem' }}
-                        onClick={() => navigate(`/patients/${n.pid}`)}>
-                        <i className="bi bi-eye me-1"></i>View
-                      </button>
-                      {isNew && (
-                        <button className="btn btn-outline-secondary btn-sm rounded-pill py-0 px-2" style={{ fontSize: '0.65rem' }}
-                          disabled={ackLabNotification.isPending}
-                          onClick={() => ackLabNotification.mutate(n.id)}>
-                          Mark read
+                  <div key={g.key} className="border-bottom">
+                    <div className="d-flex align-items-center gap-2 px-3 py-2"
+                      style={{ background: g.unread > 0 ? '#0d6efd0a' : 'transparent', cursor: 'pointer' }}
+                      onClick={() => setLabNotifyExpanded(open ? null : g.key)}>
+                      <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                        style={{ width: '30px', height: '30px', backgroundColor: g.unread > 0 ? '#dc354520' : '#6c757d20' }}>
+                        <i className={`bi ${g.critical ? 'bi-exclamation-triangle-fill' : 'bi-droplet'} ${g.unread > 0 ? 'text-danger' : 'text-secondary'}`}></i>
+                      </div>
+                      <div className="flex-grow-1 min-w-0">
+                        <div className="fw-semibold small text-truncate">{g.name}</div>
+                        <small className="text-muted" style={{ fontSize: '0.65rem' }}>
+                          {g.items.length} result notice{g.items.length !== 1 ? 's' : ''}
+                          {g.unread > 0 ? ` · ${g.unread} unread` : ' · all read'}
+                        </small>
+                      </div>
+                      {g.chartId > 0 ? (
+                        <button className="btn btn-primary btn-sm rounded-pill py-0 px-2 flex-shrink-0" style={{ fontSize: '0.65rem' }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/patients/${g.chartId}`); }}>
+                          <i className="bi bi-eye me-1"></i>View
                         </button>
+                      ) : (
+                        <span className="badge bg-light text-muted border flex-shrink-0" style={{ fontSize: '0.6rem' }}
+                          title="This notice was recorded before the patient reference was stored, so it has no chart link.">
+                          no chart link
+                        </span>
                       )}
+                      <i className={`bi bi-chevron-${open ? 'up' : 'down'} text-muted small flex-shrink-0`}></i>
                     </div>
+                    {open && (
+                      <div className="px-3 pb-2">
+                        {g.items.slice(0, LAB_NOTICE_LIMIT).map((n: any) => {
+                          const isNew = String(n.messageStatus || '').toLowerCase() !== 'done';
+                          return (
+                            <div key={n.id} className="d-flex align-items-center gap-2 py-1 ms-4">
+                              <i className={`bi bi-dot flex-shrink-0 ${isNew ? 'text-danger' : 'text-muted'}`}></i>
+                              <div className="flex-grow-1 min-w-0">
+                                <div className={`text-truncate ${isNew ? 'fw-semibold' : 'text-muted'}`} style={{ fontSize: '0.72rem' }}
+                                  title={String(n.title || '')}>
+                                  {String(n.title || '').replace(/^\S*\s*/, '')}
+                                </div>
+                                <small className="text-muted" style={{ fontSize: '0.6rem' }}>
+                                  {n.date ? new Date(n.date).toLocaleString() : ''}
+                                </small>
+                              </div>
+                              {isNew && (
+                                <button className="btn btn-outline-secondary btn-sm rounded-pill py-0 px-2 flex-shrink-0" style={{ fontSize: '0.6rem' }}
+                                  disabled={ackLabNotification.isPending}
+                                  onClick={() => ackLabNotification.mutate(n.id)}>
+                                  Mark read
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {g.items.length > LAB_NOTICE_LIMIT && (
+                          <div className="text-muted ms-4" style={{ fontSize: '0.6rem' }}>
+                            +{g.items.length - LAB_NOTICE_LIMIT} more notice{g.items.length - LAB_NOTICE_LIMIT !== 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+            {labNotifyGroups.length > 3 && (
+              <div className="card-footer bg-white py-2 text-center">
+                <button className="btn btn-link btn-sm text-decoration-none" onClick={() => setLabNotifyShowAll((v) => !v)}>
+                  {labNotifyShowAll ? 'Show less' : `Show all ${labNotifyGroups.length} patients`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

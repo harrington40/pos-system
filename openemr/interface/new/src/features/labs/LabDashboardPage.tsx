@@ -6,6 +6,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { useAuth } from '../../hooks/useAuth';
 import { groupOrdersByPatient } from '../../utils/groupOrdersByPatient';
 import { formatPatientName } from '../../utils/patientName';
+import { chartPatientId } from '../../utils/patientChart';
 import Barcode from '../../components/shared/Barcode';
 
 const TEST_PANELS: { name: string; icon: string; tests: string[] }[] = [
@@ -640,7 +641,7 @@ export default function LabDashboardPage() {
                       {g.orders.map((o: any) => {
                         const tests = testsForOrder(o);
                         return (
-                        <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/patients/${o.patientPid || o.patientId}`)}>
+                        <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => { const cid = chartPatientId(o.chartId, o.patientPid, o.patientId); if (cid) navigate(`/patients/${cid}`); }}>
                           <td className="ps-4"><code>#{o.id}</code></td>
                           <td></td>
                           <td><span className="badge bg-light text-dark">{o.instructions || 'Custom'}</span></td>

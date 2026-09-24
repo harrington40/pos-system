@@ -192,10 +192,19 @@ export class AdminService implements OnModuleInit {
 
   // --- Messages ---
   async getMessages() {
+    // Join patient_data so the UI can open the chart with the canonical patient
+    // id instead of guessing between `id` and `pid` (they are not equal on this
+    // schema — patient_data.id = pid + 1), and so pid=0 rows can be detected.
     return this.dataSource.query(
-      `SELECT id, date, title, body, pid, user, groupname, message_status, assigned_to
-      FROM pnotes WHERE deleted = 0 AND groupname IN ('events', 'Default')
-      ORDER BY date DESC LIMIT 200`,
+      `SELECT p.id, p.date, p.title, p.body, p.pid, p.user, p.groupname,
+              p.message_status, p.assigned_to,
+              pd.id  AS patientId,
+              pd.pid AS patientPid,
+              CONCAT(COALESCE(pd.fname,''), ' ', COALESCE(pd.lname,'')) AS patientName
+       FROM pnotes p
+       LEFT JOIN patient_data pd ON pd.pid = p.pid
+       WHERE p.deleted = 0 AND p.groupname IN ('events', 'Default')
+       ORDER BY p.date DESC LIMIT 200`,
     );
   }
 
