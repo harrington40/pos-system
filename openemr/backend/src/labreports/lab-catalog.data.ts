@@ -155,7 +155,6 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
 
   // BIOCHEMISTRY — KIDNEY FUNCTION TEST
   t('Creatinine – Creatinine Kinase', BIO_KIDNEY, 'TEXT'),
-  t('Creatinine', BIO_KIDNEY, 'NUMERIC', 'mg/dl', '0.6 – 1.5', 0.6, 1.5),
   t('Urea', BIO_KIDNEY, 'NUMERIC', 'mg/dl', '7 – 20', 7, 20),
   t('BUN', BIO_KIDNEY, 'NUMERIC'),
   t('Uric Acid', BIO_KIDNEY, 'NUMERIC', 'mg/dl', '3.4 – 5.7', 3.4, 5.7),
@@ -170,8 +169,6 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('Potassium K+', BIO_ELECTRO, 'NUMERIC', 'mmol/L', '3.5 – 5.0', 3.5, 5.0),
   t('Chloride Cl-', BIO_ELECTRO, 'NUMERIC', 'mmol/L', '98 – 106', 98, 106),
   t('Calcium Ca++', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '8.4 – 11.5', 8.4, 11.5),
-  t('Magnesium', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '1.7 – 2.2', 1.7, 2.2),
-  t('Phosphorus', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '3.0 – 4.5', 3.0, 4.5),
 
   // BIOCHEMISTRY — PANCREATIC FUNCTION PANEL
   t('Lipase', BIO_PANCREAS, 'NUMERIC'),
@@ -289,6 +286,14 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   // reference ranges at all. Appended at the end so the request form's
   // display order is left untouched.
   // ============================================================
+
+  // BLOOD BIOCHEMISTRY — measurements on the result sheet that had no row.
+  // Added here rather than mid-list: `code` is positional (MJ-nnn), so inserting
+  // above would renumber every later test and change what an existing MJ code
+  // refers to.
+  t('Creatinine', BIO_KIDNEY, 'NUMERIC', 'mg/dl', '0.6 – 1.5', 0.6, 1.5),
+  t('Magnesium', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '1.7 – 2.2', 1.7, 2.2),
+  t('Phosphorus', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '3.0 – 4.5', 3.0, 4.5),
 
   // COMPLETE HEMOGRAM
   // `WBC Count (giga/1)` 4 – 10 is covered by 'WBC white Blood Cells' above.

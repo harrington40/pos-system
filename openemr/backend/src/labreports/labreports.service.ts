@@ -112,21 +112,27 @@ export class LabReportsService implements OnModuleInit {
       );
     }
 
-    // 2. Insert missing rows, refresh structural fields on the rest. The
-    //    COALESCE guard is what protects an existing reference range: if the
-    //    seed supplies no range the stored one is kept, and if the row already
-    //    has a range it is not overwritten.
+    // 2. Insert missing rows, refresh structural fields on the rest.
+    //
+    //    The ref_* assignments come BEFORE `name = VALUES(name)` on purpose:
+    //    MySQL evaluates ON DUPLICATE KEY UPDATE left to right, so referencing
+    //    `name` here still yields the *stored* name and we can tell whether this
+    //    code still refers to the same test.
+    //      - same test  -> COALESCE keeps any range already stored/edited
+    //      - name changed (the code now means a different test) -> take the
+    //        seed's range, so a stale range cannot be left on the row
     for (const t of LAB_CATALOG_SEED) {
       await this.dataSource.query(
         `INSERT INTO lab_test_catalog
           (code, name, category, unit, ref_min, ref_max, ref_text, result_type, options, display_order, active)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
          ON DUPLICATE KEY UPDATE
+           ref_min = IF(name <> VALUES(name), VALUES(ref_min), COALESCE(ref_min, VALUES(ref_min))),
+           ref_max = IF(name <> VALUES(name), VALUES(ref_max), COALESCE(ref_max, VALUES(ref_max))),
+           ref_text = IF(name <> VALUES(name), VALUES(ref_text),
+                         COALESCE(NULLIF(ref_text, ''), VALUES(ref_text))),
            name = VALUES(name), category = VALUES(category),
            unit = COALESCE(VALUES(unit), unit),
-           ref_min = COALESCE(ref_min, VALUES(ref_min)),
-           ref_max = COALESCE(ref_max, VALUES(ref_max)),
-           ref_text = COALESCE(NULLIF(ref_text, ''), VALUES(ref_text)),
            result_type = VALUES(result_type), options = VALUES(options),
            display_order = VALUES(display_order),
            active = 1`,
