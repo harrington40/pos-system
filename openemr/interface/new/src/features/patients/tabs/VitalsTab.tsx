@@ -2,25 +2,11 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../../api/nest-client';
 import { classifyBP, classifyPulse, classifyTemp, classifyResp, classifySpO2, vitalTrend, formatVital, formatBP, formatVitalUnit } from '../../../utils/vitalsClassify';
-
-interface VitalItem {
-  id: number;
-  date?: string;
-  bps?: string;
-  bpd?: string;
-  weight?: number;
-  height?: number;
-  temperature?: number;
-  pulse?: number;
-  respiration?: number;
-  BMI?: number;
-  BMI_status?: string;
-  oxygen_saturation?: number;
-  note?: string;
-}
+import VitalsTrend from '../../../components/vitals/VitalsTrend';
+import type { VitalPoint } from '../../../components/vitals/VitalsTrendChart';
 
 interface Props {
-  vitals: VitalItem[];
+  vitals: VitalPoint[];
   patientId: string;
 }
 
@@ -30,33 +16,10 @@ const emptyForm = {
   BMI: '', note: '',
 };
 
-function MiniChart({ data, label, unit, color }: { data: number[]; label: string; unit: string; color: string }) {
-  if (!data.length) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data);
-  const h = 60; const w = data.length * 30 + 20;
-  const points = data.map((v, i) => {
-    const x = 10 + i * 30;
-    const y = h - 10 - ((v - min) / (max - min || 1)) * (h - 20);
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <div className="mb-3">
-      <small className="text-muted">{label} ({unit})</small>
-      <svg width={w} height={h} className="d-block">
-        <polyline points={points} fill="none" stroke={color} strokeWidth="2" />
-        {data.map((v, i) => (
-          <circle key={i} cx={10 + i * 30} cy={h - 10 - ((v - min) / (max - min || 1)) * (h - 20)} r="3" fill={color} />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
 export default function VitalsTab({ vitals, patientId }: Props) {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [view, setView] = useState<'chart' | 'table' | 'both'>('chart');
   const [form, setForm] = useState(emptyForm);
   const [saved, setSaved] = useState(false);
 
@@ -93,12 +56,6 @@ export default function VitalsTab({ vitals, patientId }: Props) {
 
     createVital.mutate(payload);
   };
-
-  const reversed = [...vitals].reverse();
-  const bpSystolic = reversed.map((v: any) => Number(v.bps) || 0).filter((n: number) => n > 0);
-  const bpDiastolic = reversed.map((v: any) => Number(v.bpd) || 0).filter((n: number) => n > 0);
-  const weights = reversed.map((v: any) => Number(v.weight) || 0).filter((n: number) => n > 0);
-  const pulses = reversed.map((v: any) => Number(v.pulse) || 0).filter((n: number) => n > 0);
 
   return (
     <div>
@@ -241,18 +198,43 @@ export default function VitalsTab({ vitals, patientId }: Props) {
 
       {vitals.length > 0 && (
         <>
-          {/* Charts */}
-          <div className="card mb-3">
-            <div className="card-header"><h6 className="mb-0"><i className="bi bi-graph-up me-2"></i>Trend Charts</h6></div>
-            <div className="card-body overflow-auto">
-              <MiniChart data={bpSystolic} label="Systolic BP" unit="mmHg" color="#dc3545" />
-              <MiniChart data={bpDiastolic} label="Diastolic BP" unit="mmHg" color="#0d6efd" />
-              <MiniChart data={weights} label="Weight" unit="kg" color="#198754" />
-              <MiniChart data={pulses} label="Pulse" unit="bpm" color="#fd7e14" />
+          {/* View toggle — kept outside the card it controls, so both views
+              stay reachable once one of them is showing. */}
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <h6 className="mb-0"><i className="bi bi-graph-up me-2"></i>Vital Sign Trends</h6>
+            <div className="btn-group btn-group-sm" role="group" aria-label="Vitals view">
+              {([['chart', 'chart-line', 'Chart'], ['table', 'table', 'Table'], ['both', 'layout-split', 'Both']] as const).map(
+                ([id, icon, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`btn ${view === id ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setView(id)}
+                    aria-pressed={view === id}
+                    title={`${label} view`}
+                  >
+                    <i className={`bi bi-${icon} me-1`}></i>{label}
+                  </button>
+                ),
+              )}
             </div>
           </div>
 
+          {/* Line chart per vital sign; the metric is picked with the pill buttons. */}
+          {view !== 'table' && (
+            <div className="card mb-3">
+              <div className="card-body">
+                <VitalsTrend vitals={vitals} height={300} />
+                <div className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>
+                  <i className="bi bi-info-circle me-1"></i>
+                  Shaded band marks the normal reference range. Points are plotted on the date each reading was taken.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Table */}
+          {view !== 'chart' && (
           <div className="card">
             <div className="card-header"><h6 className="mb-0"><i className="bi bi-table me-2"></i>History</h6></div>
             <div className="card-body p-0">
@@ -287,6 +269,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
             </div>
           </div>
+          )}
         </>
       )}
     </div>

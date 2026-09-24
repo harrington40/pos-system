@@ -6,14 +6,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { formatPatientName } from '../../utils/patientName';
 import { formatDateOnly } from '../../utils/date';
 import { formatVital, formatBP } from '../../utils/vitalsClassify';
+import VitalsTrend from '../../components/vitals/VitalsTrend';
 
 const PAIN_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const SPO2_ALERT_THRESHOLD = 92; // clinic-configurable escalation threshold
-
-function num(v: any): number | null {
-  const n = Number(v);
-  return Number.isFinite(n) && n !== 0 ? n : null;
-}
 
 export default function PatientRoundsPage() {
   const { pid } = useParams<{ pid: string }>();
@@ -73,16 +69,22 @@ export default function PatientRoundsPage() {
 
   const age = patient?.DOB ? Math.floor((Date.now() - new Date(patient.DOB).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
 
-  const trendData = useMemo(() => {
+  // Vital readings inside the selected window, oldest first, ready to chart.
+  const trendVitals = useMemo(() => {
     const now = Date.now();
     const hours = trendWindow === '24h' ? 24 : trendWindow === '48h' ? 48 : 168;
     return [...(vitals as any[])]
-      .reverse()
-      .filter((v: any) => v.date && (now - new Date(v.date).getTime()) <= hours * 3600 * 1000)
-      .map((v: any) => ({ pulse: num(v.pulse), spo2: num(v.oxygen_saturation), temp: num(v.temperature) }));
+      .filter((v: any) => {
+        if (!v.date) return false;
+        const t = new Date(String(v.date).replace(' ', 'T')).getTime();
+        return Number.isFinite(t) && now - t <= hours * 3600 * 1000;
+      })
+      .sort(
+        (a: any, b: any) =>
+          new Date(String(a.date).replace(' ', 'T')).getTime() -
+          new Date(String(b.date).replace(' ', 'T')).getTime(),
+      );
   }, [vitals, trendWindow]);
-
-  const pulseSeries = trendData.map((d: any) => d.pulse).filter((n: any) => n != null);
 
   const checkEscalation = () => {
     const spo2 = Number(form.oxygen_saturation);
@@ -177,16 +179,11 @@ export default function PatientRoundsPage() {
           </div>
         </div>
         <div className="card-body">
-          <div className="small text-muted mb-2">Pulse trend ({pulseSeries.length} readings)</div>
-          {pulseSeries.length >= 2 ? (
-            <svg viewBox="0 0 100 40" width="100%" height="70" preserveAspectRatio="none" style={{ background: '#f8f9fa', borderRadius: '8px' }}>
-              {(() => {
-                const max = Math.max(...pulseSeries), min = Math.min(...pulseSeries), range = (max - min) || 1;
-                const pts = pulseSeries.map((v, i) => `${(i / (pulseSeries.length - 1)) * 100},${40 - 5 - ((v - min) / range) * 30}`).join(' ');
-                return <polyline points={pts} fill="none" stroke="#0d6efd" strokeWidth="2" />;
-              })()}
-            </svg>
-          ) : <div className="text-muted small">Not enough readings for a trend.</div>}
+          {trendVitals.length === 0 ? (
+            <div className="text-muted small">No vitals recorded in the last {trendWindow}.</div>
+          ) : (
+            <VitalsTrend vitals={trendVitals} height={240} />
+          )}
         </div>
       </div>
 

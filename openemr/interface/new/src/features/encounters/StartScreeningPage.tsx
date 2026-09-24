@@ -5,6 +5,7 @@ import nestClient from '../../api/nest-client';
 import { useAuth } from '../../hooks/useAuth';
 import { assessPatient, riskBadge } from '../../utils/nursingSafety';
 import { formatVital, formatBP } from '../../utils/vitalsClassify';
+import VitalsTrend from '../../components/vitals/VitalsTrend';
 import { formatPatientName } from '../../utils/patientName';
 
 // ── Types ───────────────────────────────────────────────────────
@@ -1683,21 +1684,7 @@ export default function StartScreeningPage() {
                       <div className="text-center text-muted py-4">No prior vitals recorded for this patient.</div>
                     ) : (
                       <>
-                        {(() => {
-                          const data = [...vitalHistory].reverse().map(v => Number(v.pulse)).filter(n => Number.isFinite(n) && n > 0);
-                          if (data.length < 2) return null;
-                          const w = 100, h = 40;
-                          const max = Math.max(...data), min = Math.min(...data), range = (max - min) || 1;
-                          const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - 5 - ((v - min) / range) * (h - 10)}`).join(' ');
-                          return (
-                            <div className="mb-2">
-                              <div className="small text-muted mb-1" style={{ fontSize: '0.7rem' }}>Pulse trend (bpm)</div>
-                              <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="80" preserveAspectRatio="none" style={{ background: '#f8f9fa', borderRadius: '8px' }}>
-                                <polyline points={pts} fill="none" stroke="#0d6efd" strokeWidth="2" />
-                              </svg>
-                            </div>
-                          );
-                        })()}
+                        <VitalsTrend vitals={vitalHistory} height={240} />
                         <div style={{ maxHeight: '340px', overflow: 'auto' }}>
                           <table className="table table-sm table-hover mb-0 small" style={{ fontSize: '0.75rem' }}>
                             <thead className="table-light"><tr><th>When</th><th>BP</th><th>Pulse</th><th>Temp</th><th>Resp</th><th>SpO₂</th><th>BMI</th></tr></thead>
