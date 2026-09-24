@@ -31,18 +31,12 @@ describe('missingChartFields', () => {
       status: 'pending',
     });
 
-    expect(missing).toEqual(['Sex', 'Phone', 'Assigned provider']);
-  });
-
-  it('does not block on a blank address, which most of the register has', () => {
-    // Street/city are non-blocking: they are blank on ~70% of live patients, so
-    // requiring them would flag nearly every chart yellow.
-    expect(missingChartFields({ ...completePatient, street: '', city: null })).toEqual([]);
+    expect(missing).toEqual(['Sex', 'Phone', 'Street', 'City', 'Assigned provider']);
   });
 
   it('treats empty and whitespace-only strings as missing', () => {
-    expect(missingChartFields({ ...completePatient, sex: '' })).toEqual(['Sex']);
-    expect(missingChartFields({ ...completePatient, phone_contact: '   ' })).toEqual(['Phone']);
+    expect(missingChartFields({ ...completePatient, city: '' })).toEqual(['City']);
+    expect(missingChartFields({ ...completePatient, street: '   ' })).toEqual(['Street']);
   });
 
   it('treats a null or undefined value as missing', () => {
@@ -58,7 +52,7 @@ describe('missingChartFields', () => {
   it('matches the column names on the patient row', () => {
     // Guards against a rename in patient_data silently disabling a requirement.
     expect(CHART_REQUIREMENTS.map((r) => r.key)).toEqual([
-      'fname', 'lname', 'DOB', 'sex', 'phone_contact', 'providerID',
+      'fname', 'lname', 'DOB', 'sex', 'phone_contact', 'street', 'city', 'providerID',
     ]);
   });
 

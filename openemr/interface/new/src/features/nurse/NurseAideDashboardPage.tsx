@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDebounce } from '../../hooks/useDebounce';
 import nestClient from '../../api/nest-client';
 import PhoneInput from '../../components/shared/PhoneInput';
+import CitySelect from '../../components/shared/CitySelect';
 import {
   assessPatient,
   computeNEWS2,
@@ -79,7 +80,7 @@ export default function NurseAideDashboardPage() {
 
   // New patient intake (triage) — nurse aide collects demographics + vitals for a new patient.
   const [showIntake, setShowIntake] = useState(false);
-  const [intakeForm, setIntakeForm] = useState<any>({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
+  const [intakeForm, setIntakeForm] = useState<any>({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
   const [intakeResult, setIntakeResult] = useState('');
 
   // ── Nurse dashboard: all active ward patients + shared notes ────────────
@@ -219,6 +220,8 @@ export default function NurseAideDashboardPage() {
           DOB: intakeForm.DOB || null,
           sex: intakeForm.sex || '',
           phone_contact: intakeForm.phone_contact || '',
+          street: intakeForm.street || '',
+          city: intakeForm.city || '',
           status: 'pending',
         });
         pid = created.data.pid;
@@ -245,7 +248,7 @@ export default function NurseAideDashboardPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['nurse-dashboard'] });
-      setIntakeForm({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
+      setIntakeForm({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
       setIntakeResult('');
       setShowIntake(false);
     },
@@ -390,6 +393,8 @@ export default function NurseAideDashboardPage() {
                         <div className="col-md-2"><label className="form-label small mb-0">DOB</label><input type="date" className="form-control form-control-sm" value={intakeForm.DOB} onChange={e => setIntakeForm({ ...intakeForm, DOB: e.target.value })} /></div>
                         <div className="col-md-2"><label className="form-label small mb-0">Sex</label><select className="form-select form-select-sm" value={intakeForm.sex} onChange={e => setIntakeForm({ ...intakeForm, sex: e.target.value })}><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select></div>
                         <div className="col-md-4"><label className="form-label small mb-0">Phone</label><PhoneInput value={intakeForm.phone_contact} onChange={v => setIntakeForm({ ...intakeForm, phone_contact: v })} /></div>
+                        <div className="col-md-4"><label className="form-label small mb-0">Street *</label><input className="form-control form-control-sm" placeholder="House no, street" value={intakeForm.street} onChange={e => setIntakeForm({ ...intakeForm, street: e.target.value })} /></div>
+                        <div className="col-md-3"><label className="form-label small mb-0">City *</label><CitySelect value={intakeForm.city} onChange={v => setIntakeForm({ ...intakeForm, city: v })} className="form-select-sm" /></div>
                       </div>
                       <hr className="my-3" />
                       <div className="small fw-semibold text-muted mb-2"><i className="bi bi-heart-pulse me-1 text-danger"></i>Vitals</div>

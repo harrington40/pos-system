@@ -23,17 +23,10 @@ export const CHART_REQUIREMENTS: ChartRequirement[] = [
   { key: 'DOB', label: 'Date of birth' },
   { key: 'sex', label: 'Sex' },
   { key: 'phone_contact', label: 'Phone' },
+  { key: 'street', label: 'Street' },
+  { key: 'city', label: 'City' },
   { key: 'providerID', label: 'Assigned provider' },
 ];
-
-/*
- * Street and city are deliberately NOT required. Across the live register they
- * are blank on ~70% of patients (address is often taken later, or not at all for
- * a walk-in), so making them blocking would leave three charts in four flagged
- * yellow forever — which would make the highlight meaningless. They still show
- * on the demographics form and can be added here if the clinic starts capturing
- * them at registration.
- */
 
 const isBlank = (value: unknown): boolean => {
   if (value === null || value === undefined) return true;
