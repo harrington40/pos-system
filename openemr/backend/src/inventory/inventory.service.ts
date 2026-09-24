@@ -19,6 +19,7 @@ import {
   daysUntilExpiration,
   resolveTransactionDelta,
   applyStockChange,
+  compareByDepletion,
 } from './inventory-status.util';
 import { BillingService } from '../billing/billing.service';
 
@@ -1009,11 +1010,7 @@ export class InventoryService implements OnModuleInit {
 
     const lowStockItems = all
       .filter((i: any) => i.stock_status === 'LOW_STOCK' || i.stock_status === 'OUT_OF_STOCK')
-      .sort((a: any, b: any) => {
-        const ar = a.minimum_quantity > 0 ? a.current_quantity / a.minimum_quantity : 0;
-        const br = b.minimum_quantity > 0 ? b.current_quantity / b.minimum_quantity : 0;
-        return ar - br;
-      })
+      .sort(compareByDepletion)
       .slice(0, 5);
 
     const expiring = await this.expiring();
@@ -1048,11 +1045,7 @@ export class InventoryService implements OnModuleInit {
     const all = await this.getAllItems();
     return all
       .filter((i: any) => i.stock_status === 'LOW_STOCK' || i.stock_status === 'OUT_OF_STOCK')
-      .sort((a: any, b: any) => {
-        const ar = a.minimum_quantity > 0 ? a.current_quantity / a.minimum_quantity : 0;
-        const br = b.minimum_quantity > 0 ? b.current_quantity / b.minimum_quantity : 0;
-        return ar - br;
-      })
+      .sort(compareByDepletion)
       .slice(0, Math.max(1, Number(limit) || 5));
   }
 
@@ -1864,7 +1857,10 @@ export class InventoryService implements OnModuleInit {
         const suggestedQuantity = Math.max(0, reorderTo - i.current_quantity);
         return { ...i, reorder_to: reorderTo, suggested_quantity: suggestedQuantity };
       })
-      .sort((a: any, b: any) => a.suggested_quantity - b.suggested_quantity);
+      // Most depleted first, shared with lowStock() and the dashboard list. This
+      // used to sort ascending on suggested_quantity, which put the *smallest*
+      // shortfall at the top of a list a buyer works down from the top.
+      .sort(compareByDepletion);
   }
 
   async getForecast(days = 90): Promise<any[]> {

@@ -5,6 +5,8 @@ import {
   daysUntilExpiration,
   applyStockChange,
   resolveTransactionDelta,
+  compareByDepletion,
+  depletionRatio,
 } from './inventory-status.util';
 
 describe('inventory status rules', () => {
@@ -29,6 +31,58 @@ describe('inventory status rules', () => {
     it('treats non-numeric input as zero', () => {
       expect(computeStockStatus(null, 10)).toBe('OUT_OF_STOCK');
       expect(computeStockStatus('abc', 10)).toBe('OUT_OF_STOCK');
+    });
+  });
+
+  describe('depletionRatio', () => {
+    it('reports the fraction of the minimum still held', () => {
+      expect(depletionRatio(5, 10)).toBe(0.5);
+      expect(depletionRatio(10, 10)).toBe(1);
+      expect(depletionRatio(0, 10)).toBe(0);
+    });
+
+    it('has no ratio when the item carries no minimum', () => {
+      expect(depletionRatio(0, 0)).toBeNull();
+      expect(depletionRatio(50, 0)).toBeNull();
+      expect(depletionRatio(5, null)).toBeNull();
+    });
+  });
+
+  describe('compareByDepletion', () => {
+    const item = (current: number, minimum: number, suggested?: number) => ({
+      current_quantity: current,
+      minimum_quantity: minimum,
+      suggested_quantity: suggested,
+    });
+
+    it('ranks the most depleted item first', () => {
+      expect(compareByDepletion(item(5, 50), item(40, 50))).toBeLessThan(0);
+      expect(compareByDepletion(item(40, 50), item(5, 50))).toBeGreaterThan(0);
+    });
+
+    it('puts an item at 10% of minimum ahead of one at 90%, regardless of pack size', () => {
+      // The old reorder list sorted ascending on suggested_quantity, which floated
+      // the smallest shortfall to the top; urgency is about how depleted it is.
+      const nearlyEmptyBigPack = item(10, 100, 190);
+      const almostFullSmallPack = item(90, 100, 110);
+      expect([nearlyEmptyBigPack, almostFullSmallPack].sort(compareByDepletion))
+        .toEqual([nearlyEmptyBigPack, almostFullSmallPack]);
+    });
+
+    it('breaks a tie on the larger shortfall', () => {
+      expect(compareByDepletion(item(5, 10, 15), item(5, 10, 40))).toBeGreaterThan(0);
+    });
+
+    it('sorts items with no minimum (not stocked) last', () => {
+      const notStocked = item(0, 0);
+      const lowStock = item(5, 50);
+      expect([notStocked, lowStock].sort(compareByDepletion)).toEqual([lowStock, notStocked]);
+    });
+
+    it('treats non-numeric quantities as zero, i.e. fully depleted', () => {
+      // 'abc' -> 0, so 0/10 ranks ahead of 1/10: the most depleted item first.
+      expect(compareByDepletion(item('abc' as any, 10), item(1, 10))).toBeLessThan(0);
+      expect(compareByDepletion(item(1, 10), item('abc' as any, 10))).toBeGreaterThan(0);
     });
   });
 

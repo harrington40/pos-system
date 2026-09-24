@@ -71,6 +71,50 @@ export function computeStockStatus(
 }
 
 /**
+ * How much of its minimum an item still holds: 0 = empty, 1 = exactly at the
+ * minimum, above 1 = more than the minimum. `null` when there is no minimum to
+ * compare against, i.e. a catalog entry that is not a physical stock item.
+ */
+export function depletionRatio(
+  current: StockRuleInput['current'],
+  minimum: StockRuleInput['minimum'],
+): number | null {
+  const min = toNum(minimum);
+  if (min <= 0) return null;
+  return toNum(current) / min;
+}
+
+/** Minimal shape the depletion comparator needs. */
+export interface DepletionSortable {
+  current_quantity: number | string | null | undefined;
+  minimum_quantity: number | string | null | undefined;
+  /** Optional; breaks a tie between two equally depleted items. */
+  suggested_quantity?: number | string | null | undefined;
+}
+
+/**
+ * Rank stock by urgency: most depleted first, so an item sitting at 10% of its
+ * minimum is listed before one at 90%.
+ *
+ * Shared by `lowStock()`, the dashboard list and the reorder suggestions so the
+ * three cannot drift apart — the reorder list previously sorted ascending on the
+ * suggested quantity, which put the *smallest* shortfall at the top of a list a
+ * buyer works down from the top.
+ *
+ * Rows with no minimum (not stocked) have no ratio and sort last.
+ */
+export function compareByDepletion(a: DepletionSortable, b: DepletionSortable): number {
+  const ar = depletionRatio(a.current_quantity, a.minimum_quantity);
+  const br = depletionRatio(b.current_quantity, b.minimum_quantity);
+  if (ar === null && br === null) return 0;
+  if (ar === null) return 1;
+  if (br === null) return -1;
+  if (ar !== br) return ar - br;
+  // Equally depleted: the bigger shortfall is the more urgent one.
+  return toNum(b.suggested_quantity) - toNum(a.suggested_quantity);
+}
+
+/**
  * EXPIRED:       expiration_date < today
  * EXPIRING_SOON: within alertDays of today (and not expired)
  * NO_EXPIRATION: no expiration date recorded
