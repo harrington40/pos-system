@@ -1,0 +1,11 @@
+# Dependencies
+node_modules
+
+# Environment files — never commit real credentials.
+# Templates (.env.example / .env.sample / .env.template) stay tracked.
+**/.env
+**/.env.local
+**/.env.development
+**/.env.production
+**/.env.test
+
