@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { LAB_CATALOG_SEED } from './lab-catalog.data';
+import { LAB_CATALOG_SEED, UNMATCHED_SHEET_CODES } from './lab-catalog.data';
 
 @Injectable()
 export class LabReportsService implements OnModuleInit {
@@ -12,6 +12,11 @@ export class LabReportsService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.ensureSchema();
     await this.seedCatalog();
+    if (UNMATCHED_SHEET_CODES.length) {
+      this.logger.error(
+        `Lab catalog: ${UNMATCHED_SHEET_CODES.length} result-sheet code(s) do not exist and were dropped from the result form: ${UNMATCHED_SHEET_CODES.join(', ')}`,
+      );
+    }
   }
 
   private async ensureSchema(): Promise<void> {
@@ -80,6 +85,16 @@ export class LabReportsService implements OnModuleInit {
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+    // Which printed RESULT sheet(s) a test appears on. Added after the original
+    // table, so it has to be applied to existing installs too; MariaDB supports
+    // ADD COLUMN IF NOT EXISTS, making this safe to run on every boot.
+    try {
+      await this.dataSource.query(
+        `ALTER TABLE lab_test_catalog ADD COLUMN IF NOT EXISTS sheet VARCHAR(255) NULL`,
+      );
+    } catch {
+      // Older MySQL without IF NOT EXISTS: ignore "duplicate column" and carry on.
+    }
     this.logger.log('Lab reports schema ready');
   }
 
@@ -124,8 +139,8 @@ export class LabReportsService implements OnModuleInit {
     for (const t of LAB_CATALOG_SEED) {
       await this.dataSource.query(
         `INSERT INTO lab_test_catalog
-          (code, name, category, unit, ref_min, ref_max, ref_text, result_type, options, display_order, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+          (code, name, category, unit, ref_min, ref_max, ref_text, result_type, options, display_order, active, sheet)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
          ON DUPLICATE KEY UPDATE
            ref_min = IF(name <> VALUES(name), VALUES(ref_min), COALESCE(ref_min, VALUES(ref_min))),
            ref_max = IF(name <> VALUES(name), VALUES(ref_max), COALESCE(ref_max, VALUES(ref_max))),
@@ -135,9 +150,10 @@ export class LabReportsService implements OnModuleInit {
            unit = COALESCE(VALUES(unit), unit),
            result_type = VALUES(result_type), options = VALUES(options),
            display_order = VALUES(display_order),
-           active = 1`,
+           active = 1,
+           sheet = VALUES(sheet)`,
         [t.code, t.name, t.category, t.unit || null, t.refMin ?? null, t.refMax ?? null,
-         t.refText || null, t.resultType, t.options || null, t.displayOrder],
+         t.refText || null, t.resultType, t.options || null, t.displayOrder, t.sheet || null],
       );
     }
     this.logger.log(`Lab test catalog seeded (${LAB_CATALOG_SEED.length} tests)`);

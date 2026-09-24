@@ -32,7 +32,32 @@ export interface CatalogSeed {
   resultType: 'NUMERIC' | 'TEXT' | 'POSITIVE_NEGATIVE' | 'SELECT' | 'BLOOD_GROUP';
   options?: string;
   displayOrder: number;
+  /**
+   * Comma-separated RESULT sheets this test is printed on (see RESULT_SHEETS).
+   *
+   * The catalog serves two jobs: the ordering menu (grouped by `category`, the
+   * request form) and the patient result form (grouped by sheet, the four
+   * printed result sheets). Only rows with a `sheet` appear on the result form,
+   * so the ordering-only sections — fertility panels, tumour markers, thyroid,
+   * the nutritional and coagulation panels — no longer show up there. A test
+   * printed on two sheets lists both and is shown in each folder. Assigned from
+   * SHEET_MEMBERS at the bottom of this file.
+   */
+  sheet?: string;
 }
+
+/**
+ * The four printed RESULT sheets, in the order they appear on paper. The result
+ * form renders one folder per sheet, in this order.
+ */
+export const RESULT_SHEETS = [
+  'RESULTS BLOOD BIOCHEMISTRY',
+  'BIO-MEDICAL ANALYSIS LABORATORY',
+  'COMPLETE HEMOGRAM',
+  'URINE CHEMISTRY LAB RESULT-FORM',
+] as const;
+
+export type ResultSheet = (typeof RESULT_SHEETS)[number];
 
 let seq = 0;
 const t = (
@@ -332,3 +357,131 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
 ];
 
 export const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// ============================================================
+// RESULT-SHEET MEMBERSHIP
+// ------------------------------------------------------------
+// Which of the four printed result sheets each test belongs to, in the exact
+// order the rows appear on that sheet. Keyed by `code` (not name) so a rename
+// cannot silently drop a test from the result form; every code is checked below
+// and anything that does not resolve is reported at boot instead of vanishing.
+//
+// A test printed on two sheets is listed under both and appears in each folder
+// on the form, but it stays a single catalog row — the value entered is shared,
+// so the biochemistry FBS and the serology FBS can never disagree.
+// ============================================================
+const SHEET_MEMBERS: Record<ResultSheet, string[]> = {
+  // RESULTS BLOOD BIOCHEMISTRY
+  'RESULTS BLOOD BIOCHEMISTRY': [
+    'MJ-031', // FBS
+    'MJ-032', // RBS
+    'MJ-052', // Urea
+    'MJ-128', // Creatinine
+    'MJ-049', // Calcium
+    'MJ-129', // Magnesium
+    'MJ-054', // Uric Acid
+    'MJ-050', // Total Protein
+    'MJ-037', // Triglyceride
+    'MJ-036', // Cholesterol Total
+    'MJ-038', // HDL
+    'MJ-039', // LDL
+    'MJ-057', // Chlorine
+    'MJ-130', // Phosphorus
+    'MJ-056', // Potassium
+    'MJ-055', // Sodium
+    'MJ-046', // Transa ALT(GPT)
+    'MJ-045', // Transa AST(GOT)
+    'MJ-061', // Total Bilirubin
+    'MJ-070', // AFP
+  ],
+  // BIO-MEDICAL ANALYSIS LABORATORY
+  'BIO-MEDICAL ANALYSIS LABORATORY': [
+    'MJ-016', // Syphilis
+    'MJ-010', // Widal TO
+    'MJ-011', // Widal TH
+    'MJ-020', // Hepatitis B
+    'MJ-026', // Hepatitis C
+    'MJ-150', // Spot Test
+    'MJ-151', // Cold Test
+    'MJ-019', // H. Pylori
+    'MJ-001', // HGB
+    'MJ-031', // FBS  (also on Blood Biochemistry)
+    'MJ-032', // RBS  (also on Blood Biochemistry)
+    'MJ-004', // M/S
+    'MJ-006', // Blood / Group
+    'MJ-005', // Sickle Cell
+    'MJ-152', // Skin Test
+    'MJ-153', // Stool Test
+    'MJ-036', // Total Cholesterol (also on Blood Biochemistry)
+    'MJ-008', // RDT
+    'MJ-154', // MTT
+    'MJ-003', // Count WBC (also on Complete Hemogram)
+  ],
+  // COMPLETE HEMOGRAM
+  'COMPLETE HEMOGRAM': [
+    'MJ-003', // WBC Count
+    'MJ-131', // LYM (%)
+    'MJ-132', // Mid (%)
+    'MJ-133', // GR (%)
+    'MJ-134', // Lym (#)
+    'MJ-135', // Mid (#)
+    'MJ-136', // GR (#)
+    'MJ-137', // RBC Count
+    'MJ-138', // HGB
+    'MJ-139', // HCT (%)
+    'MJ-140', // M.C.V (fl)
+    'MJ-141', // M.C.H. (pg)
+    'MJ-142', // M.C.H.C (g/dl)
+    'MJ-143', // RDW-CV (%)
+    'MJ-144', // RDW-SD (fl)
+    'MJ-145', // MPV (fl)
+    'MJ-146', // PCT (%)
+    'MJ-147', // PDW (%)
+    'MJ-148', // PLCR (%)
+    'MJ-149', // PLCC (L)
+  ],
+  // URINE CHEMISTRY LAB RESULT-FORM
+  'URINE CHEMISTRY LAB RESULT-FORM': [
+    'MJ-110', // PH
+    'MJ-111', // S/G
+    'MJ-104', // BILIRUBIN
+    'MJ-103', // UROBILLIOGEN
+    'MJ-108', // BLOOD
+    'MJ-105', // KETONE
+    'MJ-109', // NITRITE
+    'MJ-107', // PROTEIN
+    'MJ-112', // LEUKOCYTES
+    'MJ-106', // GLUCOSE
+    'MJ-101', // COLOR
+    'MJ-102', // CHARACTER
+    'MJ-155', // SEDIMENT
+    'MJ-113', // WBC
+    'MJ-114', // RBC
+    'MJ-115', // EPITHELIA CELLS
+    'MJ-116', // CASTS
+    'MJ-117', // CRYSTAL
+    'MJ-118', // PARASITES
+    'MJ-119', // YEASTS
+    'MJ-120', // BACTERIA
+    'MJ-121', // OTHERS
+  ],
+};
+
+/**
+ * Codes listed in SHEET_MEMBERS that do not exist in the seed. Empty is the
+ * healthy state; the service logs anything here on boot so a bad code shows up
+ * immediately instead of quietly dropping a row off the result form.
+ */
+export const UNMATCHED_SHEET_CODES: string[] = [];
+
+for (const [sheet, codes] of Object.entries(SHEET_MEMBERS) as [ResultSheet, string[]][]) {
+  for (const code of codes) {
+    const row = LAB_CATALOG_SEED.find((t) => t.code === code);
+    if (!row) {
+      UNMATCHED_SHEET_CODES.push(code);
+      continue;
+    }
+    row.sheet = row.sheet ? `${row.sheet},${sheet}` : sheet;
+  }
+}
+

@@ -8,6 +8,28 @@ import { formatDateTime } from '../../utils/date';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+/**
+ * The four printed RESULT sheets, in paper order. Mirrors `RESULT_SHEETS` in
+ * backend/src/labreports/lab-catalog.data.ts — the result form is built from the
+ * tests that carry one of these sheet names, so the ordering-only catalog
+ * sections (fertility panels, tumour markers, thyroid, nutritional and
+ * coagulation panels) do not appear here at all.
+ */
+const RESULT_SHEETS = [
+  'RESULTS BLOOD BIOCHEMISTRY',
+  'BIO-MEDICAL ANALYSIS LABORATORY',
+  'COMPLETE HEMOGRAM',
+  'URINE CHEMISTRY LAB RESULT-FORM',
+];
+
+/** The sheets a catalog row belongs to (a test can be printed on two sheets). */
+const sheetsOf = (t: any): string[] =>
+  String(t?.sheet || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+
 function computeFlag(test: any, value: string): string {
   if (!value) return '';
   if (test.result_type === 'NUMERIC' && (test.ref_min != null || test.ref_max != null)) {
@@ -145,13 +167,24 @@ export default function LabResultFormPage() {
     enabled: !!selectedPid,
   });
 
+  /**
+   * Only the tests printed on a RESULT sheet reach this form. A test printed on
+   * two sheets is listed in each folder but stays one row, so the value entered
+   * is shared and the two sheets can never disagree.
+   */
+  const sheetTests = useMemo(
+    () => (catalog as any[]).filter((t: any) => sheetsOf(t).length > 0),
+    [catalog],
+  );
+
   const grouped = useMemo(() => {
     const map: Record<string, any[]> = {};
-    for (const t of catalog as any[]) {
-      (map[t.category] ||= []).push(t);
+    for (const sheet of RESULT_SHEETS) {
+      const tests = sheetTests.filter((t: any) => sheetsOf(t).includes(sheet));
+      if (tests.length) map[sheet] = tests;
     }
     return map;
-  }, [catalog]);
+  }, [sheetTests]);
 
   const orderedLower = useMemo(() => new Set((orderedTests as string[]).map(s => s.toLowerCase())), [orderedTests]);
 
@@ -163,9 +196,9 @@ export default function LabResultFormPage() {
     setComments({});
     setReportId(null);
     setLabNo('');
-    // Auto-select tests matching the ordered test names.
+    // Auto-select the result-sheet tests that match the ordered test names.
     const sel: Record<number, boolean> = {};
-    for (const t of catalog as any[]) {
+    for (const t of sheetTests as any[]) {
       const match = orderedLower.has(String(t.name).toLowerCase()) ||
         orderedLower.has(String(t.code).toLowerCase());
       if (match) sel[t.id] = true;
@@ -174,9 +207,9 @@ export default function LabResultFormPage() {
   };
 
   const visibleTests = useMemo(() => {
-    const list = (catalog as any[]).filter(t => showAll || selectedTests[t.id]);
+    const list = (sheetTests as any[]).filter(t => showAll || selectedTests[t.id]);
     return list;
-  }, [catalog, selectedTests, showAll]);
+  }, [sheetTests, selectedTests, showAll]);
 
   /**
    * The catalog is 155 tests across ~20 sections, which makes one very long
@@ -381,7 +414,7 @@ export default function LabResultFormPage() {
           <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
             <span className="small text-muted">
               <i className="bi bi-folder2-open me-1"></i>
-              {catFolders.length} section{catFolders.length === 1 ? '' : 's'} · {openFolders} open
+              {catFolders.length} result sheet{catFolders.length === 1 ? '' : 's'} · {openFolders} open
               <span className="ms-2">{visibleTests.length} tests shown</span>
             </span>
             <div className="d-flex align-items-center gap-2 flex-wrap">
@@ -426,6 +459,13 @@ export default function LabResultFormPage() {
               </button>
             )}
           </div>
+
+          <p className="text-muted mb-3" style={{ fontSize: '0.78rem' }}>
+            <i className="bi bi-info-circle me-1"></i>
+            This form covers the four printed result sheets — Blood Biochemistry, Bio-Medical Analysis (serology),
+            Complete Hemogram and Urine Chemistry. Tests ordered from the laboratory request form that are not on
+            those sheets are not recorded here.
+          </p>
 
           {!selectedPid ? (
             <div className="text-center text-muted py-5"><i className="bi bi-person-search fs-1 d-block mb-2"></i>Select a patient to begin result entry.</div>
