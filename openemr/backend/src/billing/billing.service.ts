@@ -66,6 +66,133 @@ export interface ClearanceItem {
   icon: string;
 }
 
+/**
+ * `billing.code_text` is NULL on this schema, so a charge rendered straight from
+ * the row shows nothing but a bare CPT/HCPCS code — which is why the encounter
+ * breakdown read like "#56 · 85025 · HCPCS". This catalog supplies a real name
+ * and a category for every code the fork writes, so a line can say
+ * "Complete blood count (CBC) with differential — Laboratory test".
+ *
+ * Codes not listed here fall back to `code_text`, then to a prettified code.
+ */
+const CHARGE_CATALOG: Record<string, { name: string; category: string }> = {
+  // Internal facility codes written by this fork (see billTriageIntake).
+  REG: { name: 'Patient registration', category: 'Administrative' },
+  TRIAGE: { name: 'Triage / intake assessment', category: 'Nursing' },
+  VITALS: { name: 'Vital signs recording', category: 'Nursing' },
+  ROOM: { name: 'Examination room use', category: 'Facility' },
+  // Laboratory tests.
+  '80048': { name: 'Basic metabolic panel', category: 'Laboratory' },
+  '80053': { name: 'Comprehensive metabolic panel', category: 'Laboratory' },
+  '81001': { name: 'Urinalysis, automated with microscopy', category: 'Laboratory' },
+  '81025': { name: 'Urine pregnancy test', category: 'Laboratory' },
+  '82947': { name: 'Glucose, quantitative (fasting blood sugar)', category: 'Laboratory' },
+  '83036': { name: 'Hemoglobin A1c', category: 'Laboratory' },
+  '84443': { name: 'Thyroid stimulating hormone (TSH)', category: 'Laboratory' },
+  '85025': { name: 'Complete blood count (CBC) with differential', category: 'Laboratory' },
+  '87086': { name: 'Urine culture, quantitative colony count', category: 'Laboratory' },
+  // Imaging studies.
+  '72100': { name: 'X-ray, spine, lumbosacral', category: 'Imaging' },
+  '76770': { name: 'Ultrasound, retroperitoneal (renal), complete', category: 'Imaging' },
+  // Consultation / evaluation.
+  '99213': { name: 'Office visit, established patient, 15 minutes', category: 'Consultation' },
+};
+
+/** Medication / consumable names for the RX- codes the pharmacy writes. */
+const RX_CATALOG: Record<string, string> = {
+  'RX-TMP-SMX-800-160MG': 'Trimethoprim / Sulfamethoxazole 800/160 mg',
+  'RX-IV-CANNULA-22G': 'IV cannula, 22 gauge',
+  'RX-IV-CANNULA-18G': 'IV cannula, 18 gauge',
+  'RX-IBUPROFEN-600MG': 'Ibuprofen 600 mg',
+  'RX-LISINOPRIL-10MG': 'Lisinopril 10 mg',
+};
+
+/** `RX-IV-CANNULA-22G` -> "IV cannula 22G" when there is no explicit name. */
+function prettifyRxCode(code: string): string {
+  const parts = code.replace(/^RX-/, '').split('-').filter(Boolean);
+  if (!parts.length) return code;
+  return parts
+    .map((p, i) => (i === 0 ? p : p.length <= 3 ? p : p.charAt(0) + p.slice(1).toLowerCase()))
+    .join(' ');
+}
+
+/**
+ * Human name + category for a billing line. The category is what lets the
+ * breakdown say "Laboratory test" instead of making the reader decode a code.
+ */
+function describeCharge(
+  code: string | null,
+  codeType: string | null,
+  codeText: string | null,
+): { name: string; category: string; isLab: boolean } {
+  const c = String(code || '').trim();
+  const known = CHARGE_CATALOG[c.toUpperCase()];
+  if (known) return { ...known, isLab: known.category === 'Laboratory' || known.category === 'Imaging' };
+
+  if (/^RX-/i.test(c)) {
+    return {
+      name: RX_CATALOG[c.toUpperCase()] || prettifyRxCode(c),
+      category: /CANNULA|SYRINGE|GLOVE|GAUZE/i.test(c) ? 'Consumable' : 'Medication',
+      isLab: false,
+    };
+  }
+
+  const text = String(codeText || '').trim();
+  if (text) {
+    const lab = /lab|blood|urine|culture|panel|count|glucose|hba1c|thyroid/i.test(text);
+    return { name: text, category: lab ? 'Laboratory' : (codeType || 'Charge'), isLab: lab };
+  }
+
+  return {
+    name: `${codeType ? `${codeType} ` : ''}code ${c || 'unknown'}`,
+    category: 'Uncategorized',
+    isLab: false,
+  };
+}
+
+/**
+ * A short, human title for an encounter. `form_encounter.reason` is meaningful
+ * for real visits ("Routine Visit") but the fork also auto-creates placeholder
+ * rows ("Auto-created encounter for billing"), which tell a reader nothing — so
+ * those fall back to the dominant category of the charges on the visit.
+ */
+function describeEncounter(reason: string | null, categories: string[]): string {
+  const r = String(reason || '').trim();
+  const placeholder = !r || /auto-?created|for billing|^n\/?a$/i.test(r);
+  if (!placeholder) return r;
+
+  const has = (c: string) => categories.includes(c);
+  if (has('Laboratory') && !has('Consultation') && !has('Imaging')) return 'Laboratory visit';
+  if (has('Imaging') && !has('Consultation')) return 'Imaging visit';
+  if (has('Consultation')) return 'Consultation visit';
+  if (has('Nursing') || has('Administrative')) return 'Intake / triage visit';
+  if (has('Medication') || has('Consumable')) return 'Pharmacy / medication only';
+  if (has('Facility')) return 'Facility charge';
+  return 'Visit (no description recorded)';
+}
+
+/**
+ * The single most meaningful category on a visit, used for the type badge.
+ * Visits usually mix a clinical charge with facility/consumable items, and the
+ * first line is not necessarily the interesting one.
+ */
+const CATEGORY_PRIORITY = [
+  'Laboratory',
+  'Imaging',
+  'Consultation',
+  'Nursing',
+  'Administrative',
+  'Medication',
+  'Consumable',
+  'Facility',
+];
+
+function dominantCategory(categories: string[]): string {
+  for (const c of CATEGORY_PRIORITY) if (categories.includes(c)) return c;
+  return categories[0] || 'Uncategorized';
+}
+
+
 @Injectable()
 export class BillingService implements OnModuleInit {
   private readonly logger = new Logger(BillingService.name);
@@ -459,55 +586,164 @@ export class BillingService implements OnModuleInit {
       });
     }
 
+    // Lab orders are the other half of a lab charge: the billing row only carries
+    // the CPT code, so pull the ordered tests in and match them back to the
+    // charge. `procedure_order.encounter_id` is 0 on this data, so the link is
+    // made by matching the ordered test name to the code's catalogue name, and
+    // the encounter link is inferred from the order date when it is not stored.
+    const labOrders = await this.dataSource.query(
+      `SELECT po.procedure_order_id   AS orderId,
+              po.encounter_id         AS encounterId,
+              po.order_status         AS status,
+              po.order_priority       AS priority,
+              po.date_ordered         AS dateOrdered,
+              po.date_collected       AS dateCollected,
+              COALESCE(NULLIF(TRIM(po.patient_instructions), ''), 'Lab test') AS testName
+         FROM procedure_order po
+        WHERE po.patient_id = ? AND po.activity = 1
+        ORDER BY po.date_ordered DESC`,
+      [pid],
+    );
+
+    /** Significant lowercase words, for fuzzy charge <-> lab-order matching. */
+    const keywords = (s: string): string[] =>
+      String(s || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !['test', 'panel', 'with', 'and', 'the'].includes(w));
+
+    const describeLines = (rows: any[], refDate?: any): any[] =>
+      rows.map((l: any) => {
+        const info = describeCharge(l.code, l.codeType, l.description);
+        const words = keywords(info.name);
+
+        // Lab order that shares a significant word with the charge name. When the
+        // visit date is known, prefer the order raised closest to that date so the
+        // charge is tied to the right episode rather than to a later repeat.
+        const ref = refDate ? new Date(refDate).getTime() : null;
+        const match = (labOrders as any[])
+          .filter((o) => {
+            const t = String(o.testName || '').toLowerCase();
+            return words.some((w) => t.includes(w));
+          })
+          .sort((a, b) => {
+            const at = new Date(a.dateOrdered || 0).getTime();
+            const bt = new Date(b.dateOrdered || 0).getTime();
+            if (ref == null) return at - bt;
+            return Math.abs(at - ref) - Math.abs(bt - ref);
+          })
+          .shift();
+
+        return {
+          code: l.code,
+          codeType: l.codeType,
+          description: info.name,
+          category: info.category,
+          isLab: info.isLab,
+          amount: Number(l.amount) || 0,
+          qty: Number(l.qty) || 0,
+          labOrder: match
+            ? { orderId: match.orderId, testName: match.testName, status: match.status }
+            : null,
+        };
+      });
+
     let grandCharges = 0;
     let grandPaid = 0;
     const result = encounters.map((e: any) => {
       const k = String(e.encounterId);
-      const encLines = byEnc[k] || [];
-      const charges = encLines.reduce((s, l) => s + l.amount, 0);
+      const lines = describeLines(byEnc[k] || [], e.date);
+      const charges = lines.reduce((s, l) => s + l.amount, 0);
       const paid = paidMap[k] || 0;
       const adjustments = adjMap[k] || 0;
       grandCharges += charges;
       grandPaid += paid;
       const encHolds = holdsByEnc[k] || [];
+
+      const categories = Array.from(new Set(lines.map((l: any) => l.category)));
+      // Tests actually billed on this visit — the authoritative list for the row.
+      const billedLabTests = Array.from(
+        new Set(lines.filter((l: any) => l.isLab).map((l: any) => l.description)),
+      );
+
+      // Lab orders we can tie to this visit: the stored encounter link when set,
+      // otherwise (only for visits that really have lab charges) orders raised
+      // the same day. `procedure_order.encounter_id` is 0 on this data, so the
+      // date link is a heuristic and the UI labels it as such.
+      const sameDay = (a: any, b: any) =>
+        !!a && !!b && new Date(a).toDateString() === new Date(b).toDateString();
+      let encLabs = (labOrders as any[]).filter(
+        (o) => Number(o.encounterId) === Number(e.encounterId) && Number(o.encounterId) > 0,
+      );
+      let labLink: 'encounter' | 'date' | null = encLabs.length ? 'encounter' : null;
+      if (!encLabs.length && billedLabTests.length) {
+        encLabs = (labOrders as any[]).filter((o) => sameDay(o.dateOrdered, e.date));
+        if (encLabs.length) labLink = 'date';
+      }
+
       return {
         encounterId: e.encounterId,
         date: e.date,
         dateEnd: e.dateEnd,
         reason: e.reason,
         disposition: e.disposition,
+        // Human title + dominant charge type, so the row never shows a bare "#56".
+        label: describeEncounter(e.reason, categories),
+        categories,
+        type: dominantCategory(categories),
         charges,
         paid,
         adjustments,
         balance: Math.max(0, charges - paid - adjustments),
-        lines: encLines,
+        lines,
+        labOrders: encLabs.map((o: any) => ({
+          orderId: o.orderId,
+          testName: o.testName,
+          status: o.status,
+          priority: o.priority,
+          dateOrdered: o.dateOrdered,
+          dateCollected: o.dateCollected,
+        })),
+        labTests: billedLabTests.length ? billedLabTests : encLabs.map((o: any) => o.testName),
+        labLink,
         holds: encHolds,
         pendingHolds: encHolds.filter((h: any) => h.status === 'hold').length,
       };
     });
 
-    // Charges not tied to a real encounter row (encounter = 0 or missing).
+    // Charges with no encounter row of their own (encounter = 0 or missing) —
+    // registration, intake and pharmacy items are posted this way.
     const encIds = new Set(result.map((r: any) => String(r.encounterId)));
     const orphanLines = (lines as any[]).filter((l: any) => !encIds.has(String(l.encounter)));
     const orphanCharges = orphanLines.reduce((s: number, l: any) => s + (Number(l.fee) || 0), 0);
     if (orphanCharges > 0) {
       const orphanPaid = paidMap['0'] || paidMap['null'] || 0;
+      const described = describeLines(orphanLines);
+      const orphanCategories = Array.from(new Set(described.map((l: any) => l.category)));
       grandCharges += orphanCharges;
       grandPaid += orphanPaid;
       result.push({
         encounterId: 0,
         date: null,
         dateEnd: null,
-        reason: 'Unassigned charges (no encounter)',
-        disposition: null,
+        reason: 'Not linked to a visit',
+        // A real explanation instead of the old bare "Unassigned": these are
+        // charges posted directly against the patient (registration, intake,
+        // medication) rather than against a visit.
+        label: 'Not linked to a visit',
+        description:
+          'Charges recorded directly against the patient instead of a visit — typically registration, triage/intake or pharmacy items posted on their own.',
+        categories: orphanCategories,
+        type: dominantCategory(orphanCategories),
         charges: orphanCharges,
         paid: orphanPaid,
         adjustments: adjMap['0'] || 0,
         balance: Math.max(0, orphanCharges - orphanPaid - (adjMap['0'] || 0)),
-        lines: orphanLines.map((l: any) => ({
-          codeType: l.codeType, code: l.code, description: l.description || '',
-          amount: Number(l.fee) || 0, qty: Number(l.qty) || 0,
-        })),
+        lines: described,
+        labOrders: [],
+        labTests: [],
+        labLink: null,
         holds: holdsByEnc['0'] || [],
         pendingHolds: (holdsByEnc['0'] || []).filter((h: any) => h.status === 'hold').length,
       });
@@ -522,6 +758,12 @@ export class BillingService implements OnModuleInit {
         paid: grandPaid,
         balance: Math.max(0, grandCharges - grandPaid),
       },
+      labOrders: (labOrders as any[]).map((o: any) => ({
+        orderId: o.orderId,
+        testName: o.testName,
+        status: o.status,
+        dateOrdered: o.dateOrdered,
+      })),
       pendingHolds: pendingHolds.length,
       holdsPending: pendingHolds,
     };

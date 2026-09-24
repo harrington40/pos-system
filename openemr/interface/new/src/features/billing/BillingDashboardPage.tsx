@@ -646,11 +646,33 @@ export default function BillingDashboardPage() {
                               <tr>
                                 <td>
                                   <div className="fw-semibold">
-                                    {e.encounterId ? `#${e.encounterId}` : 'Unassigned'}
+                                    {e.label || e.reason || 'Visit'}
+                                    {e.encounterId > 0 && (
+                                      <span className="text-muted ms-1" style={{ fontSize: '0.65rem', fontWeight: 400 }}>
+                                        #{e.encounterId}
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-                                    {e.date ? new Date(e.date).toLocaleDateString() : (e.reason || '')}
+                                    {e.date ? formatDateHuman(e.date) : ''}
+                                    {e.type && (
+                                      <span className="badge bg-light text-dark border ms-1" style={{ fontSize: '0.6rem' }}>
+                                        {e.type}
+                                      </span>
+                                    )}
                                   </div>
+                                  {e.description && (
+                                    <div className="text-muted" style={{ fontSize: '0.68rem' }}>{e.description}</div>
+                                  )}
+                                  {e.labTests?.length > 0 && (
+                                    <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+                                      <i className="bi bi-flask me-1"></i>
+                                      Lab: {e.labTests.join(', ')}
+                                      {e.labLink === 'date' && (
+                                        <span className="fst-italic ms-1">(matched by order date)</span>
+                                      )}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="text-end">{formatUSD(e.charges)}</td>
                                 <td className="text-end text-success">{formatUSD(e.paid)}</td>
@@ -665,7 +687,20 @@ export default function BillingDashboardPage() {
                               </tr>
                               {e.lines.map((l: any, li: number) => (
                                 <tr key={`${e.encounterId}-${li}`} className="text-muted" style={{ fontSize: '0.72rem' }}>
-                                  <td className="ps-4"><i className="bi bi-dot"></i>{l.code} · {l.description || l.codeType}</td>
+                                  <td className="ps-4">
+                                    <i className="bi bi-dot"></i>
+                                    <span className="text-dark">{l.description || l.code}</span>
+                                    <span className="ms-1" style={{ fontSize: '0.65rem' }}>
+                                      · {l.code}
+                                      {l.category ? ` · ${l.category}` : ''}
+                                    </span>
+                                    {l.labOrder && (
+                                      <span className="ms-1" style={{ fontSize: '0.65rem' }}>
+                                        <i className="bi bi-flask me-1"></i>
+                                        ordered as “{l.labOrder.testName}” · {l.labOrder.status}
+                                      </span>
+                                    )}
+                                  </td>
                                   <td className="text-end">{formatUSD(l.amount)}</td>
                                   <td colSpan={3} className="text-end">qty {l.qty}</td>
                                 </tr>
