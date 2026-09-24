@@ -193,6 +193,8 @@ export default function BillingDashboardPage() {
   // Coverage editor state (Insured split vs No insurance) — for calculation purposes.
   const [coverageType, setCoverageType] = useState('self_pay');
   const [coveragePercent, setCoveragePercent] = useState('40');
+  /** Highlight the CPT/HCPCS code on every encounter-breakdown charge line. */
+  const [showCptCodes, setShowCptCodes] = useState(false);
 
   useEffect(() => {
     if (clearance) {
@@ -626,9 +628,22 @@ export default function BillingDashboardPage() {
 
                 {breakdown?.encounters?.length ? (
                   <div className="mb-3">
-                    <h6 className="fw-bold small text-uppercase text-muted mb-2">
-                      <i className="bi bi-diagram-3 me-1"></i>Encounter Breakdown
-                    </h6>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6 className="fw-bold small text-uppercase text-muted mb-0">
+                        <i className="bi bi-diagram-3 me-1"></i>Encounter Breakdown
+                      </h6>
+                      <button
+                        type="button"
+                        className={`btn btn-sm rounded-pill ${showCptCodes ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        style={{ fontSize: '0.66rem' }}
+                        onClick={() => setShowCptCodes((v) => !v)}
+                        title={showCptCodes
+                          ? 'Hide the CPT / HCPCS codes'
+                          : 'Highlight the CPT / HCPCS code on every charge line'}
+                      >
+                        <i className="bi bi-upc-scan me-1"></i>CPT{showCptCodes ? ' ✓' : ''}
+                      </button>
+                    </div>
                     <div className="table-responsive" style={{ maxHeight: '320px', overflowY: 'auto' }}>
                       <table className="table table-sm small align-middle mb-0">
                         <thead className="table-light sticky-top">
@@ -690,10 +705,19 @@ export default function BillingDashboardPage() {
                                   <td className="ps-4">
                                     <i className="bi bi-dot"></i>
                                     <span className="text-dark">{l.description || l.code}</span>
-                                    <span className="ms-1" style={{ fontSize: '0.65rem' }}>
-                                      · {l.code}
-                                      {l.category ? ` · ${l.category}` : ''}
-                                    </span>
+                                    {showCptCodes ? (
+                                      <span
+                                        className="badge bg-primary bg-opacity-10 text-primary border border-primary ms-2 align-middle"
+                                        style={{ fontSize: '0.62rem' }}
+                                      >
+                                        {l.code}
+                                      </span>
+                                    ) : (
+                                      <span className="ms-1" style={{ fontSize: '0.65rem' }}>· {l.code}</span>
+                                    )}
+                                    {l.category && (
+                                      <span className="ms-1" style={{ fontSize: '0.65rem' }}>· {l.category}</span>
+                                    )}
                                     {l.labOrder && (
                                       <span className="ms-1" style={{ fontSize: '0.65rem' }}>
                                         <i className="bi bi-flask me-1"></i>
