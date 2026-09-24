@@ -32,6 +32,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { LabReportsModule } from './labreports/labreports.module';
 import { InpatientModule } from './inpatient/inpatient.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   controllers: [AppConfigController],
@@ -84,6 +85,7 @@ import { InpatientModule } from './inpatient/inpatient.module';
     BookingsModule,
     LabReportsModule,
     InpatientModule,
+    NotificationsModule,
     LicenseModule,
     NursingModule,
     PatientChatModule,

@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
+import { useInvalidateNotifications } from '../../hooks/useNotifications';
 
 const CATEGORIES = [
   { key: 'drugs', label: 'Drugs', icon: 'bi-capsule', desc: 'FDA drug labels, adverse events, recalls' },
@@ -16,6 +17,39 @@ export default function FdaLookupPage() {
   const [category, setCategory] = useState('drugs');
   const [searchTerm, setSearchTerm] = useState('');
   const [smartSearch, setSmartSearch] = useState('');
+
+  // Drug info notices raised from FDA lookups (badge + detail modal).
+  const qc = useQueryClient();
+  const invalidateNotifications = useInvalidateNotifications();
+  const raised = useRef<Set<string>>(new Set());
+  const [openNotice, setOpenNotice] = useState<any>(null);
+
+  const { data: drugInfoData } = useQuery<any>({
+    queryKey: ['drug-info-notifications'],
+    queryFn: async () => {
+      const r = await nestClient.get('/notifications/drug-info', { params: { limit: 25 } });
+      return r.data || { unread: 0, notifications: [] };
+    },
+    refetchInterval: 30000,
+  });
+  const drugNotices: any[] = drugInfoData?.notifications || [];
+  const drugUnread: number = drugInfoData?.unread || 0;
+
+  const raiseNotice = useMutation({
+    mutationFn: (payload: any) => nestClient.post('/notifications/drug-info', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['drug-info-notifications'] });
+      invalidateNotifications();
+    },
+  });
+
+  const ackNotice = useMutation({
+    mutationFn: (id: number) => nestClient.post(`/notifications/drug-info/${id}/ack`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['drug-info-notifications'] });
+      invalidateNotifications();
+    },
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['fda', category, searchTerm],
@@ -38,6 +72,51 @@ export default function FdaLookupPage() {
     },
     enabled: smartSearch.length >= 2,
   });
+
+  // When a looked-up drug is actually prescribed to patients, raise a notice so
+  // the drug information (and its specifics) is visible next to Drug Info.
+  // Only prescribed drugs raise a notice, and each drug is raised once per
+  // session, so browsing the FDA data does not spam the inbox.
+  useEffect(() => {
+    const drug = smartData?.drug;
+    const name = drug?.drugName;
+    if (!drug || !name || !(drug.patientCount > 0)) return;
+    const key = String(name).toLowerCase();
+    if (raised.current.has(key)) return;
+    raised.current.add(key);
+
+    const allergy = drug.allergyWarnings || [];
+    const interactions = drug.interactionWarnings || [];
+    raiseNotice.mutate({
+      drug: name,
+      summary:
+        `${drug.patientCount} patient(s) prescribed this drug` +
+        (allergy.length ? ` · ${allergy.length} allergy warning(s)` : '') +
+        (interactions.length ? ` · ${interactions.length} interaction warning(s)` : ''),
+      details: {
+        drugName: name,
+        patientCount: drug.patientCount,
+        patientsOnDrug: drug.patientsOnDrug || [],
+        allergyWarnings: allergy,
+        interactionWarnings: interactions,
+        topAdverseReactions: (drug.topAdverseReactions || []).slice(0, 10),
+        label: drug.fda
+          ? {
+              brandName: drug.fda.openfda?.brand_name?.[0] || null,
+              genericName: drug.fda.openfda?.generic_name?.[0] || null,
+              manufacturer: drug.fda.openfda?.manufacturer_name?.[0] || null,
+              route: drug.fda.openfda?.route?.[0] || null,
+              warnings: drug.fda.warnings?.[0] || null,
+              dosage: drug.fda.dosage_and_administration?.[0] || null,
+              indications: drug.fda.indications_and_usage?.[0] || null,
+              adverseReactions: drug.fda.adverse_reactions?.[0] || null,
+            }
+          : null,
+      },
+    });
+    // raiseNotice is a stable mutation handle; re-running on it would duplicate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smartData]);
 
   return (
     <div className="glass-page position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh', padding: '16px' }}>
@@ -76,6 +155,44 @@ export default function FdaLookupPage() {
           <p className="mb-0 text-white text-opacity-75 small">Search FDA databases for drug labels, device recalls, food safety, and more — powered by openFDA.gov</p>
         </div>
       </div>
+
+      {/* Drug information notices — raised when a prescribed drug is looked up */}
+      {drugNotices.length > 0 && (
+        <div className="card shadow-sm mb-3" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="card-header bg-white d-flex justify-content-between align-items-center py-2">
+            <h6 className="mb-0 fw-bold">
+              <i className="bi bi-bell-fill me-2 text-danger"></i>Drug Information Notices
+              {drugUnread > 0 && <span className="badge bg-danger rounded-pill ms-2">{drugUnread} new</span>}
+            </h6>
+            <small className="text-muted" style={{ fontSize: '0.65rem' }}>{drugNotices.length} recent</small>
+          </div>
+          <div className="card-body p-0">
+            {drugNotices.slice(0, 4).map((n: any) => {
+              const isNew = String(n.status || '').toLowerCase() === 'new';
+              return (
+                <div key={n.id} className="d-flex align-items-center gap-2 px-3 py-2 border-bottom"
+                  style={{ cursor: 'pointer', background: isNew ? '#dc35450a' : 'transparent' }}
+                  onClick={() => setOpenNotice(n)}>
+                  <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{ width: '30px', height: '30px', backgroundColor: isNew ? '#dc354520' : '#6c757d20' }}>
+                    <i className={`bi bi-capsule ${isNew ? 'text-danger' : 'text-secondary'}`}></i>
+                  </div>
+                  <div className="flex-grow-1 min-w-0">
+                    <div className={`small text-truncate ${isNew ? 'fw-bold' : 'text-muted'}`}>
+                      {n.drug}{n.patientName ? ` · ${n.patientName}` : ''}
+                    </div>
+                    <small className="text-muted d-block text-truncate" style={{ fontSize: '0.65rem' }}>{n.summary}</small>
+                  </div>
+                  <small className="text-muted flex-shrink-0" style={{ fontSize: '0.6rem' }}>
+                    {n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}
+                  </small>
+                  <i className="bi bi-chevron-right text-muted small"></i>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Category Tabs */}
       <div className="d-flex flex-wrap gap-1 mb-3">
@@ -205,6 +322,122 @@ export default function FdaLookupPage() {
           </div>
         </div>
       </div>
+
+      {/* Drug information detail modal — every specific of the looked-up drug */}
+      {openNotice && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ background: 'rgba(10,37,64,0.45)', zIndex: 1080, padding: '16px' }}
+          onClick={() => setOpenNotice(null)}>
+          <div className="card border-0 shadow-lg"
+            style={{ maxWidth: '720px', width: '100%', maxHeight: '88vh', overflow: 'auto', borderRadius: '20px' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="card-header text-white d-flex justify-content-between align-items-center py-3"
+              style={{ background: 'linear-gradient(135deg, #dc3545, #0d6efd)', borderRadius: '20px 20px 0 0' }}>
+              <div>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-capsule me-2"></i>{openNotice.drug}</h6>
+                <small className="text-white text-opacity-75">
+                  {openNotice.patientName ? `${openNotice.patientName} · ` : ''}
+                  {openNotice.createdAt ? new Date(openNotice.createdAt).toLocaleString() : ''}
+                  {openNotice.createdBy ? ` · by ${openNotice.createdBy}` : ''}
+                </small>
+              </div>
+              <button className="btn btn-sm btn-outline-light rounded-circle" style={{ width: '32px', height: '32px' }}
+                onClick={() => setOpenNotice(null)}><i className="bi bi-x-lg"></i></button>
+            </div>
+            <div className="card-body">
+              {(openNotice.details?.allergyWarnings || []).length > 0 && (
+                <div className="alert alert-danger py-2 small mb-3">
+                  <strong><i className="bi bi-exclamation-octagon me-1"></i>Allergy warnings</strong>
+                  {openNotice.details.allergyWarnings.map((w: string, i: number) => <div key={i}>• {w}</div>)}
+                </div>
+              )}
+              {(openNotice.details?.interactionWarnings || []).length > 0 && (
+                <div className="alert alert-warning py-2 small mb-3">
+                  <strong><i className="bi bi-exclamation-triangle me-1"></i>Drug interactions</strong>
+                  {openNotice.details.interactionWarnings.map((w: string, i: number) => <div key={i}>• {w}</div>)}
+                </div>
+              )}
+
+              <div className="row g-2 mb-3">
+                {[
+                  { l: 'Patients on this drug', v: openNotice.details?.patientCount ?? 0, c: '#0d6efd' },
+                  { l: 'Allergy warnings', v: (openNotice.details?.allergyWarnings || []).length, c: '#dc3545' },
+                  { l: 'Interactions', v: (openNotice.details?.interactionWarnings || []).length, c: '#fd7e14' },
+                ].map((s) => (
+                  <div className="col-4" key={s.l}>
+                    <div className="p-2 rounded-3 text-center" style={{ backgroundColor: `${s.c}12` }}>
+                      <div className="fw-bold" style={{ color: s.c }}>{s.v}</div>
+                      <small className="text-muted" style={{ fontSize: '0.6rem' }}>{s.l}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {openNotice.details?.label && (
+                <>
+                  <h6 className="small fw-bold text-muted text-uppercase">FDA label specifics</h6>
+                  <ul className="list-unstyled small mb-3">
+                    {[
+                      ['Brand name', openNotice.details.label.brandName],
+                      ['Generic name', openNotice.details.label.genericName],
+                      ['Manufacturer', openNotice.details.label.manufacturer],
+                      ['Route', openNotice.details.label.route],
+                    ]
+                      .filter(([, v]) => v)
+                      .map(([k, v]) => (
+                        <li key={String(k)}><span className="text-muted">{k}:</span> <strong>{v}</strong></li>
+                      ))}
+                  </ul>
+                  {[
+                    ['Indications', openNotice.details.label.indications],
+                    ['Dosage & administration', openNotice.details.label.dosage],
+                    ['Warnings', openNotice.details.label.warnings],
+                    ['Adverse reactions', openNotice.details.label.adverseReactions],
+                  ]
+                    .filter(([, v]) => v)
+                    .map(([k, v]) => (
+                      <div className="mb-2" key={String(k)}>
+                        <strong className="small">{k}</strong>
+                        <div className="text-muted small" style={{ maxHeight: '150px', overflow: 'auto' }}>{v}</div>
+                      </div>
+                    ))}
+                </>
+              )}
+              {(openNotice.details?.topAdverseReactions || []).length > 0 && (
+                <>
+                  <h6 className="small fw-bold text-muted text-uppercase mt-3">Top adverse reactions (FDA events)</h6>
+                  <div className="d-flex flex-wrap gap-1">
+                    {openNotice.details.topAdverseReactions.map((r: any, i: number) => (
+                      <span key={i} className="badge bg-light text-dark border">{r.term} ({r.count})</span>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {(openNotice.details?.patientsOnDrug || []).length > 0 && (
+                <>
+                  <h6 className="small fw-bold text-muted text-uppercase mt-3">Patients prescribed this drug</h6>
+                  <div className="small">
+                    {openNotice.details.patientsOnDrug.map((p: any, i: number) => (
+                      <div key={i} className="text-muted">• {p.fname} {p.lname} (PID {p.pid}) — {p.dosage}</div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="card-footer bg-white text-end" style={{ borderRadius: '0 0 20px 20px' }}>
+              {String(openNotice.status || '').toLowerCase() === 'new' && (
+                <button className="btn btn-outline-secondary btn-sm rounded-pill me-2"
+                  disabled={ackNotice.isPending}
+                  onClick={() => { ackNotice.mutate(openNotice.id); setOpenNotice(null); }}>
+                  Mark read
+                </button>
+              )}
+              <button className="btn btn-primary btn-sm rounded-pill" onClick={() => setOpenNotice(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

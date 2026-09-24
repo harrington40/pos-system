@@ -219,7 +219,7 @@ export class ReferralsService {
   async listReferrals() {
     const rows = await this.dataSource.query(
       `SELECT n.id, n.date, n.pid, n.title, n.body, n.user, n.assigned_to, n.message_status,
-              pd.fname, pd.lname,
+              pd.id AS patient_id, pd.fname, pd.lname, pd.DOB, pd.sex,
               u.fname AS specialist_fname, u.lname AS specialist_lname, u.specialty
          FROM pnotes n
          LEFT JOIN patient_data pd ON pd.pid = n.pid
@@ -230,6 +230,62 @@ export class ReferralsService {
     );
 
     return rows.map((r: any) => this.toReferralRow(r));
+  }
+
+  // ─── Notifications ──────────────────────────────────────────────
+
+  /**
+   * Referrals that still need attention for this provider. A provider is
+   * notified when another provider refers a patient to them (`assigned_to`),
+   * and admins also see unassigned referrals so nothing gets stranded.
+   */
+  async getReferralNotifications(user: ReferralUser) {
+    const adminFlag = user?.role === 'admin' ? 1 : 0;
+    const uid = String(Number(user?.sub) || 0);
+
+    const rows = await this.dataSource.query(
+      `SELECT n.id, n.date, n.pid, n.title, n.body, n.user, n.assigned_to, n.message_status,
+              pd.id AS patient_id, pd.fname, pd.lname, pd.DOB, pd.sex,
+              u.fname AS specialist_fname, u.lname AS specialist_lname, u.specialty
+         FROM pnotes n
+         LEFT JOIN patient_data pd ON pd.pid = n.pid
+         LEFT JOIN users u ON u.id = n.assigned_to
+        WHERE n.groupname = 'referral' AND n.deleted = 0
+          AND n.message_status IN ('pending', 'New')
+          AND (? = 1 OR n.assigned_to = ? OR n.assigned_to = '' OR n.assigned_to IS NULL)
+        ORDER BY
+          CASE
+            WHEN n.title LIKE '[stat]%' THEN 0
+            WHEN n.title LIKE '[urgent]%' THEN 1
+            ELSE 2
+          END,
+          n.date DESC
+        LIMIT 50`,
+      [adminFlag, uid],
+    );
+
+    const referrals = rows.map((r: any) => this.toReferralRow(r));
+    return {
+      pendingCount: referrals.length,
+      urgentCount: referrals.filter(
+        (r: any) => r.urgency === 'urgent' || r.urgency === 'stat',
+      ).length,
+      referrals,
+    };
+  }
+
+  /** Mark a referral as reviewed/accepted once the provider has acted on it. */
+  async ackReferral(id: number, status?: string) {
+    const allowed = ['reviewed', 'accepted', 'declined', 'pending'];
+    const next = allowed.includes(String(status)) ? String(status) : 'reviewed';
+    const result = await this.dataSource.query(
+      `UPDATE pnotes SET message_status = ? WHERE id = ? AND groupname = 'referral'`,
+      [next, id],
+    );
+    if (!result?.affectedRows) {
+      throw new NotFoundException(`Referral #${id} not found`);
+    }
+    return { id, status: next };
   }
 
   // ---- private helpers ----
@@ -247,6 +303,10 @@ export class ReferralsService {
       id: r.id,
       date: r.date,
       pid: r.pid,
+      /** Canonical `patient_data.id` — use this for chart links. */
+      patientId: r.patient_id ? Number(r.patient_id) : null,
+      patientDOB: r.DOB || null,
+      patientSex: r.sex || null,
       patientName,
       reason,
       urgency,

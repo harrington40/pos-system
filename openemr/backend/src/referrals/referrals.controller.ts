@@ -27,4 +27,19 @@ export class ReferralsController {
   create(@Body() dto: any, @Req() req: any) {
     return this.referrals.createReferral(req.user, dto);
   }
+
+  /**
+   * Referrals addressed to the signed-in provider that still need attention,
+   * with the count used for the sidebar badge.
+   */
+  @Get('notifications')
+  notifications(@Req() req: any) {
+    return this.referrals.getReferralNotifications(req.user);
+  }
+
+  /** Mark a referral reviewed / accepted / declined. */
+  @Post(':id/ack')
+  ack(@Param('id') id: string, @Body() dto: any) {
+    return this.referrals.ackReferral(+id, dto?.status);
+  }
 }

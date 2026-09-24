@@ -3,6 +3,10 @@ import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
+import { useNotificationSummary } from '../../hooks/useNotifications';
+
+/** The numeric counters from /notifications/summary that can carry a badge. */
+type BadgeKey = 'messages' | 'referrals' | 'drugInfo' | 'pharmacy' | 'patientFlow';
 
 interface SubItem {
   to: string;
@@ -10,6 +14,8 @@ interface SubItem {
   icon: string;
   roles: string[];
   mainMenuRoles?: string[];
+  /** Which badge count from /notifications/summary to show next to the item. */
+  badgeKey?: BadgeKey;
 }
 
 interface MenuSection {
@@ -71,7 +77,7 @@ const menuSections: MenuSection[] = [
     label: 'Pharmacy', icon: 'bi-capsule',
     roles: ['pharmacist', 'admin'],
     children: [
-      { to: '/pharmacy', label: 'Pharmacy & Prescriptions', icon: 'bi-capsule-pill', roles: ['pharmacist', 'admin'] },
+      { to: '/pharmacy', label: 'Pharmacy & Prescriptions', icon: 'bi-capsule-pill', roles: ['pharmacist', 'admin'], badgeKey: 'pharmacy' },
     ],
   },
   {
@@ -80,7 +86,7 @@ const menuSections: MenuSection[] = [
     children: [
       { to: '/appointments', label: 'Calendar', icon: 'bi-calendar3', roles: ['admin', 'physician', 'front_desk'] },
       { to: '/bookings', label: 'Bookings & QR', icon: 'bi-qr-code', roles: ['admin', 'front_desk'] },
-      { to: '/appointments/flow', label: 'Patient Flow', icon: 'bi-kanban', roles: ['admin', 'physician', 'front_desk'] },
+      { to: '/appointments/flow', label: 'Patient Flow', icon: 'bi-kanban', roles: ['admin', 'physician', 'front_desk'], badgeKey: 'patientFlow' },
       { to: '/appointments/recall', label: 'Recall Board', icon: 'bi-bell', roles: ['admin', 'physician'] },
       { to: '/appointments/screening', label: 'Drug Screening', icon: 'bi-shuffle', roles: ['admin', 'physician'] },
       { to: '/inpatient', label: 'Inpatient / ADT', icon: 'bi-hospital', roles: ['admin', 'physician', 'nurse', 'front_desk'] },
@@ -90,20 +96,20 @@ const menuSections: MenuSection[] = [
     label: 'Clinical', icon: 'bi-heart-pulse',
     roles: ['admin', 'physician'],
     children: [
-      { to: '/referrals', label: 'Referrals', icon: 'bi-send', roles: ['admin', 'physician', 'front_desk'] },
+      { to: '/referrals', label: 'Referrals', icon: 'bi-send', roles: ['admin', 'physician', 'front_desk'], badgeKey: 'referrals' },
       { to: '/cds', label: 'Decision Support', icon: 'bi-cpu', roles: ['admin', 'physician'] },
       { to: '/group-therapy', label: 'Group Therapy', icon: 'bi-people-fill', roles: ['admin', 'physician'] },
       { to: '/fda', label: 'FDA Lookup', icon: 'bi-shield-check', roles: ['admin', 'physician', 'nurse'] },
-      { to: '/drug-info', label: 'Drug Info', icon: 'bi-capsule', roles: ['admin', 'physician', 'nurse'] },
+      { to: '/drug-info', label: 'Drug Info', icon: 'bi-capsule', roles: ['admin', 'physician', 'nurse'], badgeKey: 'drugInfo' },
       { to: '/templates', label: 'Templates', icon: 'bi-file-earmark-text', roles: ['admin', 'physician'] },
-      { to: '/pharmacy', label: 'Pharmacy', icon: 'bi-capsule-pill', roles: ['admin', 'physician', 'nurse'] },
+      { to: '/pharmacy', label: 'Pharmacy', icon: 'bi-capsule-pill', roles: ['admin', 'physician', 'nurse'], badgeKey: 'pharmacy' },
     ],
   },
   {
     label: 'Messaging', icon: 'bi-chat-dots',
     roles: ['admin', 'physician', 'front_desk', 'billing', 'midwife', 'lab_tech', 'nurse'],
     children: [
-      { to: '/messages', label: 'Inbox', icon: 'bi-inbox', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
+      { to: '/messages', label: 'Inbox', icon: 'bi-inbox', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'], badgeKey: 'messages' },
       { to: '/messages/patient-chat', label: 'Patient Chat', icon: 'bi-chat-heart', roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk', 'lab_tech', 'pharmacist', 'billing'] },
       { to: '/direct-messaging', label: 'Direct Msg', icon: 'bi-envelope-arrow-up', roles: ['admin', 'physician'] },
     ],
@@ -188,6 +194,13 @@ export default function Sidebar() {
     enabled: !!user?.role,
   });
 
+  // Live badge counts: messages, referrals, drug info, pharmacy, patient flow.
+  const notificationCounts = useNotificationSummary();
+  const badgeFor = (item: SubItem): number =>
+    item.badgeKey ? notificationCounts[item.badgeKey] || 0 : 0;
+  const badgeTone = (key?: BadgeKey) =>
+    key === 'referrals' || key === 'drugInfo' ? 'bg-danger' : 'bg-primary';
+
   const toggleSection = (label: string) => {
     setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
   };
@@ -259,6 +272,7 @@ export default function Sidebar() {
               (child.to !== '/db-admin' || dbAdminUnlocked),
           );
           if (visibleChildren.length === 0) return null;
+          const sectionBadge = visibleChildren.reduce((n, c) => n + badgeFor(c), 0);
 
           const sectionId = section.label.replace(/\s+/g, '-');
           const isOpen = openSections[section.label] ?? false;
@@ -276,6 +290,11 @@ export default function Sidebar() {
               >
                 <i className={`bi ${section.icon} me-2`} style={{ fontSize: '0.85rem', color: '#0d6efd' }}></i>
                 <span className="flex-grow-1 text-start">{section.label}</span>
+                {sectionBadge > 0 && (
+                  <span className="badge rounded-pill bg-danger me-2" style={{ fontSize: '0.6rem' }}>
+                    {sectionBadge > 99 ? '99+' : sectionBadge}
+                  </span>
+                )}
                 <i className={`bi bi-chevron-${isOpen ? 'down' : 'right'} small`}></i>
               </button>
 
@@ -292,7 +311,15 @@ export default function Sidebar() {
                         style={{ fontSize: '0.78rem' }}
                       >
                         <i className={`bi ${item.icon} me-2`} style={{ fontSize: '0.75rem', width: '16px', textAlign: 'center' }}></i>
-                        {item.label}
+                        <span className="text-truncate">{item.label}</span>
+                        {badgeFor(item) > 0 && (
+                          <span
+                            className={`badge rounded-pill ms-auto ${badgeTone(item.badgeKey)}`}
+                            style={{ fontSize: '0.6rem' }}
+                          >
+                            {badgeFor(item) > 99 ? '99+' : badgeFor(item)}
+                          </span>
+                        )}
                       </NavLink>
                     </li>
                   ))}

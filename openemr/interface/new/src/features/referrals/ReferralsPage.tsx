@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import { useDebounce } from '../../hooks/useDebounce';
 import { formatPatientName } from '../../utils/patientName';
+import { chartPatientId } from '../../utils/patientChart';
+import { useInvalidateNotifications } from '../../hooks/useNotifications';
 
 interface PatientHit {
   id: number;
@@ -39,6 +42,12 @@ const urgencyBadge: Record<string, string> = {
   routine: 'bg-info',
   urgent: 'bg-danger',
   stat: 'bg-warning text-dark',
+};
+
+const urgencyColor: Record<string, string> = {
+  routine: '#0dcaf0',
+  urgent: '#dc3545',
+  stat: '#ffc107',
 };
 
 export default function ReferralsPage() {
@@ -92,6 +101,41 @@ export default function ReferralsPage() {
       return r.data || [];
     },
   });
+
+  // Referrals sent to THIS provider by another provider and still pending —
+  // this is what the inbound notification and the sidebar badge are built on.
+  const { data: referralNotify } = useQuery<any>({
+    queryKey: ['referral-notifications'],
+    queryFn: async () => {
+      const r = await nestClient.get('/referrals/notifications');
+      return r.data || { pendingCount: 0, urgentCount: 0, referrals: [] };
+    },
+    refetchInterval: 20000,
+  });
+  const pendingReferrals: any[] = referralNotify?.referrals || [];
+  const pendingCount: number = referralNotify?.pendingCount ?? pendingReferrals.length;
+  const urgentCount: number = referralNotify?.urgentCount || 0;
+
+  const [openReferral, setOpenReferral] = useState<any>(null);
+  const [showAllPending, setShowAllPending] = useState(false);
+  const invalidateNotifications = useInvalidateNotifications();
+  const navigate = useNavigate();
+
+  const ackReferral = useMutation({
+    mutationFn: (d: { id: number; status?: string }) =>
+      nestClient.post(`/referrals/${d.id}/ack`, { status: d.status || 'reviewed' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['referrals'] });
+      qc.invalidateQueries({ queryKey: ['referral-notifications'] });
+      invalidateNotifications();
+      setOpenReferral(null);
+    },
+  });
+
+  const openReferralChart = (r: any) => {
+    const cid = chartPatientId(r.patientId, r.pid);
+    if (cid) navigate(`/patients/${cid}`);
+  };
 
   // Auto-populate reason + clinical notes (sorted by date) once the engine responds.
   useEffect(() => {
@@ -198,6 +242,50 @@ export default function ReferralsPage() {
           <i className="bi bi-stars me-1"></i>AI-assisted specialist matching · patient notes auto-loaded
         </p>
       </div>
+
+      {/* Inbound referrals from other providers — the notification surface */}
+      {pendingReferrals.length > 0 && (
+        <div className="card border-0 shadow-sm mb-4"
+          style={{ borderRadius: '20px', borderLeft: '4px solid #dc3545', position: 'relative', zIndex: 1 }}>
+          <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '20px 20px 0 0' }}>
+            <h6 className="mb-0 fw-bold">
+              <i className="bi bi-bell-fill me-2 text-danger"></i>Referrals for You
+              <span className="badge bg-danger rounded-pill ms-2">{pendingCount}</span>
+            </h6>
+            {urgentCount > 0 && (
+              <span className="badge bg-warning text-dark rounded-pill">{urgentCount} urgent</span>
+            )}
+          </div>
+          <div className="card-body p-0">
+            {(showAllPending ? pendingReferrals : pendingReferrals.slice(0, 3)).map((r: any) => (
+              <div key={r.id} className="d-flex align-items-center gap-2 px-3 py-2 border-bottom"
+                style={{ cursor: 'pointer' }} onClick={() => setOpenReferral(r)}>
+                <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                  style={{ width: '32px', height: '32px', backgroundColor: `${urgencyColor[r.urgency] || '#0d6efd'}20` }}>
+                  <i className={`bi ${r.urgency === 'stat' ? 'bi-exclamation-octagon-fill' : 'bi-send'} small`}
+                    style={{ color: urgencyColor[r.urgency] || '#0d6efd' }}></i>
+                </div>
+                <div className="flex-grow-1 min-w-0">
+                  <div className="fw-semibold small text-truncate">{r.patientName}</div>
+                  <small className="text-muted d-block text-truncate" style={{ fontSize: '0.65rem' }}>{r.reason}</small>
+                </div>
+                <span className={`badge rounded-pill ${urgencyBadge[r.urgency] || 'bg-info'}`} style={{ fontSize: '0.6rem' }}>{r.urgency}</span>
+                {r.referringProvider && (
+                  <small className="text-muted d-none d-lg-block" style={{ fontSize: '0.6rem' }}>from {r.referringProvider}</small>
+                )}
+                <i className="bi bi-chevron-right text-muted small"></i>
+              </div>
+            ))}
+          </div>
+          {pendingReferrals.length > 3 && (
+            <div className="card-footer bg-white py-2 text-center">
+              <button className="btn btn-link btn-sm text-decoration-none" onClick={() => setShowAllPending((v) => !v)}>
+                {showAllPending ? 'Show less' : `Show all ${pendingReferrals.length}`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {success && (
         <div className="alert alert-success d-flex align-items-center gap-2">
@@ -387,6 +475,81 @@ export default function ReferralsPage() {
           </div>
         </div>
       </div>
+
+      {/* Referral detail modal — every specific of the inbound referral */}
+      {openReferral && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ background: 'rgba(10,37,64,0.45)', zIndex: 1080, padding: '16px' }}
+          onClick={() => setOpenReferral(null)}>
+          <div className="card border-0 shadow-lg"
+            style={{ maxWidth: '660px', width: '100%', maxHeight: '88vh', overflow: 'auto', borderRadius: '20px' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="card-header text-white d-flex justify-content-between align-items-center py-3"
+              style={{ background: 'linear-gradient(135deg, #20c997, #0d6efd)', borderRadius: '20px 20px 0 0' }}>
+              <div>
+                <h6 className="mb-0 fw-bold">
+                  <i className="bi bi-send-check me-2"></i>Referral — {openReferral.patientName}
+                </h6>
+                <small className="text-white text-opacity-75">{fmtDate(openReferral.date)}</small>
+              </div>
+              <button className="btn btn-sm btn-outline-light rounded-circle" style={{ width: '32px', height: '32px' }}
+                onClick={() => setOpenReferral(null)}><i className="bi bi-x-lg"></i></button>
+            </div>
+            <div className="card-body">
+              <div className="d-flex flex-wrap gap-2 mb-3">
+                <span className={`badge rounded-pill ${urgencyBadge[openReferral.urgency] || 'bg-info'}`}>
+                  {String(openReferral.urgency || '').toUpperCase()}
+                </span>
+                <span className="badge bg-light text-dark border rounded-pill">status: {openReferral.status}</span>
+                {openReferral.specialty && <span className="badge bg-primary rounded-pill">{openReferral.specialty}</span>}
+              </div>
+
+              <dl className="row small mb-3">
+                <dt className="col-sm-4 text-muted">Patient</dt>
+                <dd className="col-sm-8 fw-semibold">{openReferral.patientName}</dd>
+                <dt className="col-sm-4 text-muted">Patient ID</dt>
+                <dd className="col-sm-8">
+                  PID {openReferral.pid}
+                  {openReferral.patientDOB ? ` · DOB ${String(openReferral.patientDOB).slice(0, 10)}` : ''}
+                  {openReferral.patientSex ? ` · ${openReferral.patientSex}` : ''}
+                </dd>
+                <dt className="col-sm-4 text-muted">Reason</dt>
+                <dd className="col-sm-8 fw-semibold">{openReferral.reason || '—'}</dd>
+                <dt className="col-sm-4 text-muted">Referred by</dt>
+                <dd className="col-sm-8">{openReferral.referringProvider || '—'}</dd>
+                <dt className="col-sm-4 text-muted">Assigned specialist</dt>
+                <dd className="col-sm-8">{openReferral.specialistName || '—'}</dd>
+              </dl>
+
+              {openReferral.body && (
+                <>
+                  <h6 className="small fw-bold text-muted text-uppercase">Clinical notes</h6>
+                  <div className="p-3 bg-light rounded-3 small" style={{ whiteSpace: 'pre-wrap', maxHeight: '260px', overflow: 'auto' }}>
+                    {openReferral.body}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="card-footer bg-white d-flex flex-wrap gap-2" style={{ borderRadius: '0 0 20px 20px' }}>
+              {chartPatientId(openReferral.patientId, openReferral.pid) !== null && (
+                <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => openReferralChart(openReferral)}>
+                  <i className="bi bi-folder2-open me-1"></i>Open chart
+                </button>
+              )}
+              <button className="btn btn-success btn-sm rounded-pill ms-auto"
+                disabled={ackReferral.isPending}
+                onClick={() => ackReferral.mutate({ id: openReferral.id, status: 'accepted' })}>
+                <i className="bi bi-check2-circle me-1"></i>Accept
+              </button>
+              <button className="btn btn-outline-secondary btn-sm rounded-pill"
+                disabled={ackReferral.isPending}
+                onClick={() => ackReferral.mutate({ id: openReferral.id, status: 'reviewed' })}>
+                Mark reviewed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
