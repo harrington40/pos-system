@@ -400,6 +400,8 @@ export default function StartScreeningPage() {
   const [showValidation, setShowValidation] = useState(false);
   /** Required vitals that blocked completion, surfaced in the alert. */
   const [missingVitalsNotice, setMissingVitalsNotice] = useState<string[]>([]);
+  /** Why the vitals save was refused by the API, if it was. */
+  const [vitalsSaveError, setVitalsSaveError] = useState('');
 
   // Note sharing + chart notes panel
   const [shareWithNursing, setShareWithNursing] = useState(true);
@@ -469,7 +471,25 @@ export default function StartScreeningPage() {
   });
 
   const saveVitals = useMutation({
-    mutationFn: async () => nestClient.post(`/patients/${clinicalPid}/vitals`, vitals),
+    mutationFn: async () => {
+      // Post the form_vitals column names. The screening form keeps its own
+      // short labels (temp/resp/bp_systolic/o2_sat), which the API used to
+      // ignore — so the whole set was saved blank.
+      const w = Number(vitals.weight);
+      const h = Number(vitals.height);
+      const payload: Record<string, any> = {
+        bps: vitals.bp_systolic || null,
+        bpd: vitals.bp_diastolic || null,
+        pulse: vitals.pulse || null,
+        respiration: vitals.resp || null,
+        temperature: vitals.temp || null,
+        oxygen_saturation: vitals.o2_sat || null,
+        weight: vitals.weight || null,
+        height: vitals.height || null,
+      };
+      if (w > 0 && h > 0) payload.BMI = Math.round((w / Math.pow(h / 100, 2)) * 10) / 10;
+      return nestClient.post(`/patients/${clinicalPid}/vitals`, payload);
+    },
   });
 
   const savePrescriptions = useMutation({
@@ -574,7 +594,13 @@ export default function StartScreeningPage() {
 
   /** Required vitals that are still blank, so we can name them in the UI. */
   const missingVitals = useMemo(
-    () => REQUIRED_VITALS.filter((v) => !String(vitals[v.key] ?? '').trim()).map((v) => v.label),
+    () =>
+      REQUIRED_VITALS.filter((v) => {
+        // Mirrors the API rule: a reading has to be greater than 0, so "0" is
+        // treated as not recorded rather than sent and rejected.
+        const n = Number(vitals[v.key]);
+        return !(Number.isFinite(n) && n > 0);
+      }).map((v) => v.label),
     [vitals],
   );
 
@@ -597,12 +623,26 @@ export default function StartScreeningPage() {
     }
 
     setMissingVitalsNotice([]);
+    setVitalsSaveError('');
     setShowValidation(false);
     try {
       const encResult = await createEncounter.mutateAsync();
       const encounterId = encResult?.encounterId || encResult?.id;
+
+      // Vitals are mandatory, so a failure has to stop the flow and be shown.
+      // Previously every save was wrapped in Promise.allSettled, which swallowed
+      // the error and navigated away — the vitals silently never appeared.
+      try {
+        await saveVitals.mutateAsync();
+      } catch (err: any) {
+        setVitalsSaveError(
+          err?.response?.data?.message || err?.message || 'Vitals could not be saved.',
+        );
+        setShowVitals(true);
+        return;
+      }
+
       await Promise.allSettled([
-        saveVitals.mutateAsync(),
         savePrescriptions.mutateAsync(),
         saveLabOrders.mutateAsync(),
         saveSoap.mutateAsync(),
@@ -610,7 +650,7 @@ export default function StartScreeningPage() {
         encounterId ? autoBill.mutateAsync(encounterId) : Promise.resolve(),
       ]);
     } catch (e) {
-      // Continue to dashboard even if some saves fail
+      // Continue to dashboard even if some non-vital saves fail
     }
     queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['all-lab-orders'] });
@@ -833,6 +873,19 @@ export default function StartScreeningPage() {
           </button>
         </div>
       </div>
+
+      {vitalsSaveError && (
+        <div className="alert alert-danger py-2 mb-2 small d-flex align-items-start gap-2" style={{ borderRadius: '8px' }}>
+          <i className="bi bi-exclamation-octagon-fill fs-6"></i>
+          <div className="flex-grow-1">
+            <strong>Vitals were not saved</strong>
+            <br />
+            <span>{vitalsSaveError}</span>
+          </div>
+          <button type="button" className="btn btn-sm btn-outline-danger rounded-pill align-self-center"
+            onClick={() => setVitalsSaveError('')}>Dismiss</button>
+        </div>
+      )}
 
       {missingVitalsNotice.length > 0 && (
         <div className="alert alert-warning py-2 mb-2 small d-flex align-items-start gap-2" style={{ borderRadius: '8px' }}>

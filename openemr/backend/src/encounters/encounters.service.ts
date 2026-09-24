@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { normaliseVitals, vitalsInsertParams } from '../common/vitals.util';
 
 export interface EncounterRow {
   id: number;
@@ -166,25 +167,23 @@ export class EncountersService {
   }
 
   async createVital(pid: number, eid: number, dto: any): Promise<{ vid: number }> {
+    const { row, invalid, hasReading } = normaliseVitals(dto);
+
+    if (invalid.length) {
+      throw new BadRequestException(`${invalid.join(', ')} must be greater than 0.`);
+    }
+    if (!hasReading) {
+      throw new BadRequestException(
+        'No vital signs supplied — refusing to record an empty vitals row.',
+      );
+    }
+
     const result = await this.dataSource.query(
       `INSERT INTO form_vitals
         (pid, date, bps, bpd, weight, height, temperature, pulse, respiration,
          BMI, BMI_status, oxygen_saturation, note, activity, authorized)
        VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
-      [
-        pid,
-        dto.bps || null,
-        dto.bpd || null,
-        dto.weight || 0,
-        dto.height || 0,
-        dto.temperature || 0,
-        dto.pulse || 0,
-        dto.respiration || 0,
-        dto.BMI || 0,
-        dto.BMI_status || null,
-        dto.oxygen_saturation || 0,
-        dto.note || null,
-      ],
+      [pid, ...vitalsInsertParams(row)],
     );
     return { vid: result.insertId };
   }

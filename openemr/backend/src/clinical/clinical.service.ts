@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { normalizeKey } from '../common/dedup.util';
+import { normaliseVitals, vitalsInsertParams } from '../common/vitals.util';
 import { BillingService } from '../billing/billing.service';
 
 @Injectable()
@@ -374,25 +375,28 @@ export class ClinicalService implements OnModuleInit {
   }
 
   async createVital(pid: number, dto: any) {
+    const { row, invalid, hasReading } = normaliseVitals(dto);
+
+    // A recorded vital of 0 is never an observation (0 bpm, 0 °C), so it is
+    // reported rather than stored as if it were a reading.
+    if (invalid.length) {
+      throw new BadRequestException(
+        `${invalid.join(', ')} must be greater than 0.`,
+      );
+    }
+    // Refuse an empty observation set instead of adding a blank row to the chart.
+    if (!hasReading) {
+      throw new BadRequestException(
+        'No vital signs supplied — refusing to record an empty vitals row.',
+      );
+    }
+
     const result = await this.dataSource.query(
       `INSERT INTO form_vitals
         (pid, date, bps, bpd, weight, height, temperature, pulse, respiration,
          BMI, BMI_status, oxygen_saturation, note, activity, authorized)
        VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
-      [
-        pid,
-        dto.bps || null,
-        dto.bpd || null,
-        dto.weight || 0,
-        dto.height || 0,
-        dto.temperature || 0,
-        dto.pulse || 0,
-        dto.respiration || 0,
-        dto.BMI || 0,
-        dto.BMI_status || null,
-        dto.oxygen_saturation || 0,
-        dto.note || null,
-      ],
+      [pid, ...vitalsInsertParams(row)],
     );
     return { id: result.insertId };
   }
