@@ -143,6 +143,17 @@ function describeCharge(
     return { name: text, category: lab ? 'Laboratory' : (codeType || 'Charge'), isLab: lab };
   }
 
+  // Dashed all-caps mnemonics (e.g. MALARIA-SMEAR-M-S) read better spaced out.
+  if (/^[A-Z0-9]+(?:[-_][A-Z0-9]+)+$/.test(c)) {
+    const name = c
+      .split(/[-_]+/)
+      .filter(Boolean)
+      .map((p, i) => (i === 0 || p.length > 3 ? p.charAt(0) + p.slice(1).toLowerCase() : p))
+      .join(' ');
+    const lab = /malaria|smear|hiv|tb|typhoid|hepatitis|widal|stool|sputum|rapid/i.test(c);
+    return { name, category: lab ? 'Laboratory' : (codeType || 'Charge'), isLab: lab };
+  }
+
   return {
     name: `${codeType ? `${codeType} ` : ''}code ${c || 'unknown'}`,
     category: 'Uncategorized',
@@ -635,12 +646,19 @@ export class BillingService implements OnModuleInit {
           })
           .shift();
 
+        // A dashed mnemonic code with no catalogue entry ("MALARIA-SMEAR-M-S")
+        // describes itself poorly, so when it matched a lab order we use the
+        // ordered test name instead and treat it as laboratory work.
+        const isMnemonic = /^[A-Z0-9]+(?:[-_][A-Z0-9]+)+$/.test(String(l.code || ''));
+        const uncatalogued = !CHARGE_CATALOG[String(l.code || '').toUpperCase()];
+        const useLabName = !!match && isMnemonic && uncatalogued;
+
         return {
           code: l.code,
           codeType: l.codeType,
-          description: info.name,
-          category: info.category,
-          isLab: info.isLab,
+          description: useLabName && match ? match.testName : info.name,
+          category: useLabName ? 'Laboratory' : info.category,
+          isLab: info.isLab || useLabName,
           amount: Number(l.amount) || 0,
           qty: Number(l.qty) || 0,
           labOrder: match
@@ -691,7 +709,7 @@ export class BillingService implements OnModuleInit {
         // Human title + dominant charge type, so the row never shows a bare "#56".
         label: describeEncounter(e.reason, categories),
         categories,
-        type: dominantCategory(categories),
+        type: lines.length ? dominantCategory(categories) : 'No charges',
         charges,
         paid,
         adjustments,
