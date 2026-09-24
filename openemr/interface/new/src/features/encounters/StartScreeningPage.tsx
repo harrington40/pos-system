@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { assessPatient, riskBadge } from '../../utils/nursingSafety';
 import { formatVital, formatBP } from '../../utils/vitalsClassify';
 import VitalsTrend from '../../components/vitals/VitalsTrend';
+import VitalsViewToggle, { type VitalsView } from '../../components/vitals/VitalsViewToggle';
 import { formatPatientName } from '../../utils/patientName';
 
 // ── Types ───────────────────────────────────────────────────────
@@ -396,6 +397,7 @@ export default function StartScreeningPage() {
 
   // Vital history panel
   const [vitalHistoryOpen, setVitalHistoryOpen] = useState(false);
+  const [vitalsView, setVitalsView] = useState<VitalsView>('chart');
 
   // ── Save / Load Draft ──────────────────────────────────────
 
@@ -1684,7 +1686,13 @@ export default function StartScreeningPage() {
                       <div className="text-center text-muted py-4">No prior vitals recorded for this patient.</div>
                     ) : (
                       <>
-                        <VitalsTrend vitals={vitalHistory} height={240} />
+                        {/* Same three-way toggle as the patient chart, so both
+                            vitals views read the same way. */}
+                        <div className="d-flex justify-content-end mb-2">
+                          <VitalsViewToggle view={vitalsView} onChange={setVitalsView} />
+                        </div>
+                        {vitalsView !== 'table' && <VitalsTrend vitals={vitalHistory} height={240} />}
+                        {vitalsView !== 'chart' && (
                         <div style={{ maxHeight: '340px', overflow: 'auto' }}>
                           <table className="table table-sm table-hover mb-0 small" style={{ fontSize: '0.75rem' }}>
                             <thead className="table-light"><tr><th>When</th><th>BP</th><th>Pulse</th><th>Temp</th><th>Resp</th><th>SpO₂</th><th>BMI</th></tr></thead>
@@ -1703,6 +1711,7 @@ export default function StartScreeningPage() {
                             </tbody>
                           </table>
                         </div>
+                        )}
                       </>
                     )}
                   </div>

@@ -9,6 +9,7 @@ import VitalsTrendChart, {
   type VitalPoint,
 } from '../components/vitals/VitalsTrendChart';
 import VitalsTab from '../features/patients/tabs/VitalsTab';
+import VitalsViewToggle from '../components/vitals/VitalsViewToggle';
 
 // jsdom has no canvas, so stub the ECharts runtime and assert on setOption.
 const { initMock, setOptionMock, disposeMock } = vi.hoisted(() => {
@@ -275,5 +276,31 @@ describe('VitalsTab view toggle', () => {
 
     expect(screen.getByText('No vital signs recorded yet.')).toBeInTheDocument();
     expect(screen.queryByTestId('vitals-trend-canvas')).not.toBeInTheDocument();
+  });
+});
+
+describe('VitalsViewToggle', () => {
+  it('offers the same three views everywhere it is used', () => {
+    render(<VitalsViewToggle view="chart" onChange={vi.fn()} />);
+
+    for (const label of ['Chart', 'Table', 'Both']) {
+      expect(screen.getByTitle(`${label} view`)).toBeInTheDocument();
+    }
+  });
+
+  it('marks the active view', () => {
+    render(<VitalsViewToggle view="both" onChange={vi.fn()} />);
+
+    expect(screen.getByTitle('Both view')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTitle('Chart view')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTitle('Table view')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('reports the chosen view', () => {
+    const onChange = vi.fn();
+    render(<VitalsViewToggle view="chart" onChange={onChange} />);
+
+    fireEvent.click(screen.getByTitle('Table view'));
+    expect(onChange).toHaveBeenCalledWith('table');
   });
 });

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../../api/nest-client';
 import { classifyBP, classifyPulse, classifyTemp, classifyResp, classifySpO2, vitalTrend, formatVital, formatBP, formatVitalUnit } from '../../../utils/vitalsClassify';
 import VitalsTrend from '../../../components/vitals/VitalsTrend';
+import VitalsViewToggle, { type VitalsView } from '../../../components/vitals/VitalsViewToggle';
 import type { VitalPoint } from '../../../components/vitals/VitalsTrendChart';
 
 interface Props {
@@ -19,7 +20,7 @@ const emptyForm = {
 export default function VitalsTab({ vitals, patientId }: Props) {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [view, setView] = useState<'chart' | 'table' | 'both'>('chart');
+  const [view, setView] = useState<VitalsView>('chart');
   const [form, setForm] = useState(emptyForm);
   const [saved, setSaved] = useState(false);
 
@@ -202,22 +203,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               stay reachable once one of them is showing. */}
           <div className="d-flex justify-content-between align-items-center mb-2">
             <h6 className="mb-0"><i className="bi bi-graph-up me-2"></i>Vital Sign Trends</h6>
-            <div className="btn-group btn-group-sm" role="group" aria-label="Vitals view">
-              {([['chart', 'chart-line', 'Chart'], ['table', 'table', 'Table'], ['both', 'layout-split', 'Both']] as const).map(
-                ([id, icon, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`btn ${view === id ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    onClick={() => setView(id)}
-                    aria-pressed={view === id}
-                    title={`${label} view`}
-                  >
-                    <i className={`bi bi-${icon} me-1`}></i>{label}
-                  </button>
-                ),
-              )}
-            </div>
+            <VitalsViewToggle view={view} onChange={setView} />
           </div>
 
           {/* Line chart per vital sign; the metric is picked with the pill buttons. */}
