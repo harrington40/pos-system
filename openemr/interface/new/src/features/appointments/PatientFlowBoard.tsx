@@ -6,6 +6,7 @@ import type { Appointment } from '../../types/appointment';
 import nestClient from '../../api/nest-client';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
 import { formatDateOnly } from '../../utils/date';
+import { chartPatientId } from '../../utils/patientChart';
 
 type StatusColumn = 'Scheduled' | 'Checked In' | 'Checked Out' | 'Canceled' | 'No Show';
 
@@ -157,7 +158,7 @@ export default function PatientFlowBoard() {
               {walkIns.map((w: any) => (
                 <div className="col-xl-3 col-md-4 col-sm-6" key={w.tracker_id}>
                   <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '14px', cursor: 'pointer', borderLeft: '4px solid #ffc107' }}
-                    onClick={() => navigate(`/patients/${w.id || w.pid}`)}>
+                    onClick={() => { const cid = chartPatientId(w.patient_id, w.id, w.pid); if (cid) navigate(`/patients/${cid}`); }}>
                     <div className="card-body p-3">
                       <div className="d-flex align-items-center gap-2 mb-2">
                         <div className="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center"
@@ -237,7 +238,7 @@ export default function PatientFlowBoard() {
                         return (
                           <div key={apt.pc_eid} className="card mb-2 border-0 shadow-sm"
                             style={{ borderRadius: '14px', borderLeft: `4px solid ${catColor}`, cursor: 'pointer' }}
-                            onClick={() => navigate(`/patients/${apt.patient_id ?? apt.pc_pid}`)}>
+                            onClick={() => { const cid = chartPatientId(apt.patient_id, apt.pc_pid); if (cid) navigate(`/patients/${cid}`); }}>
                             <div className="card-body p-3">
                               {/* Patient Name */}
                               <div className="d-flex align-items-center gap-2 mb-2">

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
+import { chartPatientId } from '../../utils/patientChart';
 
 /** Simple horizontal bar chart using inline SVG */
 function BarChart({ data, height = 120 }: { data: { label: string; value: number; color: string }[]; height?: number }) {
@@ -363,7 +364,7 @@ export default function RegistrarDashboardPage() {
                       {appointments.map((a: any) => {
                         const provider = providers.find((p: any) => String(p.id) === String(a.pc_aid));
                         return (
-                          <tr key={a.pc_eid} style={{ cursor: 'pointer' }} onClick={() => navigate(`/patients/${a.patient_id ?? a.pc_pid}`)}>
+                          <tr key={a.pc_eid} style={{ cursor: 'pointer' }} onClick={() => { const cid = chartPatientId(a.patient_id, a.pc_pid); if (cid) navigate(`/patients/${cid}`); }}>
                             <td>{a.pc_startTime?.substring(0, 5) || '—'}</td>
                             <td>
                               <span className="fw-semibold">#{a.pc_pid}</span>
@@ -481,7 +482,7 @@ export default function RegistrarDashboardPage() {
                         style={{ width: '32px', height: '32px' }}>
                         <small className="fw-bold text-danger">{p.fname?.[0]}{p.lname?.[0]}</small>
                       </div>
-                      <div className="flex-grow-1" style={{ cursor: 'pointer' }} onClick={() => navigate(`/patients/${p.id}`)}>
+                      <div className="flex-grow-1" style={{ cursor: 'pointer' }} onClick={() => { const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}>
                         <small className="fw-semibold">{formatPatientNameLastFirst(p)}</small>
                         <br />
                         <small className="text-muted">

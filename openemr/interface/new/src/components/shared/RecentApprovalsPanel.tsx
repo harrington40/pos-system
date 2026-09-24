@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 import { formatPatientName } from '../../utils/patientName';
 import { formatDateOnly } from '../../utils/date';
+import { chartPatientId } from '../../utils/patientChart';
 
 interface RecentPatient {
   id: number;
@@ -83,7 +84,7 @@ export default function RecentApprovalsPanel() {
               <button
                 key={p.id}
                 className="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0"
-                onClick={() => navigate(`/patients/${p.id}`)}
+                onClick={() => { const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}
                 style={{ cursor: 'pointer' }}
               >
                 <div className="d-flex align-items-center gap-2">

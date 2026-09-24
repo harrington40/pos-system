@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 import { formatDateOnly } from '../../utils/date';
+import { chartPatientId } from '../../utils/patientChart';
 
 export default function DrugScreeningPage() {
   const [count, setCount] = useState(5);
@@ -201,7 +202,7 @@ export default function DrugScreeningPage() {
                 const risk = getRiskScore(p);
                 return (
                   <div key={p.id} className="col-md-4 col-sm-6 border-bottom border-end p-3" style={{cursor:'pointer'}}
-                    onClick={()=>navigate(`/patients/${p.id}`)}>
+                    onClick={()=>{ const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}>
                     <div className="d-flex align-items-center gap-3">
                       <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
                         style={{width:'44px',height:'44px',backgroundColor:risk>=5?'#dc354515':risk>=3?'#ffc10715':'#19875415'}}>

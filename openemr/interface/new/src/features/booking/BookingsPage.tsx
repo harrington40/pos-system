@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
+import { patientChartPath } from '../../utils/patientChart';
 
 const BOOKING_PATH = '/book-appointment';
 const BOOKING_URL =
@@ -70,7 +71,7 @@ export default function BookingsPage() {
             </button>
           </>
         ) : b.pid ? (
-          <a className="btn btn-outline-primary btn-sm rounded-pill" href={`/patients/${b.patient_id || b.pid}`}>
+          <a className="btn btn-outline-primary btn-sm rounded-pill" href={patientChartPath(b.patient_id, b.pid) || '#'}>
             <i className="bi bi-folder2-open me-1"></i>Chart
           </a>
         ) : (

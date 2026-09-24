@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { canViewFinancials } from '../../utils/permissions';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
 import { formatDateTime } from '../../utils/date';
+import { chartPatientId } from '../../utils/patientChart';
 
 // ── Reference data ──────────────────────────────────────────────────
 
@@ -422,7 +423,7 @@ export default function PharmacyPage() {
                                 <button className="btn btn-sm btn-outline-secondary rounded-pill ms-1" onClick={(e) => { e.stopPropagation(); setPrintRx(p); }} title="Print medication label">
                                   <i className="bi bi-printer"></i>
                                 </button>
-                                <button className="btn btn-sm btn-outline-secondary rounded-pill ms-1" onClick={(e) => { e.stopPropagation(); navigate(`/patients/${p.patient_id}`); }} title="Open patient chart">
+                                <button className="btn btn-sm btn-outline-secondary rounded-pill ms-1" onClick={(e) => { e.stopPropagation(); const cid = chartPatientId(p.patient_id, p.patientId, p.pid); if (cid) navigate(`/patients/${cid}`); }} title="Open patient chart">
                                   <i className="bi bi-person-badge"></i>
                                 </button>
                               </td>

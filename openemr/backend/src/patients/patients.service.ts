@@ -1,4 +1,4 @@
- import { Injectable, NotFoundException } from '@nestjs/common';
+ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -45,6 +45,8 @@ export interface CreatePatientDto {
 
 @Injectable()
 export class PatientsService {
+  private readonly logger = new Logger(PatientsService.name);
+
   constructor(
     @InjectDataSource()
     private dataSource: DataSource,
@@ -120,7 +122,19 @@ export class PatientsService {
     if (!rows || rows.length === 0) {
       throw new NotFoundException(`Patient #${id} not found`);
     }
-    return rows[0];
+
+    const patient = rows[0];
+    // `patient_data.id` and `pid` are different columns that can both hold the
+    // requested number, so a caller linking with a pid silently gets the
+    // neighbouring patient. We keep resolving (for compatibility) but log it so
+    // any remaining pid-based caller is visible instead of quietly wrong.
+    if (Number(patient.id) !== id) {
+      this.logger.warn(
+        `Patient lookup: id=${id} matched patient_data.pid only ` +
+          `(canonical id=${patient.id}). Callers should link with patientId.`,
+      );
+    }
+    return patient;
   }
 
   /**

@@ -10,6 +10,7 @@ import { isInvalidLiberiaNationalNumber } from '../../utils/liberia';
 import type { Patient } from '../../types/patient';
 import { formatPatientName, formatPatientNameLastFirst } from '../../utils/patientName';
 import { formatDateOnly } from '../../utils/date';
+import { chartPatientId } from '../../utils/patientChart';
 
 const emptyForm = { fname: '', lname: '', mname: '', DOB: '', sex: '', email: '', phone_contact: '', street: '', city: '', providerID: '' };
 
@@ -37,14 +38,18 @@ export default function PatientSearchPage() {
     enabled: debouncedSearch.length >= 2,
   });
 
-  const handleSelectPatient = useCallback((patient: Patient) => navigate(`/patients/${(patient as any).id || patient.uuid}`), [navigate]);
+  const handleSelectPatient = useCallback((patient: Patient) => {
+    const cid = chartPatientId((patient as any).id, (patient as any).pid, patient.uuid);
+    if (cid) navigate(`/patients/${cid}`);
+  }, [navigate]);
 
   const newPatient = useMutation({
     mutationFn: (data: any) => createPatient(data),
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
       setShowModal(false); setForm(emptyForm); setStep(1);
-      navigate(`/patients/${result.id}`);
+      const cid = chartPatientId(result.id, result.pid);
+      if (cid) navigate(`/patients/${cid}`);
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Unknown error';
@@ -265,7 +270,7 @@ export default function PatientSearchPage() {
                         <div className="text-muted">DOB: {d.DOB || '—'} · Phone: {d.phone_contact || '—'}</div>
                       </div>
                       <button className="btn btn-sm btn-outline-primary rounded-pill px-3"
-                        onClick={() => { setShowModal(false); setDuplicates([]); navigate(`/patients/${d.id}`); }}>
+                        onClick={() => { setShowModal(false); setDuplicates([]); const cid = chartPatientId(d.id, d.pid); if (cid) navigate(`/patients/${cid}`); }}>
                         Use Existing <i className="bi bi-arrow-right ms-1"></i>
                       </button>
                     </div>

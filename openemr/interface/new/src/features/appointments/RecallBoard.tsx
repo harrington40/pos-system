@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 import { formatDateOnly } from '../../utils/date';
+import { chartPatientId } from '../../utils/patientChart';
 
 export default function RecallBoard() {
   const qc = useQueryClient();
@@ -94,7 +95,7 @@ export default function RecallBoard() {
                   <td className="text-danger"><i className="bi bi-clock me-1"></i>12+ months</td>
                   <td>{p.providerName||'Unassigned'}</td>
                   <td>
-                    <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={()=>navigate(`/patients/${p.id}`)}>
+                    <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={()=>{ const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}>
                       <i className="bi bi-folder2-open me-1"></i>Chart
                     </button>
                     <button className="btn btn-outline-warning btn-sm rounded-pill ms-1"

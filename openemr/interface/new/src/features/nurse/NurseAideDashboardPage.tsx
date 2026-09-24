@@ -17,6 +17,7 @@ import { classifyBP, classifyPulse, classifyTemp, classifyResp, classifySpO2, vi
 import { isInvalidLiberiaNationalNumber } from '../../utils/liberia';
 import { LAB_TESTS } from '../labs/LabsPage';
 import { formatPatientName, formatPatientNameLastFirst } from '../../utils/patientName';
+import { chartPatientId } from '../../utils/patientChart';
 
 /** Normalise a vitals row into a snapshot for the safety algorithm. */
 function toSnapshot(v: any): VitalsSnapshot {
@@ -501,7 +502,7 @@ export default function NurseAideDashboardPage() {
                         <i className="bi bi-clipboard2-pulse me-1"></i>Vital Signs Round
                       </button>
                       {selectedPatient.chart_shared ? (
-                        <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => navigate(`/patients/${selectedPatient.id}`)}>
+                        <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => { const cid = chartPatientId(selectedPatient.id, selectedPatient.pid); if (cid) navigate(`/patients/${cid}`); }}>
                           Full Chart <i className="bi bi-arrow-right ms-1"></i>
                         </button>
                       ) : (

@@ -520,7 +520,7 @@ export default function ProviderDashboardPage() {
                             { label: 'Prescribe', icon: 'bi-prescription2', color: '#6f42c1', desc: 'Write & send e-prescriptions',
                               action: () => navigate(`/pharmacy`) },
                             { label: 'Record Vitals', icon: 'bi-heart-pulse', color: '#dc3545', desc: 'BP, pulse, temp, O₂, weight',
-                              action: () => navigate(`/patients/${p.id}`) },
+                              action: () => { const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); } },
                             { label: 'Imaging', icon: 'bi-image', color: '#20c997', desc: 'Order X-ray, DICOM, ultrasound',
                               action: () => navigate(`/dicom`) },
                             { label: 'Refer to Specialist', icon: 'bi-send', color: '#0dcaf0', desc: 'Create referral to specialist',
@@ -548,7 +548,7 @@ export default function ProviderDashboardPage() {
                         {/* Open Full Chart */}
                         <div className="text-center mt-2">
                           <button className="btn btn-outline-success btn-sm rounded-pill"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/patients/${p.id}`); }}>
+                            onClick={(e) => { e.stopPropagation(); const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}>
                             <i className="bi bi-folder2-open me-1"></i>Open Full Patient Chart
                           </button>
                         </div>

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
+import { chartPatientId } from '../../utils/patientChart';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -149,7 +150,7 @@ export default function DashboardPage() {
             <div className="card-body p-0">
               {pendingPatients.length>0?(
                 pendingPatients.slice(0,4).map((p:any)=>(
-                  <div key={p.id} className="d-flex align-items-center gap-2 px-3 py-2 border-bottom" style={{cursor:'pointer'}} onClick={()=>navigate(`/patients/${p.id}`)}>
+                  <div key={p.id} className="d-flex align-items-center gap-2 px-3 py-2 border-bottom" style={{cursor:'pointer'}} onClick={()=>{ const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}>
                     <div className="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center" style={{width:'32px',height:'32px'}}>
                       <small className="fw-bold text-danger">{p.fname?.[0]}{p.lname?.[0]}</small>
                     </div>

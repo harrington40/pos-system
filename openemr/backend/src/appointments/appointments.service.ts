@@ -319,6 +319,7 @@ export class AppointmentsService {
     const today = date || new Date().toISOString().substring(0, 10);
     return this.dataSource.query(
       `SELECT pt.id as tracker_id, pt.date as checked_in_at, pt.pid,
+              pd.id as patient_id,
               pd.fname, pd.lname, pd.DOB, pd.sex,
               pd.providerID,
               CONCAT(u.fname, ' ', u.lname) as provider_name,

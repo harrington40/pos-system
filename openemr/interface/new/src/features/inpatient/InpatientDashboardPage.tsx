@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import { formatPatientName } from '../../utils/patientName';
 import { formatVital, formatBP } from '../../utils/vitalsClassify';
+import { chartPatientId } from '../../utils/patientChart';
 
 interface BedDef { id: string; label: string; }
 interface WardDef { id: string; name: string; floor: string; beds: BedDef[]; }
@@ -349,7 +350,7 @@ export default function InpatientDashboardPage() {
               )}
 
               <div className="d-flex gap-2">
-                <button className="btn btn-primary rounded-pill flex-grow-1" onClick={() => { setShowPatientDetail(false); navigate(`/patients/${activePatient.pid}`); }}>
+                <button className="btn btn-primary rounded-pill flex-grow-1" onClick={() => { setShowPatientDetail(false); const cid = chartPatientId(activePatient.id, activePatient.pid); if (cid) navigate(`/patients/${cid}`); }}>
                   <i className="bi bi-folder2-open me-1"></i>Open Full Chart
                 </button>
                 {canWrite && (
