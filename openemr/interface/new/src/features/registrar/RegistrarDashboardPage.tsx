@@ -476,18 +476,45 @@ export default function RegistrarDashboardPage() {
                 pendingPatients.slice(0, 6).map((p: any) => {
                   const hasVitals = p.vitals_count > 0;
                   const isLongWait = p.minutes_waiting > 30;
+                  // Every patient here is still `pending`, so the chart is by
+                  // definition unfinished until the registrar approves it.
+                  const isIncomplete = p.chart_complete === false;
+                  const missing: string[] = p.missing_fields || [];
                   return (
-                    <div key={p.id} className={`d-flex align-items-center gap-2 px-3 py-2 border-bottom ${isLongWait ? 'bg-warning bg-opacity-10' : ''}`}>
+                    <div key={p.id}
+                      className={`d-flex align-items-center gap-2 px-3 py-2 border-bottom ${isIncomplete ? 'bg-warning bg-opacity-10' : ''}`}
+                      style={isIncomplete ? { borderLeft: '4px solid #ffc107' } : undefined}>
                       <div className="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center flex-shrink-0"
                         style={{ width: '32px', height: '32px' }}>
                         <small className="fw-bold text-danger">{p.fname?.[0]}{p.lname?.[0]}</small>
                       </div>
                       <div className="flex-grow-1" style={{ cursor: 'pointer' }} onClick={() => { const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}>
                         <small className="fw-semibold">{formatPatientNameLastFirst(p)}</small>
+                        {isIncomplete && (
+                          <span
+                            className="badge bg-warning text-dark rounded-pill ms-1"
+                            style={{ fontSize: '0.62rem' }}
+                            title={missing.length ? `Still needed: ${missing.join(', ')}` : 'Chart not yet completed'}
+                          >
+                            <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                            Chart incomplete{missing.length ? ` · ${missing.length} missing` : ''}
+                          </span>
+                        )}
                         <br />
                         <small className="text-muted">
-                          {p.created_by || '—'} · {hasVitals ? `${p.vitals_count} vitals` : 'No vitals'} · {formatWaitTime(p.minutes_waiting)}
+                          {p.created_by || '—'} · {hasVitals ? `${p.vitals_count} vitals` : 'No vitals'} ·{' '}
+                          <span className={isLongWait ? 'text-danger fw-semibold' : ''}>
+                            {formatWaitTime(p.minutes_waiting)}{isLongWait ? ' (long wait)' : ''}
+                          </span>
                         </small>
+                        {isIncomplete && missing.length > 0 && (
+                          <>
+                            <br />
+                            <small className="text-muted" style={{ fontSize: '0.68rem' }}>
+                              Still needed: {missing.join(', ')}
+                            </small>
+                          </>
+                        )}
                       </div>
                       <select
                         className="form-select form-select-sm"

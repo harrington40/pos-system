@@ -237,6 +237,41 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
+      {/* Registration completeness — a yellow flag until the registrar has the
+          full demographics and the patient is assigned to a provider. */}
+      {patient.chart_complete === false && (
+        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px', borderLeft: '4px solid #ffc107', background: 'rgba(255, 193, 7, 0.12)' }}>
+          <div className="card-body py-2 px-3">
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              <i className="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+              <strong className="small">Chart incomplete</strong>
+              {(() => {
+                // Distinguish "not approved yet" from "approved but a registration
+                // detail is still blank" — reporting the latter as "No provider
+                // assigned" would be wrong once a provider is on the chart.
+                const missingProvider = (patient.missing_fields || []).includes('Assigned provider');
+                if (patient.status === 'pending') {
+                  return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>Awaiting registrar approval</span>;
+                }
+                if (missingProvider) {
+                  return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>No provider assigned</span>;
+                }
+                return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>Registration details outstanding</span>;
+              })()}
+              {(patient.missing_fields?.length ?? 0) > 0 && (
+                <span className="small text-dark">
+                  Still needed: <strong>{patient.missing_fields!.join(', ')}</strong>
+                </span>
+              )}
+              <button className="btn btn-warning btn-sm rounded-pill ms-auto"
+                onClick={() => setActiveTab('demographics')}>
+                <i className="bi bi-pencil-square me-1"></i>Complete Chart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Clinical safety alerts — error prevention */}
       {safetyAlerts.length > 0 && (
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px', borderLeft: '4px solid #dc3545' }}>
@@ -258,7 +293,7 @@ export default function PatientDetailPage() {
         </div>
       )}
 
-      <QuickAssign patientId={id!} currentProviderId={patient.provider} currentProviderName={patient.provider_name} />
+      <QuickAssign patientId={id!} currentProviderId={patient.provider != null ? String(patient.provider) : undefined} currentProviderName={patient.provider_name || patient.providerName} />
 
       <div className="row g-3">
         <div className="col-lg-3">

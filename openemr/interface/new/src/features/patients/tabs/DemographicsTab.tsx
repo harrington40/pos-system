@@ -4,6 +4,7 @@ import type { Patient } from '../../../types/patient';
 import { updatePatient } from '../../../api/endpoints/patients';
 import nestClient from '../../../api/nest-client';
 import { useAuth } from '../../../hooks/useAuth';
+import { toDateInput } from '../../../utils/date';
 import PhoneInput from '../../../components/shared/PhoneInput';
 import CitySelect from '../../../components/shared/CitySelect';
 
@@ -26,13 +27,15 @@ export default function DemographicsTab({ patient }: Props) {
     fname: patient.fname || '',
     lname: patient.lname || '',
     mname: patient.mname || '',
-    dob: patient.dob || '',
+    // Prefer the canonical names, but fall back to the raw column names in case
+    // this record came from an endpoint that has not been normalised yet.
+    dob: toDateInput(patient.dob || patient.DOB),
     sex: patient.sex || '',
     email: patient.email || '',
-    phone: patient.phone || '',
+    phone: patient.phone || patient.phone_contact || '',
     street: patient.street || '',
     city: patient.city || '',
-    providerID: patient.provider || '',
+    providerID: String(patient.provider ?? patient.providerID ?? ''),
   });
 
   const { data: providers = [] } = useQuery({
@@ -43,7 +46,12 @@ export default function DemographicsTab({ patient }: Props) {
   const mutation = useMutation({
     mutationFn: (data: Partial<Patient>) => updatePatient(String(patient.id ?? patient.uuid), data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patient', patient.uuid] });
+      // Invalidate every patient query. The chart's query key is ['patient', id]
+      // while this tab only knows the route id, and `uuid` is not returned by the
+      // API — keying on it invalidated ['patient', undefined] and left the chart
+      // header showing the pre-edit demographics.
+      queryClient.invalidateQueries({ queryKey: ['patient'] });
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
     },
   });
 
@@ -70,6 +78,29 @@ export default function DemographicsTab({ patient }: Props) {
         )}
       </div>
       <div className="card-body">
+        {/* Registration completeness — tells the registrar/nurse exactly what is
+            still outstanding before the patient can be assigned to a provider. */}
+        {patient.chart_complete === false && (
+          <div className="alert alert-warning py-2 mb-3 d-flex align-items-start gap-2 border-warning">
+            <i className="bi bi-exclamation-triangle-fill fs-5"></i>
+            <div className="flex-grow-1">
+              <strong>Chart incomplete — not yet assigned to a provider</strong>
+              {(patient.missing_fields?.length ?? 0) > 0 && (
+                <>
+                  <br />
+                  <small>Still needed: {patient.missing_fields!.join(', ')}</small>
+                </>
+              )}
+              <br />
+              <small className="text-muted">
+                Finish these details and the registrar assigns the patient to a provider to complete the chart.
+              </small>
+            </div>
+            <span className="badge bg-warning text-dark rounded-pill align-self-center">
+              {patient.missing_fields?.length ?? 0} missing
+            </span>
+          </div>
+        )}
         {isLocked && (
           <div className="alert alert-warning py-2 mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-lock-fill fs-5"></i>

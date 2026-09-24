@@ -1,6 +1,7 @@
  import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { withChartStatus } from './chart-completeness.util';
 
 export interface PatientRow {
   id: number;
@@ -111,6 +112,14 @@ export class PatientsService {
         pd.email, pd.phone_contact, pd.street, pd.city, pd.state, pd.postal_code,
         pd.status, pd.public_id, pd.providerID, pd.ref_providerID,
         pd.regdate, pd.created_by,
+        -- Aliases so the SPA can use one naming convention: the Patient type and
+        -- every chart tab read dob/phone/provider/zip, but the columns are
+        -- DOB/phone_contact/providerID/postal_code. Without these the chart
+        -- showed blank date-of-birth, phone and provider fields.
+        pd.DOB AS dob,
+        pd.phone_contact AS phone,
+        pd.providerID AS provider,
+        pd.postal_code AS zip,
         CONCAT(u.fname, ' ', u.lname) as providerName
       FROM patient_data pd
       LEFT JOIN users u ON pd.providerID = u.id
@@ -134,7 +143,8 @@ export class PatientsService {
           `(canonical id=${patient.id}). Callers should link with patientId.`,
       );
     }
-    return patient;
+    // Drives the yellow "chart incomplete" highlighting on the patient chart.
+    return withChartStatus(patient);
   }
 
   /**
@@ -255,8 +265,9 @@ export class PatientsService {
   }
 
   async getPendingPatients(): Promise<any[]> {
-    return this.dataSource.query(
+    const rows = await this.dataSource.query(
       `SELECT pd.id, pd.pid, pd.fname, pd.lname, pd.DOB, pd.sex,
+              pd.phone_contact, pd.street, pd.city, pd.providerID,
               pd.regdate, pd.created_by, pd.status,
               (SELECT COUNT(*) FROM form_vitals WHERE pid = pd.pid) as vitals_count,
               (SELECT MAX(date) FROM form_vitals WHERE pid = pd.pid) as last_vital_date,
@@ -265,6 +276,8 @@ export class PatientsService {
        WHERE pd.status = 'pending'
        ORDER BY pd.regdate ASC`,
     );
+    // The registrar list highlights the charts that are still incomplete.
+    return rows.map((row: any) => withChartStatus(row));
   }
 
   async approvePatient(
@@ -458,9 +471,28 @@ export class PatientsService {
   }
 
   async update(id: number, dto: Partial<CreatePatientDto>, isAdmin = false): Promise<void> {
+    // The SPA sends the `Patient` type's names (dob/phone/provider/zip), but the
+    // columns are DOB/phone_contact/providerID/postal_code. Without this mapping
+    // those edits were silently discarded — the save reported success and
+    // nothing changed.
+    const COLUMN_ALIASES: Record<string, string> = {
+      dob: 'DOB',
+      phone: 'phone_contact',
+      provider: 'providerID',
+      zip: 'postal_code',
+    };
+
+    // Accept both spellings; the real column name wins if both are sent.
+    const resolved = new Map<string, any>();
+    for (const [key, value] of Object.entries(dto)) {
+      if (value === undefined) continue;
+      const column = COLUMN_ALIASES[key] || key;
+      if (key === column || !resolved.has(column)) resolved.set(column, value);
+    }
+
     // Check 30-day edit window for demographic fields
     const demographicFields = ['fname', 'lname', 'mname', 'DOB', 'sex'];
-    const isEditingDemographics = demographicFields.some(f => dto[f as keyof CreatePatientDto] !== undefined);
+    const isEditingDemographics = demographicFields.some(f => resolved.has(f));
     if (isEditingDemographics && !isAdmin) {
       const [patient] = await this.dataSource.query(
         `SELECT regdate FROM patient_data WHERE id = ?`, [id],
@@ -473,18 +505,18 @@ export class PatientsService {
       }
     }
 
-    const sets: string[] = [];
-    const vals: any[] = [];
-    const fields: (keyof CreatePatientDto)[] = [
+    const allowed = new Set<string>([
       'fname', 'lname', 'mname', 'DOB', 'sex', 'email',
       'phone_contact', 'street', 'city', 'state', 'postal_code',
       'providerID', 'ref_providerID',
-    ];
-    for (const f of fields) {
-      if (dto[f] !== undefined) {
-        sets.push(`${f} = ?`);
-        vals.push(dto[f]);
-      }
+    ]);
+
+    const sets: string[] = [];
+    const vals: any[] = [];
+    for (const [column, value] of resolved) {
+      if (!allowed.has(column)) continue;
+      sets.push(`${column} = ?`);
+      vals.push(value);
     }
     if (!sets.length) return;
     vals.push(id);
