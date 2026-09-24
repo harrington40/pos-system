@@ -1,0 +1,411 @@
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import nestClient from '../../api/nest-client';
+import { formatPatientName } from '../../utils/patientName';
+import { formatDateTime } from '../../utils/date';
+
+const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+function computeFlag(test: any, value: string): string {
+  if (!value) return '';
+  if (test.result_type === 'NUMERIC' && (test.ref_min != null || test.ref_max != null)) {
+    const num = Number(value);
+    if (isNaN(num)) return 'TEXT';
+    if (test.ref_min != null && num < Number(test.ref_min)) return 'LOW';
+    if (test.ref_max != null && num > Number(test.ref_max)) return 'HIGH';
+    return 'NORMAL';
+  }
+  if (test.result_type === 'POSITIVE_NEGATIVE') {
+    const v = value.toLowerCase();
+    if (['negative', 'non-reactive', 'non reactive'].includes(v)) return 'NEGATIVE';
+    if (['positive', 'reactive'].includes(v)) return 'POSITIVE';
+  }
+  return '';
+}
+
+const flagBadge = (f: string) =>
+  f === 'LOW' ? 'bg-warning text-dark' : f === 'HIGH' ? 'bg-danger' : f === 'NORMAL' ? 'bg-success' :
+  f === 'POSITIVE' ? 'bg-danger' : f === 'NEGATIVE' ? 'bg-success' : 'bg-secondary';
+
+/** Deterministic barcode-like SVG (same approach as the pharmacy label). */
+function Barcode({ seed, width = 140 }: { seed: string; width?: number }) {
+  const bars = useMemo(() => {
+    let h = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const out: number[] = [];
+    let x = h >>> 0;
+    for (let i = 0; i < 48; i++) {
+      x = (Math.imul(x, 1103515245) + 12345) >>> 0;
+      out.push((x >> 16) % 3 === 0 ? 1 : 2);
+    }
+    return out;
+  }, [seed]);
+
+  return (
+    <svg width={width} height="40" viewBox="0 0 140 40" className="d-block">
+      {bars.map((w, i) => (
+        <rect key={i} x={i * 2.9} y={0} width={w === 2 ? 2.4 : 1.2} height="34" fill="#1e293b" rx="0.4" />
+      ))}
+    </svg>
+  );
+}
+
+export default function LabResultFormPage() {
+  const { pid: urlPid } = useParams<{ pid: string }>();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [patientSearch, setPatientSearch] = useState('');
+  const [selectedPid, setSelectedPid] = useState<string>(urlPid || '');
+  const [selectedTests, setSelectedTests] = useState<Record<number, boolean>>({});
+  const [values, setValues] = useState<Record<number, string>>({});
+  const [comments, setComments] = useState<Record<number, string>>({});
+  const [showAll, setShowAll] = useState(false);
+  const [tab, setTab] = useState<'form' | 'history'>('form');
+  const [reportId, setReportId] = useState<number | null>(null);
+  const [labNo, setLabNo] = useState('');
+  const [toast, setToast] = useState('');
+
+  const { data: patients = [] } = useQuery({
+    queryKey: ['lab-patient-search', patientSearch],
+    queryFn: async () => {
+      if (patientSearch.trim().length < 2) return [];
+      const r = await nestClient.get('/patients', { params: { search: patientSearch, limit: 15 } });
+      return r.data;
+    },
+    enabled: patientSearch.trim().length >= 2,
+  });
+
+  const { data: patient } = useQuery({
+    queryKey: ['patient', selectedPid],
+    queryFn: async () => { const r = await nestClient.get(`/patients/${selectedPid}`); return r.data; },
+    enabled: !!selectedPid,
+  });
+
+  const { data: catalog = [] } = useQuery({
+    queryKey: ['lab-catalog'],
+    queryFn: async () => { const r = await nestClient.get('/lab/catalog'); return r.data; },
+  });
+
+  const { data: orderedTests = [] } = useQuery({
+    queryKey: ['lab-ordered-tests', selectedPid],
+    queryFn: async () => {
+      if (!selectedPid) return [];
+      try { const r = await nestClient.get(`/patients/${selectedPid}/lab/ordered-tests`); return r.data || []; } catch { return []; }
+    },
+    enabled: !!selectedPid,
+  });
+
+  const { data: reports = [] } = useQuery({
+    queryKey: ['lab-reports', selectedPid],
+    queryFn: async () => { const r = await nestClient.get(`/patients/${selectedPid}/lab-reports`); return r.data; },
+    enabled: !!selectedPid,
+  });
+
+  const grouped = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const t of catalog as any[]) {
+      (map[t.category] ||= []).push(t);
+    }
+    return map;
+  }, [catalog]);
+
+  const orderedLower = useMemo(() => new Set((orderedTests as string[]).map(s => s.toLowerCase())), [orderedTests]);
+
+  const selectPatient = (p: any) => {
+    setSelectedPid(String(p.pid ?? p.id));
+    setPatientSearch('');
+    setSelectedTests({});
+    setValues({});
+    setComments({});
+    setReportId(null);
+    setLabNo('');
+    // Auto-select tests matching the ordered test names.
+    const sel: Record<number, boolean> = {};
+    for (const t of catalog as any[]) {
+      const match = orderedLower.has(String(t.name).toLowerCase()) ||
+        orderedLower.has(String(t.code).toLowerCase());
+      if (match) sel[t.id] = true;
+    }
+    setSelectedTests(sel);
+  };
+
+  const visibleTests = useMemo(() => {
+    const list = (catalog as any[]).filter(t => showAll || selectedTests[t.id]);
+    return list;
+  }, [catalog, selectedTests, showAll]);
+
+  const saveReport = useMutation({
+    mutationFn: async (verify: boolean) => {
+      const items = visibleTests.map(t => ({
+        testId: t.id, code: t.code, name: t.name, category: t.category, unit: t.unit,
+        refMin: t.ref_min, refMax: t.ref_max, refText: t.ref_text, resultType: t.result_type,
+        resultValue: values[t.id] || '', comments: comments[t.id] || '',
+      }));
+      const payload = {
+        items, labNo: labNo || undefined,
+        technicianId: null,
+        technicianName: user?.displayName || null,
+        status: verify ? 'VERIFIED' : 'DRAFT',
+      };
+      if (reportId) {
+        await nestClient.put(`/lab/reports/${reportId}`, { items });
+        if (verify) await nestClient.post(`/lab/reports/${reportId}/verify`, payload);
+      } else {
+        const r = await nestClient.post(`/patients/${selectedPid}/lab-reports`, payload);
+        return r.data;
+      }
+    },
+    onSuccess: (d: any) => {
+      qc.invalidateQueries({ queryKey: ['lab-reports', selectedPid] });
+      setToast(d?.labNo ? `Saved ${d.labNo}` : 'Report saved');
+      if (!reportId && d?.id) setReportId(d.id);
+    },
+    onError: (e: any) => setToast(e?.response?.data?.message || 'Save failed'),
+  });
+
+  const openReport = async (id: number) => {
+    try {
+      const r = await nestClient.get(`/lab/reports/${id}`);
+      const rep = r.data;
+      setReportId(rep.id);
+      setLabNo(rep.lab_no || '');
+      setSelectedPid(String(rep.pid));
+      const sel: Record<number, boolean> = {};
+      const val: Record<number, string> = {};
+      const cm: Record<number, string> = {};
+      for (const it of rep.items || []) {
+        if (it.test_id) { sel[it.test_id] = true; val[it.test_id] = it.result_value || ''; cm[it.test_id] = it.comments || ''; }
+      }
+      setSelectedTests(sel);
+      setValues(val);
+      setComments(cm);
+      setTab('form');
+    } catch (e: any) { setToast('Could not load report'); }
+  };
+
+  const renderInput = (t: any) => {
+    if (t.result_type === 'POSITIVE_NEGATIVE') {
+      return (
+        <select className="form-select form-select-sm" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })}>
+          <option value="">—</option>
+          <option>Negative</option><option>Positive</option><option>Non-Reactive</option><option>Reactive</option>
+        </select>
+      );
+    }
+    if (t.result_type === 'BLOOD_GROUP') {
+      return (
+        <select className="form-select form-select-sm" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })}>
+          <option value="">—</option>
+          {BLOOD_GROUPS.map(g => <option key={g}>{g}</option>)}
+        </select>
+      );
+    }
+    if (t.result_type === 'SELECT' && t.options) {
+      return (
+        <select className="form-select form-select-sm" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })}>
+          <option value="">—</option>
+          {String(t.options).split(',').map(o => <option key={o}>{o}</option>)}
+        </select>
+      );
+    }
+    return <input className="form-control form-control-sm" type={t.result_type === 'NUMERIC' ? 'number' : 'text'} step="any" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })} />;
+  };
+
+  const refText = (t: any) => t.ref_text || (t.ref_min != null && t.ref_max != null ? `${t.ref_min} - ${t.ref_max}` : t.ref_min != null ? `≥ ${t.ref_min}` : t.ref_max != null ? `≤ ${t.ref_max}` : '—');
+
+  return (
+    <div className="glass-page position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh', padding: '16px' }}>
+      {toast && (
+        <div className="alert alert-info py-2 small d-flex justify-content-between align-items-center">
+          <span><i className="bi bi-info-circle me-1"></i>{toast}</span>
+          <button className="btn-close btn-sm" onClick={() => setToast('')}></button>
+        </div>
+      )}
+
+      <div className="rounded-4 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #198754 60%, #00c9a7 100%)' }}>
+        <h3 className="mb-1 fw-bold"><i className="bi bi-droplet-half me-2"></i>Patient Laboratory Result Form</h3>
+        <p className="mb-0 text-white text-opacity-75 small">MA JUAH MEMORIAL CLINIC · DELIVERING QUALITY MEDICAL SERVICES</p>
+      </div>
+
+      {/* Patient selector */}
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
+        <div className="card-body">
+          <label className="form-label small fw-semibold">Select patient</label>
+          <div className="position-relative">
+            <input className="form-control" placeholder="Search patient name…" value={patientSearch} onChange={e => setPatientSearch(e.target.value)} />
+            {patientSearch.trim().length >= 2 && patients.length > 0 && (
+              <div className="list-group position-absolute w-100 shadow" style={{ zIndex: 10, maxHeight: '260px', overflowY: 'auto' }}>
+                {patients.map((p: any) => (
+                  <button key={p.id} type="button" className="list-group-item list-group-item-action small" onClick={() => selectPatient(p)}>
+                    {formatPatientName(p)} · {p.sex || '—'} · PID #{p.pid}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {patient && (
+            <div className="row g-2 mt-3">
+              <div className="col-md-3"><small className="text-muted">Name</small><div className="fw-semibold">{formatPatientName(patient)}</div></div>
+              <div className="col-md-2"><small className="text-muted">Age</small><div>{patient.DOB ? String(patient.DOB).slice(0, 10) : '—'}</div></div>
+              <div className="col-md-2"><small className="text-muted">Sex</small><div>{patient.sex || '—'}</div></div>
+              <div className="col-md-2"><small className="text-muted">Reg #</small><div>{patient.public_id || `#${patient.pid}`}</div></div>
+              <div className="col-md-3"><small className="text-muted">Lab No</small><input className="form-control form-control-sm" placeholder="Auto" value={labNo} onChange={e => setLabNo(e.target.value)} /></div>
+            </div>
+          )}
+          {patient && (
+            <div className="d-flex align-items-end gap-3 mt-3">
+              <div className="p-2 bg-white border rounded-3">
+                <Barcode seed={labNo || patient.public_id || `#${patient.pid}`} />
+                <div className="small text-muted text-center" style={{ fontSize: '0.7rem' }}>{labNo || patient.public_id || `#${patient.pid}`}</div>
+              </div>
+              <div className="small text-muted"><i className="bi bi-upc-scan me-1"></i>Specimen / Lab No barcode</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <ul className="nav nav-pills gap-2 mb-3">
+        <li className="nav-item"><button className={`nav-link ${tab === 'form' ? 'active' : ''}`} onClick={() => setTab('form')}><i className="bi bi-pencil-square me-1"></i>Result Entry</button></li>
+        <li className="nav-item"><button className={`nav-link ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}><i className="bi bi-clock-history me-1"></i>Lab History</button></li>
+      </ul>
+
+      {tab === 'form' ? (
+        <>
+          <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <span className="small text-muted">{visibleTests.length} tests selected / shown</span>
+            <div className="form-check form-switch">
+              <input className="form-check-input" type="checkbox" id="showAll" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
+              <label className="form-check-label small" htmlFor="showAll">Show All Tests</label>
+            </div>
+          </div>
+
+          {!selectedPid ? (
+            <div className="text-center text-muted py-5"><i className="bi bi-person-search fs-1 d-block mb-2"></i>Select a patient to begin result entry.</div>
+          ) : Object.keys(grouped).map(cat => {
+            const tests = grouped[cat].filter(t => showAll || selectedTests[t.id]);
+            if (!tests.length) return null;
+            return (
+              <div className="card border-0 shadow-sm mb-3" key={cat} style={{ borderRadius: '16px' }}>
+                <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small text-uppercase">{cat}</h6></div>
+                <div className="card-body p-0">
+                  <div className="table-responsive">
+                    <table className="table table-sm table-hover mb-0 align-middle">
+                      <thead className="table-light">
+                        <tr><th style={{ width: 40 }}></th><th>Test Request</th><th>Results</th><th>Unit</th><th>Normal Value</th><th>Flag</th><th>Comments</th></tr>
+                      </thead>
+                      <tbody>
+                        {tests.map((t: any) => (
+                          <tr key={t.id} className={selectedTests[t.id] ? '' : 'opacity-50'}>
+                            <td><input type="checkbox" className="form-check-input" checked={!!selectedTests[t.id]} onChange={e => setSelectedTests({ ...selectedTests, [t.id]: e.target.checked })} /></td>
+                            <td className="fw-semibold">{t.name}</td>
+                            <td style={{ minWidth: 140 }}>{renderInput(t)}</td>
+                            <td>{t.unit || '—'}</td>
+                            <td>{refText(t)}</td>
+                            <td>{values[t.id] ? <span className={`badge ${flagBadge(computeFlag(t, values[t.id]))}`}>{computeFlag(t, values[t.id])}</span> : '—'}</td>
+                            <td><input className="form-control form-control-sm" value={comments[t.id] || ''} onChange={e => setComments({ ...comments, [t.id]: e.target.value })} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {selectedPid && (
+            <div className="d-flex gap-2 justify-content-end mt-3 flex-wrap">
+              <button className="btn btn-outline-secondary rounded-pill" onClick={() => window.print()}><i className="bi bi-printer me-1"></i>Print</button>
+              <button className="btn btn-primary rounded-pill px-4" disabled={saveReport.isPending} onClick={() => saveReport.mutate(false)}>
+                <i className="bi bi-save me-1"></i>Save Draft
+              </button>
+              <button className="btn btn-success rounded-pill px-4" disabled={saveReport.isPending} onClick={() => saveReport.mutate(true)}>
+                <i className="bi bi-check2-circle me-1"></i>Save & Verify
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+          <div className="card-body p-0">
+            {!reports || reports.length === 0 ? (
+              <div className="text-center text-muted py-5">No laboratory reports for this patient.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover small mb-0 align-middle">
+                  <thead className="table-light"><tr><th>Date</th><th>Lab No</th><th>Tests</th><th>Status</th><th>Technician</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {(reports as any[]).map((r: any) => (
+                      <tr key={r.id}>
+                        <td>{formatDateTime(r.created_at)}</td>
+                        <td>{r.lab_no || `#${r.id}`}</td>
+                        <td>{r.item_count}</td>
+                        <td><span className={`badge ${r.status === 'VERIFIED' ? 'bg-success' : 'bg-secondary'}`}>{r.status}</span></td>
+                        <td>{r.technician_name || '—'}</td>
+                        <td>
+                          <button className="btn btn-outline-primary btn-sm rounded-pill me-1" onClick={() => openReport(r.id)}><i className="bi bi-pencil"></i> View/Edit</button>
+                          <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => { setReportId(r.id); setTab('form'); openReport(r.id).then(() => window.print()); }}><i className="bi bi-printer"></i></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Print-only report */}
+      <div className="print-only" style={{ display: 'none' }}>
+        <style>{`
+          @media print {
+            body * { visibility: hidden; }
+            .print-only, .print-only * { visibility: visible; }
+            .print-only { position: absolute; left: 0; top: 0; width: 100%; }
+          }
+        `}</style>
+        <div style={{ padding: '20px', fontFamily: 'Georgia, serif' }}>
+          <div className="text-center mb-2">
+            <h3 className="mb-0 fw-bold">MA JUAH MEMORIAL CLINIC</h3>
+            <div className="text-uppercase small">Delivering Quality Medical Services</div>
+            <div className="d-inline-block mt-2">
+              <Barcode seed={labNo || patient?.public_id || `#${patient?.pid || '—'}`} />
+              <div className="small" style={{ letterSpacing: 2 }}>{labNo || patient?.public_id || `#${patient?.pid || '—'}`}</div>
+            </div>
+          </div>
+          <table className="table table-bordered table-sm mb-3">
+            <tbody>
+              <tr><th>Patient's Name:</th><td>{patient ? formatPatientName(patient) : '—'}</td><th>Sex:</th><td>{patient?.sex || '—'}</td></tr>
+              <tr><th>Reg #:</th><td>{patient?.public_id || `#${patient?.pid || '—'}`}</td><th>Date:</th><td>{new Date().toLocaleDateString()}</td></tr>
+              <tr><th>Lab No:</th><td>{labNo || 'Auto'}</td><th>Age:</th><td>{patient?.DOB ? String(patient.DOB).slice(0, 10) : '—'}</td></tr>
+            </tbody>
+          </table>
+          <table className="table table-bordered table-sm">
+            <thead><tr><th>Test Request</th><th>Results</th><th>Normal Value</th></tr></thead>
+            <tbody>
+              {visibleTests.map((t: any) => (
+                <tr key={t.id}>
+                  <td>{t.name}</td>
+                  <td>{values[t.id] || ''} {t.unit || ''}</td>
+                  <td>{refText(t)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="d-flex justify-content-between mt-4">
+            <div>Lab Technician's Name: {user?.displayName || '________________'}</div>
+            <div>Signature: ______________________</div>
+            <div>Date: {new Date().toLocaleDateString()}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
