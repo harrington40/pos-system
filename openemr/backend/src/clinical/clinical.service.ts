@@ -25,8 +25,11 @@ export class ClinicalService implements OnModuleInit {
   }
 
   async getPharmacyAlerts(): Promise<any> {
+    // `pd.id` is returned alongside `pid` because patient_data.id != patient_data.pid
+    // on this schema; chart links must use the canonical id.
     const alerts = await this.dataSource.query(
       `SELECT a.id, a.pid, a.drug, a.message, a.is_read, a.created_at,
+              pd.id AS patient_id,
               CONCAT(COALESCE(pd.fname,''), ' ', COALESCE(pd.lname,'')) AS patient_name
        FROM pharmacy_alerts a
        LEFT JOIN patient_data pd ON pd.pid = a.pid

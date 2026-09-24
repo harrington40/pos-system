@@ -6,6 +6,8 @@ import nestClient from '../../api/nest-client';
 import { useMessagingSocket, MessagingEvent } from '../../hooks/useMessagingSocket';
 import { useAuth } from '../../hooks/useAuth';
 import { formatPatientName } from '../../utils/patientName';
+import { formatDateTime } from '../../utils/date';
+import { NotificationFeedCard, NotificationFeedModal, FeedItem } from '../../components/notifications/NotificationFeed';
 
 interface Toast { id: number; type: 'success'|'warning'|'info'|'danger'; title: string; body: string; priority: string; }
 
@@ -38,6 +40,7 @@ export default function MessagesPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<number | null>(null);
+  const [openFeed, setOpenFeed] = useState<FeedItem | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [, setNewCount] = useState(0);
   const tid = useRef(0);
@@ -90,6 +93,49 @@ export default function MessagesPage() {
         return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
       });
   }, [messages]);
+
+  /**
+   * The same messages folded into the shared notification shape, so a card can
+   * be opened into a modal that shows every specific that belongs to a message.
+   */
+  const feedItems: FeedItem[] = useMemo(
+    () =>
+      enriched.slice(0, 12).map((m: any): FeedItem => {
+        const isNew = m.message_status === 'New';
+        const tone = m.priority === 'STAT' ? '#dc3545' : m.priority === 'URGENT' ? '#fd7e14' : '#0d6efd';
+        return {
+          id: m.id,
+          title: m.subject || '(no subject)',
+          subtitle: m.patientName && String(m.patientName).trim()
+            ? `${String(m.patientName).trim()} · PID ${m.pid}`
+            : m.groupname === 'events' ? 'Clinic broadcast' : 'Clinic message',
+          summary: String(m.body || '').replace(/\s+/g, ' ').slice(0, 90),
+          at: m.date,
+          by: m.user,
+          icon: KIND_ICON[m.kind] || 'bi-envelope',
+          tone,
+          status: m.message_status,
+          unread: isNew,
+          link: patientChartPath(m.patientId) || undefined,
+          linkLabel: 'Open chart',
+          metrics: [
+            { label: 'Priority', value: m.priority, color: tone },
+            { label: 'Channel', value: m.kind, color: '#6f42c1' },
+            { label: 'Status', value: m.message_status || 'Read', color: isNew ? '#dc3545' : '#198754' },
+          ],
+          fields: [
+            ['Subject', m.subject],
+            ['Patient', m.patientName && String(m.patientName).trim() ? `${String(m.patientName).trim()} (PID ${m.pid})` : 'No patient attached'],
+            ['Posted by', m.user],
+            ['Posted', formatDateTime(m.date)],
+            ['Assigned to', m.assigned_to],
+            ['Status', m.message_status || 'Read'],
+          ],
+          lists: [{ title: 'Message body', lines: String(m.body || '').split(/\r?\n/).filter(Boolean) }],
+        };
+      }),
+    [enriched],
+  );
 
   const filtered = useMemo(() => {
     let list = enriched;
@@ -209,6 +255,17 @@ export default function MessagesPage() {
           </div>
         </div>
       </div>
+
+      {/* Notification surface — same card + modal viewers used elsewhere */}
+      <NotificationFeedCard
+        title="Message Notifications"
+        icon="bi-bell-fill"
+        tone="#0d6efd"
+        items={feedItems}
+        emptyText="No new messages"
+        onOpen={(item) => { setOpenFeed(item); if (item.unread) markRead.mutate(Number(item.id)); }}
+        onSeeAll={() => setFilter('unread')}
+      />
 
       {/* Compose */}
       {canWrite && showCompose && (
@@ -373,6 +430,14 @@ export default function MessagesPage() {
           )}
         </div>
       </div>
+
+      <NotificationFeedModal
+        item={openFeed}
+        onClose={() => setOpenFeed(null)}
+        onAck={(item) => { markRead.mutate(Number(item.id)); setOpenFeed(null); }}
+        ackPending={markRead.isPending}
+        onNavigate={(link) => navigate(link)}
+      />
     </div>
   );
 }

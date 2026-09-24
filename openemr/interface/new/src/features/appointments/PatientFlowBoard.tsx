@@ -5,8 +5,9 @@ import { getAppointments } from '../../api/endpoints/appointments';
 import type { Appointment } from '../../types/appointment';
 import nestClient from '../../api/nest-client';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
-import { formatDateOnly } from '../../utils/date';
-import { chartPatientId } from '../../utils/patientChart';
+import { formatDateOnly, formatDateTime } from '../../utils/date';
+import { chartPatientId, patientChartPath } from '../../utils/patientChart';
+import { NotificationFeedCard, NotificationFeedModal, FeedItem } from '../../components/notifications/NotificationFeed';
 
 type StatusColumn = 'Scheduled' | 'Checked In' | 'Checked Out' | 'Canceled' | 'No Show';
 
@@ -37,6 +38,8 @@ export default function PatientFlowBoard() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  /** The flow entry whose detail modal is open. */
+  const [openFeed, setOpenFeed] = useState<FeedItem | null>(null);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments', 'flow', selectedDate],
@@ -76,6 +79,92 @@ export default function PatientFlowBoard() {
     if (mins >= 60) return `${Math.floor(mins / 60)}h ${mins % 60}m`;
     return `${mins}m`;
   };
+
+  /**
+   * Today's flow folded into the shared notification shape: every patient on the
+   * board becomes a card that opens into a modal with the full visit detail.
+   */
+  const flowFeed: FeedItem[] = useMemo(() => {
+    const fromAppointments = appointments.map((a: Appointment): FeedItem => {
+      const status = a.pc_apptstatus || 'Scheduled';
+      const style = STATUS_STYLE[status] || STATUS_STYLE['Scheduled'];
+      const name = formatPatientNameLastFirst(a) || a.pc_title || `Appointment #${a.pc_eid}`;
+      const waited = a.wait_minutes ?? null;
+      const provider = a.provider_name
+        || `${a.pce_aid_fname || ''} ${a.pce_aid_lname || ''}`.trim()
+        || a.patient_provider_name
+        || '';
+      return {
+        id: a.pc_eid,
+        title: name,
+        subtitle: [status, a.pc_startTime ? String(a.pc_startTime).slice(0, 5) : null].filter(Boolean).join(' · '),
+        summary: [a.pc_catname || a.pc_title, provider].filter(Boolean).join(' · '),
+        at: a.checked_in_at || a.pc_eventDate,
+        icon: style.icon,
+        tone: style.color,
+        status,
+        unread: status === 'Checked In',
+        link: patientChartPath(a.patient_id, a.pid, a.pc_pid) || undefined,
+        linkLabel: 'Open chart',
+        alerts: waited != null && waited > 30
+          ? [{ level: 'warning' as const, title: 'Long wait', lines: [`Waiting ${formatWait(waited)} — over the 30 minute target.`] }]
+          : status === 'No Show'
+            ? [{ level: 'danger' as const, title: 'No show', lines: ['Patient did not arrive for this slot.'] }]
+            : undefined,
+        metrics: [
+          { label: 'Status', value: status, color: style.color },
+          { label: 'Wait', value: formatWait(waited) || '—', color: waited != null && waited > 30 ? '#dc3545' : '#198754' },
+          { label: 'Duration', value: a.pc_duration ? `${a.pc_duration} min` : '—', color: '#6f42c1' },
+        ],
+        fields: [
+          ['Patient', name],
+          ['Visit date', formatDateOnly(a.pc_eventDate)],
+          ['Start time', a.pc_startTime ? String(a.pc_startTime).slice(0, 5) : ''],
+          ['Visit type', a.pc_catname],
+          ['Provider', provider],
+          ['Checked in', a.checked_in_at ? formatDateTime(a.checked_in_at) : ''],
+          ['Status', status],
+          ['Reason', a.pc_hometext],
+        ],
+        lists: [{ title: 'Visit notes', lines: String(a.pc_hometext || '').split(/\r?\n/).filter(Boolean) }],
+      };
+    });
+
+    const fromWalkIns = walkIns.map((w: any): FeedItem => {
+      const name = formatPatientNameLastFirst(w) || `Patient #${w.pid}`;
+      const waited = w.wait_minutes ?? null;
+      return {
+        id: `walk-${w.tracker_id ?? w.pid}`,
+        title: name,
+        subtitle: ['Walk-in', w.checked_in_at ? formatDateTime(w.checked_in_at) : null].filter(Boolean).join(' · '),
+        summary: [w.provider_name, w.sex ? `Sex ${w.sex}` : null].filter(Boolean).join(' · '),
+        at: w.checked_in_at || selectedDate,
+        icon: 'bi-person-plus',
+        tone: '#ffc107',
+        status: 'Walk-in',
+        unread: true,
+        link: patientChartPath(w.patient_id, w.id, w.pid) || undefined,
+        linkLabel: 'Open chart',
+        alerts: waited != null && waited > 30
+          ? [{ level: 'warning' as const, title: 'Long wait', lines: [`Waiting ${formatWait(waited)} — over the 30 minute target.`] }]
+          : undefined,
+        metrics: [
+          { label: 'Status', value: 'Walk-in', color: '#ffc107' },
+          { label: 'Wait', value: formatWait(waited) || '—', color: waited != null && waited > 30 ? '#dc3545' : '#198754' },
+        ],
+        fields: [
+          ['Patient', name],
+          ['Date of birth', formatDateOnly(w.DOB)],
+          ['Sex', w.sex],
+          ['Provider', w.provider_name],
+          ['Checked in', w.checked_in_at ? formatDateTime(w.checked_in_at) : ''],
+          ['Visit date', selectedDate],
+        ],
+      };
+    });
+
+    return [...fromWalkIns, ...fromAppointments];
+  }, [appointments, walkIns, selectedDate]);
 
   return (
     <div className="glass-page position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh', padding: '16px' }}>
@@ -141,6 +230,17 @@ export default function PatientFlowBoard() {
           </div>
         </div>
       </div>
+
+      {/* Flow notifications — same card + modal viewers used across the app */}
+      <NotificationFeedCard
+        title="Patient Flow Notifications"
+        icon="bi-diagram-3-fill"
+        tone="#0dcaf0"
+        items={flowFeed}
+        emptyText="No patients on the board for this date"
+        onOpen={(item) => setOpenFeed(item)}
+        max={5}
+      />
 
       {/* Walk-In Patients Section */}
       {walkIns.length > 0 && (
@@ -312,6 +412,13 @@ export default function PatientFlowBoard() {
           })}
         </div>
       )}
+
+      {/* Flow detail modal — every specific of the visit */}
+      <NotificationFeedModal
+        item={openFeed}
+        onClose={() => setOpenFeed(null)}
+        onNavigate={(link) => navigate(link)}
+      />
     </div>
   );
 }

@@ -6,7 +6,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { canViewFinancials } from '../../utils/permissions';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
 import { formatDateTime } from '../../utils/date';
-import { chartPatientId } from '../../utils/patientChart';
+import { chartPatientId, patientChartPath } from '../../utils/patientChart';
+import { NotificationFeedCard, NotificationFeedModal, FeedItem } from '../../components/notifications/NotificationFeed';
 
 // ── Reference data ──────────────────────────────────────────────────
 
@@ -125,6 +126,46 @@ export default function PharmacyPage() {
     mutationFn: () => nestClient.post('/pharmacy/alerts/read-all'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pharmacy-alerts'] }),
   });
+
+  /**
+   * Provider → pharmacist orders folded into the shared notification shape so a
+   * card opens into a modal with every specific of the order.
+   */
+  const [openFeed, setOpenFeed] = useState<FeedItem | null>(null);
+  const pharmacyFeed: FeedItem[] = useMemo(
+    () =>
+      (alertsData?.alerts || []).map((a: any): FeedItem => ({
+        id: a.id,
+        title: a.drug || 'Prescription order',
+        subtitle: a.patient_name && String(a.patient_name).trim()
+          ? String(a.patient_name).trim()
+          : `Patient #${a.pid}`,
+        summary: a.message,
+        at: a.created_at,
+        icon: 'bi-capsule-pill',
+        tone: '#0d6efd',
+        status: a.is_read ? 'Read' : 'New',
+        unread: !a.is_read,
+        link: patientChartPath(a.patient_id, a.pid) || undefined,
+        linkLabel: 'Open chart',
+        metrics: [
+          { label: 'Order type', value: 'Pharmacy', color: '#0d6efd' },
+          { label: 'Received', value: formatDateTime(a.created_at), color: '#6f42c1' },
+          { label: 'Status', value: a.is_read ? 'Read' : 'New', color: a.is_read ? '#198754' : '#dc3545' },
+        ],
+        fields: [
+          ['Drug', a.drug],
+          ['Patient', a.patient_name && String(a.patient_name).trim() ? String(a.patient_name).trim() : 'Unknown'],
+          ['PID', a.pid],
+          ['Received', formatDateTime(a.created_at)],
+          ['Status', a.is_read ? 'Read' : 'New'],
+        ],
+        lists: a.message
+          ? [{ title: 'Order note', lines: String(a.message).split(/\r?\n/).filter(Boolean) }]
+          : undefined,
+      })),
+    [alertsData],
+  );
 
   // Drug information / FDA lookup driven by the medication search.
   const firstActiveDrug = prescriptions.find((p: any) => p.active)?.drug || '';
@@ -502,35 +543,15 @@ export default function PharmacyPage() {
 
         {/* Smart alerts + queue + low stock */}
         <div className="col-lg-4">
-          {/* Provider → pharmacist notification queue */}
-          <div className="card border-0 shadow-sm mb-3" id="rx-alerts" style={{ borderRadius: '16px', borderLeft: '4px solid #0d6efd' }}>
-            <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold"><i className="bi bi-bell me-2 text-primary"></i>New Prescription Orders</h6>
-              <div className="d-flex align-items-center gap-2">
-                <span className="badge bg-primary rounded-pill">{alertsData?.unreadCount || 0}</span>
-                {(alertsData?.unreadCount || 0) > 0 && (
-                  <button className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={() => markRead.mutate()} title="Mark all read"><i className="bi bi-check2-all"></i></button>
-                )}
-              </div>
-            </div>
-            <div className="card-body p-0">
-              {(alertsData?.alerts || []).length === 0 ? (
-                <div className="text-muted small text-center py-3"><i className="bi bi-bell-slash me-1"></i>No pending orders.</div>
-              ) : (alertsData?.alerts || []).slice(0, 6).map((a: any) => (
-                <div key={a.id} className="d-flex gap-2 px-3 py-2 border-bottom small align-items-start">
-                  <i className="bi bi-capsule-pill text-primary mt-1"></i>
-                  <div className="flex-grow-1">
-                    <div className="fw-semibold">{a.drug || '—'}</div>
-                    <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                      {a.patient_name?.trim() ? a.patient_name : `Patient #${a.pid}`}
-                      {a.created_at ? ` · ${formatDateTime(a.created_at)}` : ''}
-                    </div>
-                    {a.message && <div className="text-muted" style={{ fontSize: '0.7rem' }}>{a.message}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Provider → pharmacist notification queue (shared card + modal viewer) */}
+          <NotificationFeedCard
+            title="New Prescription Orders"
+            icon="bi-bell-fill"
+            tone="#0d6efd"
+            items={pharmacyFeed}
+            emptyText="No pending orders"
+            onOpen={(item) => setOpenFeed(item)}
+          />
 
           {/* Smart alerts */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px', borderLeft: '4px solid #dc3545' }}>
@@ -600,6 +621,16 @@ export default function PharmacyPage() {
       {printRx && (
         <MedicationLabelModal p={printRx} onClose={() => setPrintRx(null)} />
       )}
+
+      {/* Pharmacy order detail modal — every specific of the order */}
+      <NotificationFeedModal
+        item={openFeed}
+        onClose={() => setOpenFeed(null)}
+        onAck={() => { markRead.mutate(); setOpenFeed(null); }}
+        ackPending={markRead.isPending}
+        ackLabel="Mark all read"
+        onNavigate={(link) => navigate(link)}
+      />
     </div>
   );
 }
