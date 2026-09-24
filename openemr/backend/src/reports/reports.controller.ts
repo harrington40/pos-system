@@ -21,7 +21,9 @@ export class ReportsController {
   }
 
   @Get('patients')
-  patientStats() { return this.reports.patientStats(); }
+  patientStats(@Query('startDate') start?: string, @Query('endDate') end?: string) {
+    return this.reports.patientStats(start, end);
+  }
 
   @Get('financial')
   financialStats() { return this.reports.financialStats(); }

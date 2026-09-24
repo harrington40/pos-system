@@ -255,8 +255,11 @@ export class BillingController {
 
   @Get('billing/financial-report')
   @Roles('admin', 'billing', 'physician')
-  getFinancialReport() {
-    return this.billing.getFinancialReport();
+  getFinancialReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.billing.getFinancialReport(startDate, endDate);
   }
 
   // ─── Billing Holds (lab orders + prescriptions) ──────────────────

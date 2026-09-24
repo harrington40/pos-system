@@ -709,42 +709,133 @@ export class BillingService implements OnModuleInit {
 
   // ─── System-wide Financial Report ────────────────────────────────
 
-  async getFinancialReport(): Promise<any> {
+  /**
+   * Financial report. Optionally scoped to a date range so the Reports page
+   * filter actually applies (previously it always reported all time). Reports
+   * charges, collections, adjustments, collection rate, an AR snapshot per
+   * patient and the outstanding billing holds the billing desk still has to
+   * clear.
+   */
+  async getFinancialReport(startDate?: string, endDate?: string): Promise<any> {
+    const chargeParams: any[] = [];
+    let chargeWhere = 'WHERE b.activity = 1';
+    if (startDate) {
+      chargeWhere += ' AND b.date >= ?';
+      chargeParams.push(`${startDate} 00:00:00`);
+    }
+    if (endDate) {
+      chargeWhere += ' AND b.date <= ?';
+      chargeParams.push(`${endDate} 23:59:59`);
+    }
+
+    const payParams: any[] = [];
+    let payWhere = 'WHERE aa.deleted IS NULL';
+    if (startDate) {
+      payWhere += ' AND aa.post_time >= ?';
+      payParams.push(`${startDate} 00:00:00`);
+    }
+    if (endDate) {
+      payWhere += ' AND aa.post_time <= ?';
+      payParams.push(`${endDate} 23:59:59`);
+    }
+
     const [summary] = await this.dataSource.query(
-      `SELECT COALESCE(SUM(fee), 0) AS totalCharges,
-              COUNT(DISTINCT pid) AS billedPatients,
-              COUNT(*) AS chargeCount
-       FROM billing WHERE activity = 1`,
+      `SELECT COALESCE(SUM(b.fee), 0) AS totalCharges,
+              COUNT(DISTINCT b.pid) AS billedPatients,
+              COUNT(*) AS chargeCount,
+              COALESCE(AVG(b.fee), 0) AS avgCharge
+       FROM billing b ${chargeWhere}`,
+      chargeParams,
     );
+
     const [payments] = await this.dataSource.query(
-      `SELECT COALESCE(SUM(pay_amount), 0) AS totalPayments,
-              COUNT(*) AS paymentCount
-       FROM ar_activity`,
+      `SELECT COALESCE(SUM(aa.pay_amount), 0) AS totalPayments,
+              COUNT(*) AS paymentCount,
+              COALESCE(AVG(NULLIF(aa.pay_amount, 0)), 0) AS avgPayment,
+              COALESCE(SUM(aa.adj_amount), 0) AS totalAdjustments
+       FROM ar_activity aa ${payWhere}`,
+      payParams,
     );
+
     const [encounters] = await this.dataSource.query(
       `SELECT COUNT(*) AS encounterCount FROM form_encounter`,
     );
+
     const byCategory = await this.dataSource.query(
-      `SELECT pc.category,
+      `SELECT COALESCE(pc.category, 'uncategorized') AS category,
               COUNT(*) AS count,
               COALESCE(SUM(b.fee), 0) AS amount
        FROM billing b
        LEFT JOIN price_catalog pc ON pc.code = b.code AND pc.code_type = b.code_type
-       WHERE b.activity = 1
-       GROUP BY pc.category
+       ${chargeWhere}
+       GROUP BY category
        ORDER BY amount DESC`,
+      chargeParams,
     );
-    const totalCharges = Number(summary?.totalCharges) || 0;
-    const totalPayments = Number(payments?.totalPayments) || 0;
+
+    // AR snapshot: biggest outstanding balances per patient. Wrapped in a
+    // derived table because MySQL rejects an aggregate alias inside a HAVING /
+    // ORDER BY *expression* ("Reference 'charges' not supported").
+    const outstanding = await this.dataSource.query(
+      `SELECT pid, patientId, patientName, charges, paid, (charges - paid) AS balance
+         FROM (
+           SELECT b.pid AS pid,
+                  pd.id AS patientId,
+                  CONCAT(COALESCE(pd.fname, ''), ' ', COALESCE(pd.lname, '')) AS patientName,
+                  COALESCE(SUM(b.fee), 0) AS charges,
+                  COALESCE((SELECT SUM(aa.pay_amount) FROM ar_activity aa
+                             WHERE aa.pid = b.pid AND aa.deleted IS NULL), 0) AS paid
+             FROM billing b
+             LEFT JOIN patient_data pd ON pd.pid = b.pid
+             ${chargeWhere}
+            GROUP BY b.pid, pd.id, patientName
+         ) t
+        WHERE t.charges > t.paid
+        ORDER BY (t.charges - t.paid) DESC
+        LIMIT 10`,
+      chargeParams,
+    );
+
+    const [holds] = await this.dataSource.query(
+      `SELECT COUNT(*) AS pendingHolds, COALESCE(SUM(fee), 0) AS heldAmount
+         FROM billing_holds WHERE cleared_at IS NULL`,
+    );
+
+    const num = (v: any) => Number(v) || 0;
+    const totalCharges = num(summary?.totalCharges);
+    const totalPayments = num(payments?.totalPayments);
+    const totalAdjustments = num(payments?.totalAdjustments);
+    const balance = Math.max(0, totalCharges - totalPayments);
+
     return {
+      range: { startDate: startDate || null, endDate: endDate || null },
       totalCharges,
       totalPayments,
-      balance: Math.max(0, totalCharges - totalPayments),
-      billedPatients: Number(summary?.billedPatients) || 0,
-      chargeCount: Number(summary?.chargeCount) || 0,
-      paymentCount: Number(payments?.paymentCount) || 0,
-      encounterCount: Number(encounters?.encounterCount) || 0,
-      byCategory: byCategory.map((r: any) => ({ category: r.category || 'uncategorized', count: Number(r.count), amount: Number(r.amount) })),
+      totalAdjustments,
+      balance,
+      collectionRate: totalCharges > 0 ? Math.round((totalPayments / totalCharges) * 1000) / 10 : 0,
+      avgCharge: Math.round(num(summary?.avgCharge) * 100) / 100,
+      avgPayment: Math.round(num(payments?.avgPayment) * 100) / 100,
+      billedPatients: num(summary?.billedPatients),
+      chargeCount: num(summary?.chargeCount),
+      paymentCount: num(payments?.paymentCount),
+      encounterCount: num(encounters?.encounterCount),
+      pendingHolds: num(holds?.pendingHolds),
+      heldAmount: num(holds?.heldAmount),
+      byCategory: (byCategory as any[]).map((r) => ({
+        category: r.category || 'uncategorized',
+        count: num(r.count),
+        amount: num(r.amount),
+        share: totalCharges > 0 ? Math.round((num(r.amount) / totalCharges) * 1000) / 10 : 0,
+      })),
+      outstanding: (outstanding as any[]).map((r) => ({
+        patientId: r.patientId ? Number(r.patientId) : null,
+        pid: num(r.pid),
+        patientName: (r.patientName || '').trim() || `PID ${r.pid}`,
+        charges: num(r.charges),
+        paid: num(r.paid),
+        balance: Math.max(0, num(r.charges) - num(r.paid)),
+      })),
     };
   }
 
