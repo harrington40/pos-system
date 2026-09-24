@@ -1412,6 +1412,75 @@ function ReportsTab() {
   const { data: forecast = [], isLoading: fLoading } = useQuery({ queryKey: ['inventory', 'forecast'], queryFn: getForecast });
   const { data: accounting } = useQuery({ queryKey: ['inventory', 'accounting'], queryFn: getAccountingSummary });
 
+  /**
+   * The forecast returns one row per inventory item — 300+ on this dataset — so
+   * the card used to run the length of the page, sorted arbitrarily and mostly
+   * full of items that had not moved in 90 days.
+   *
+   * It is now a focused view: the things that need action come first, the dead
+   * stock is tucked behind its own filter, and only a short window of rows is
+   * rendered until the user asks for the rest.
+   */
+  const [fFilter, setFFilter] = useState<'attention' | 'inuse' | 'nouse' | 'all'>('attention');
+  const [fSearch, setFSearch] = useState('');
+  const [fShowAll, setFShowAll] = useState(false);
+
+  /** Rows the user must act on soon; a shortage risk always counts. */
+  const fIsAttention = (f: ForecastRow) =>
+    f.projected_shortage || (f.days_remaining != null && f.days_remaining <= 14);
+
+  /** Shortest runway first, then alphabetical, with untouched items last. */
+  const fSorted = useMemo(() => {
+    const noUse = (f: ForecastRow) => !(f.avg_daily_usage > 0);
+    return [...forecast].sort((a, b) => {
+      if (noUse(a) !== noUse(b)) return noUse(a) ? 1 : -1;
+      const av = a.days_remaining ?? Number.MAX_SAFE_INTEGER;
+      const bv = b.days_remaining ?? Number.MAX_SAFE_INTEGER;
+      if (av !== bv) return av - bv;
+      return String(a.item_name).localeCompare(String(b.item_name));
+    });
+  }, [forecast]);
+
+  const fAttention = useMemo(() => fSorted.filter(fIsAttention), [fSorted]);
+  const fInUse = useMemo(() => fSorted.filter((f: ForecastRow) => f.avg_daily_usage > 0), [fSorted]);
+  const fNoUse = useMemo(
+    () => fSorted.filter((f: ForecastRow) => !(f.avg_daily_usage > 0)),
+    [fSorted],
+  );
+
+  const fVisible = useMemo(() => {
+    const base =
+      fFilter === 'attention' ? fAttention
+      : fFilter === 'inuse' ? fInUse
+      : fFilter === 'nouse' ? fNoUse
+      : fSorted;
+    const q = fSearch.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((f: ForecastRow) =>
+      `${f.item_name} ${f.item_code || ''}`.toLowerCase().includes(q),
+    );
+  }, [fFilter, fSearch, fAttention, fInUse, fNoUse, fSorted]);
+
+  // Short by default; the full list is one click away.
+  const F_WINDOW = 6;
+  const fRows = fShowAll ? fVisible : fVisible.slice(0, F_WINDOW);
+
+  /**
+   * `projected_shortage` is the backend's "at or below the reorder point" flag,
+   * which is not the same as running out — an item can sit at its minimum with
+   * months of cover. It gets its own wording so the badge is not alarming, and
+   * the remaining labels come from the runway.
+   */
+  const fRisk = (f: ForecastRow) => {
+    if (!(f.avg_daily_usage > 0)) return { label: 'No usage', cls: 'bg-light text-muted border' };
+    const d = f.days_remaining;
+    if (f.projected_shortage) return { label: 'Reorder now', cls: 'bg-danger' };
+    if (d != null && d <= 7) return { label: 'Critical', cls: 'bg-danger' };
+    if (d != null && d <= 14) return { label: 'Low', cls: 'bg-warning text-dark' };
+    if (d != null && d <= 30) return { label: 'Watch', cls: 'bg-info text-dark' };
+    return { label: 'Adequate', cls: 'bg-success' };
+  };
+
   return (
     <div>
       <div className="row g-3 mb-3">
@@ -1453,34 +1522,115 @@ function ReportsTab() {
         <div className="col-lg-7">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-graph-up me-2 text-info"></i>Demand Forecast (90-day avg usage)</h6>
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h6 className="mb-0 fw-bold"><i className="bi bi-graph-up me-2 text-info"></i>Demand Forecast (90-day avg usage)</h6>
+                <span className="text-muted small">{forecast.length} items tracked</span>
+              </div>
             </div>
-            <div className="card-body p-0">
-              {fLoading ? (
-                <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-hover small align-middle mb-0">
-                    <thead className="table-light"><tr><th>Item</th><th className="text-end">Current</th><th className="text-end">Avg Daily Use</th><th className="text-end">Days Left</th><th>Projected</th></tr></thead>
-                    <tbody>
-                      {forecast.map((f: ForecastRow) => (
-                        <tr key={f.id}>
-                          <td className="fw-semibold">{f.item_name}</td>
-                          <td className="text-end">{f.current_quantity} {f.unit || ''}</td>
-                          <td className="text-end">{f.avg_daily_usage}</td>
-                          <td className="text-end">{f.days_remaining == null ? '—' : `${f.days_remaining}d`}</td>
-                          <td>
-                            {f.projected_shortage
-                              ? <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.68rem' }}>Shortage risk</span>
-                              : <span className="badge bg-success rounded-pill" style={{ fontSize: '0.68rem' }}>Adequate</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+            {fLoading ? (
+              <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
+            ) : (
+              <>
+                {/* Focus switch — only what needs action is shown to begin with. */}
+                <div className="px-3 pt-3 d-flex flex-wrap align-items-center gap-2">
+                  {([
+                    ['attention', 'Needs attention', fAttention.length, 'bg-danger'],
+                    ['inuse', 'In use', fInUse.length, 'bg-primary'],
+                    ['nouse', 'No usage', fNoUse.length, 'bg-secondary'],
+                    ['all', 'All', fSorted.length, 'bg-dark'],
+                  ] as const).map(([key, label, count, tone]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`btn btn-sm rounded-pill ${fFilter === key ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      onClick={() => { setFFilter(key); setFShowAll(false); }}
+                    >
+                      {label}
+                      <span className={`badge rounded-pill ms-1 ${fFilter === key ? 'bg-light text-dark' : tone}`}>{count}</span>
+                    </button>
+                  ))}
+                  <div className="input-group input-group-sm ms-auto" style={{ maxWidth: 200 }}>
+                    <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
+                    <input
+                      className="form-control"
+                      placeholder="Find an item…"
+                      value={fSearch}
+                      onChange={e => { setFSearch(e.target.value); setFShowAll(false); }}
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div className="card-body pt-2">
+                  {fRows.length === 0 ? (
+                    <div className="text-center text-muted small py-4">
+                      <i className={`bi ${fSearch ? 'bi-search' : 'bi-check2-circle'} me-1`}></i>
+                      {fSearch
+                        ? 'No item matches that search.'
+                        : fFilter === 'attention'
+                          ? 'Nothing needs attention in the next 14 days.'
+                          : 'Nothing to show here.'}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="table-responsive" style={{ maxHeight: fShowAll ? '60vh' : undefined }}>
+                        <table className="table table-hover table-sm small align-middle mb-0">
+                          <thead className="table-light">
+                            <tr>
+                              <th>Item</th>
+                              <th className="text-end">Current</th>
+                              <th className="text-end">Avg / day</th>
+                              <th className="text-end">Days left</th>
+                              <th className="text-center">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {fRows.map((f: ForecastRow) => {
+                              const risk = fRisk(f);
+                              return (
+                                <tr key={f.id}>
+                                  <td className="fw-semibold">
+                                    <span className="text-truncate d-inline-block" style={{ maxWidth: 190 }} title={f.item_name}>
+                                      {f.item_name}
+                                    </span>
+                                    {f.item_code && <span className="text-muted ms-1" style={{ fontSize: '0.68rem' }}>{f.item_code}</span>}
+                                  </td>
+                                  <td className="text-end">{f.current_quantity} {f.unit || ''}</td>
+                                  <td className="text-end">{f.avg_daily_usage}</td>
+                                  <td className="text-end">{f.days_remaining == null ? '—' : `${f.days_remaining}d`}</td>
+                                  <td className="text-center">
+                                    <span className={`badge rounded-pill ${risk.cls}`} style={{ fontSize: '0.66rem' }}>{risk.label}</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {fVisible.length > F_WINDOW && (
+                        <div className="text-center pt-1">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-link text-decoration-none"
+                            onClick={() => setFShowAll(v => !v)}
+                          >
+                            {fShowAll ? 'Show fewer' : `Show all ${fVisible.length}`}
+                            <i className={`bi bi-chevron-${fShowAll ? 'up' : 'down'} ms-1`}></i>
+                          </button>
+                        </div>
+                      )}
+
+                      {fVisible.length > fRows.length && (
+                        <div className="text-muted text-center pb-1" style={{ fontSize: '0.7rem' }}>
+                          showing {fRows.length} of {fVisible.length}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
