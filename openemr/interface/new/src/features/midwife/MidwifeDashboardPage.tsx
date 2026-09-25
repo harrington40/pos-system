@@ -1,10 +1,40 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import RecentApprovalsPanel from '../../components/shared/RecentApprovalsPanel';
 import { formatPatientName } from '../../utils/patientName';
 import { computeRiskScore, calculateEDD, interpretApgar } from '../../utils/midwife';
+
+interface SelectedPatient {
+  pid: number;
+  id: number;
+  fname: string;
+  lname: string;
+}
+
+interface ApgarSet {
+  appearance: string;
+  pulse: string;
+  grimace: string;
+  activity: string;
+  respiration: string;
+}
+
+const APGAR_FIELDS: { key: keyof ApgarSet; label: string; icon: string }[] = [
+  { key: 'appearance', label: 'Appearance (Color)', icon: 'bi-palette' },
+  { key: 'pulse', label: 'Pulse (Heart Rate)', icon: 'bi-heart-pulse' },
+  { key: 'grimace', label: 'Grimace (Reflex)', icon: 'bi-emoji-expressionless' },
+  { key: 'activity', label: 'Activity (Tone)', icon: 'bi-person-arms-up' },
+  { key: 'respiration', label: 'Respiration', icon: 'bi-lungs' },
+];
+
+const APGAR_DEFAULT: ApgarSet = {
+  appearance: '2', pulse: '2', grimace: '2', activity: '2', respiration: '2',
+};
+
+const apgarSum = (set: ApgarSet) =>
+  Object.values(set).reduce((s, v) => s + Number(v || 0), 0);
 
 function LiveClock({ timezone, label }: { timezone: string; label: string }) {
   const [time, setTime] = useState(new Date());
@@ -22,8 +52,57 @@ function LiveClock({ timezone, label }: { timezone: string; label: string }) {
   );
 }
 
+/** One APGAR column — the score is documented at 1 minute and again at 5. */
+function ApgarColumn({
+  title, set, onChange,
+}: { title: string; set: ApgarSet; onChange: (next: ApgarSet) => void }) {
+  const total = apgarSum(set);
+  const interp = interpretApgar(total);
+  return (
+    <div className="col-lg-6">
+      <div className="border rounded-3 p-3 h-100">
+        <div className="fw-semibold small mb-2">{title}</div>
+        {APGAR_FIELDS.map((f) => (
+          <div className="mb-2" key={f.key}>
+            <label className="form-label small mb-0">
+              <i className={`${f.icon} me-1`}></i>{f.label}
+            </label>
+            <select
+              className="form-select form-select-sm"
+              value={set[f.key]}
+              onChange={(e) => onChange({ ...set, [f.key]: e.target.value })}
+            >
+              <option value="0">0 — Absent</option>
+              <option value="1">1 — Weak / Some</option>
+              <option value="2">2 — Strong / Active</option>
+            </select>
+          </div>
+        ))}
+        <div className="d-flex align-items-center gap-2 mt-3 p-2 rounded-3"
+          style={{ backgroundColor: interp.color + '15', borderLeft: `4px solid ${interp.color}` }}>
+          <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
+            style={{ width: '44px', height: '44px', backgroundColor: interp.color, fontSize: '1.1rem' }}>
+            {total}
+          </div>
+          <div>
+            <div className="fw-bold small" style={{ color: interp.color }}>{interp.interpretation}</div>
+            <div className="text-muted" style={{ fontSize: '0.7rem' }}>{title} total</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MidwifeDashboardPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Every calculator needs a patient before its result can be filed in a chart.
+  const [patientSearch, setPatientSearch] = useState('');
+  const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null);
+  const [saveNote, setSaveNote] = useState<{ text: string; ok: boolean } | null>(null);
+
   const [lmpInput, setLmpInput] = useState('');
   const [eddResult, setEddResult] = useState<ReturnType<typeof calculateEDD> | null>(null);
   const [riskForm, setRiskForm] = useState({
@@ -32,8 +111,8 @@ export default function MidwifeDashboardPage() {
     hasDiabetes: false, hasPreeclampsia: false,
   });
   const [riskResult, setRiskResult] = useState<ReturnType<typeof computeRiskScore> | null>(null);
-  const [apgarScores, setApgarScores] = useState({ appearance: '2', pulse: '2', grimace: '2', activity: '2', respiration: '2' });
-  const [apgarTotal, setApgarTotal] = useState(10);
+  const [apgar1, setApgar1] = useState<ApgarSet>({ ...APGAR_DEFAULT });
+  const [apgar5, setApgar5] = useState<ApgarSet>({ ...APGAR_DEFAULT });
 
   const { data: maternalPatients = [] } = useQuery({
     queryKey: ['maternal-patients'],
@@ -60,6 +139,61 @@ export default function MidwifeDashboardPage() {
     refetchInterval: 30000,
   });
 
+  /** Search for the patient an assessment belongs to. */
+  const { data: searchResults = [] } = useQuery({
+    queryKey: ['midwife-patient-search', patientSearch],
+    queryFn: async () => {
+      const r = await nestClient.get('/patients', { params: { search: patientSearch, limit: 10 } });
+      return r.data;
+    },
+    enabled: patientSearch.trim().length >= 2,
+  });
+
+  /** Everything recorded against the selected patient's chart. */
+  const { data: assessments = [] } = useQuery({
+    queryKey: ['midwife-assessments', selectedPatient?.pid],
+    queryFn: async () => {
+      const r = await nestClient.get(`/midwife/patients/${selectedPatient!.pid}/assessments`);
+      return r.data;
+    },
+    enabled: !!selectedPatient?.pid,
+  });
+
+  const saveAssessment = useMutation({
+    mutationFn: async (body: Record<string, any>) =>
+      nestClient.post(`/midwife/patients/${selectedPatient!.pid}/assessments`, body),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['midwife-assessments', selectedPatient?.pid] });
+      setSaveNote({ text: `Saved to chart — ${res?.data?.summary || 'recorded'}`, ok: true });
+    },
+    onError: (err: any) => {
+      setSaveNote({
+        text: err?.response?.data?.message || 'Could not save to the chart.',
+        ok: false,
+      });
+    },
+  });
+
+  const deleteAssessment = useMutation({
+    mutationFn: async (id: number) => nestClient.delete(`/midwife/assessments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['midwife-assessments', selectedPatient?.pid] });
+      setSaveNote({ text: 'Record removed.', ok: true });
+    },
+    onError: (err: any) => {
+      setSaveNote({ text: err?.response?.data?.message || 'Could not remove the record.', ok: false });
+    },
+  });
+
+  /** Guards every save: nothing is filed without a patient selected. */
+  const saveToChart = (body: Record<string, any>) => {
+    if (!selectedPatient) {
+      setSaveNote({ text: 'Select a patient first — the result is filed in their chart.', ok: false });
+      return;
+    }
+    saveAssessment.mutate(body);
+  };
+
   const handleEddCalc = () => {
     if (!lmpInput) return;
     setEddResult(calculateEDD(lmpInput));
@@ -74,14 +208,10 @@ export default function MidwifeDashboardPage() {
     setRiskResult(result);
   };
 
-  const updateApgar = (field: string, value: string) => {
-    const updated = { ...apgarScores, [field]: value };
-    setApgarScores(updated);
-    const total = Object.values(updated).reduce((s, v) => s + Number(v), 0);
-    setApgarTotal(total);
-  };
-
-  const apgarInterpretation = interpretApgar(apgarTotal);
+  const apgar1Total = apgarSum(apgar1);
+  const apgar5Total = apgarSum(apgar5);
+  /** The 5-minute score carries the interpretation, as on the record. */
+  const apgarInterpretation = interpretApgar(apgar5Total);
 
   const maternalCount = maternalPatients.length;
   const activeLabor = deliveries.filter((d: any) => d.pc_apptstatus === 'Checked In').length;
@@ -111,6 +241,80 @@ export default function MidwifeDashboardPage() {
         </div>
       </div>
 
+      {/* Patient context — every result below is filed against this chart */}
+      <div className="card border-0 shadow-sm rounded-4 mb-3">
+        <div className="card-body">
+          <div className="row g-2 align-items-end">
+            <div className="col-md-5">
+              <label className="form-label small fw-semibold mb-1">
+                <i className="bi bi-person-badge me-1"></i>Patient
+              </label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Search by name, chart number or phone…"
+                value={patientSearch}
+                onChange={(e) => setPatientSearch(e.target.value)}
+              />
+            </div>
+            <div className="col-md-7">
+              {selectedPatient ? (
+                <div className="alert alert-success py-2 mb-0 d-flex align-items-center gap-2">
+                  <i className="bi bi-check-circle-fill"></i>
+                  <span className="small">
+                    Recording against <strong>{selectedPatient.fname} {selectedPatient.lname}</strong>
+                    <span className="text-muted"> · pid {selectedPatient.pid}</span>
+                  </span>
+                  <button className="btn btn-sm btn-outline-secondary rounded-pill ms-auto"
+                    onClick={() => { setSelectedPatient(null); setPatientSearch(''); setSaveNote(null); }}>
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <div className="text-muted small">
+                  No patient selected — pick one to file the risk score, EDD and APGAR in their chart.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {!selectedPatient && patientSearch.trim().length >= 2 && (
+            <div className="mt-2 border rounded-3" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+              {searchResults.length === 0 ? (
+                <div className="text-muted small p-2">No patients match “{patientSearch}”.</div>
+              ) : (
+                searchResults.map((p: any) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="btn btn-link text-decoration-none text-start w-100 border-bottom py-2 px-3"
+                    onClick={() => {
+                      setSelectedPatient({ pid: p.pid, id: p.id, fname: p.fname, lname: p.lname });
+                      setPatientSearch('');
+                      setSaveNote(null);
+                    }}
+                  >
+                    <span className="fw-semibold small">{p.lname}, {p.fname}</span>
+                    <span className="text-muted small ms-2">
+                      {p.DOB ? `DOB ${String(p.DOB).slice(0, 10)}` : ''}
+                      {p.public_id ? ` · ${p.public_id}` : ''}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
+          {saveNote && (
+            <div className={`alert ${saveNote.ok ? 'alert-success' : 'alert-danger'} py-2 mt-2 mb-0 small d-flex align-items-center gap-2`}>
+              <i className={`bi ${saveNote.ok ? 'bi-check-circle' : 'bi-exclamation-triangle'}`}></i>
+              <span className="flex-grow-1">{saveNote.text}</span>
+              <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => setSaveNote(null)}>Dismiss</button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* KPI Cards */}
       <div className="row g-3 mb-4">
         <div className="col-md-4">
@@ -120,10 +324,28 @@ export default function MidwifeDashboardPage() {
                 style={{ width: '48px', height: '48px', backgroundColor: '#e83e8c20' }}>
                 <i className="bi bi-people-fill fs-5" style={{ color: '#e83e8c' }}></i>
               </div>
-              <div>
+              <div className="flex-grow-1">
                 <div className="text-muted small">Maternal Patients</div>
                 <div className="fw-bold fs-5">{maternalCount}</div>
               </div>
+              {/* The count alone was a dead end — this makes it actionable. */}
+              {maternalCount > 0 && (
+                <select
+                  className="form-select form-select-sm"
+                  style={{ width: '150px', fontSize: '0.72rem' }}
+                  value=""
+                  onChange={(e) => {
+                    const p = maternalPatients.find((m: any) => String(m.id) === e.target.value);
+                    if (p) { setSelectedPatient({ pid: p.pid, id: p.id, fname: p.fname, lname: p.lname }); setSaveNote(null); }
+                  }}
+                  title="Record an assessment for one of these patients"
+                >
+                  <option value="">Select…</option>
+                  {maternalPatients.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.lname}, {p.fname}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -201,6 +423,16 @@ export default function MidwifeDashboardPage() {
                       </div>
                     </div>
                   </div>
+                  <div className="text-center mt-3">
+                    <button className="btn btn-sm rounded-pill text-white"
+                      style={{ backgroundColor: '#e83e8c' }}
+                      disabled={!selectedPatient || saveAssessment.isPending}
+                      title={selectedPatient ? 'File this EDD in the patient chart' : 'Select a patient first'}
+                      onClick={() => saveToChart({ kind: 'edd', lmp: lmpInput })}>
+                      <i className="bi bi-folder-plus me-1"></i>
+                      {saveAssessment.isPending ? 'Saving…' : 'Save EDD to chart'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -271,10 +503,29 @@ export default function MidwifeDashboardPage() {
                     style={{ width: '48px', height: '48px', backgroundColor: riskResult.color, fontSize: '1.2rem' }}>
                     {riskResult.score}
                   </div>
-                  <div>
+                  <div className="flex-grow-1">
                     <div className="fw-bold" style={{ color: riskResult.color }}>{riskResult.label}</div>
                     <div className="text-muted small">PARs Score: {riskResult.score} / 20+</div>
                   </div>
+                  <button className="btn btn-sm btn-outline-danger rounded-pill"
+                    disabled={!selectedPatient || saveAssessment.isPending}
+                    title={selectedPatient ? 'File this score in the patient chart' : 'Select a patient first'}
+                    onClick={() => saveToChart({
+                      kind: 'risk',
+                      risk: {
+                        age: Number(riskForm.age),
+                        parity: Number(riskForm.parity),
+                        gestationWeeks: Number(riskForm.gestationWeeks),
+                        bpSystolic: Number(riskForm.bpSystolic),
+                        bpDiastolic: Number(riskForm.bpDiastolic),
+                        hemoglobin: Number(riskForm.hemoglobin),
+                        hasDiabetes: riskForm.hasDiabetes,
+                        hasPreeclampsia: riskForm.hasPreeclampsia,
+                      },
+                    })}>
+                    <i className="bi bi-folder-plus me-1"></i>
+                    {saveAssessment.isPending ? 'Saving…' : 'Save to chart'}
+                  </button>
                 </div>
               )}
             </div>
@@ -292,40 +543,40 @@ export default function MidwifeDashboardPage() {
               </h6>
             </div>
             <div className="card-body">
-              <div className="row g-2">
-                {[
-                  { key: 'appearance', label: 'Appearance (Color)', icon: 'bi-palette' },
-                  { key: 'pulse', label: 'Pulse (Heart Rate)', icon: 'bi-heart-pulse' },
-                  { key: 'grimace', label: 'Grimace (Reflex)', icon: 'bi-emoji-expressionless' },
-                  { key: 'activity', label: 'Activity (Tone)', icon: 'bi-person-arms-up' },
-                  { key: 'respiration', label: 'Respiration', icon: 'bi-lungs' },
-                ].map(item => (
-                  <div className="col-md-6 mb-2" key={item.key}>
-                    <label className="form-label small fw-semibold">
-                      <i className={`${item.icon} me-1`}></i>{item.label}
-                    </label>
-                    <select className="form-select form-select-sm"
-                      value={(apgarScores as any)[item.key]}
-                      onChange={e => updateApgar(item.key, e.target.value)}>
-                      <option value="0">0 — Absent</option>
-                      <option value="1">1 — Weak / Some</option>
-                      <option value="2">2 — Strong / Active</option>
-                    </select>
-                  </div>
-                ))}
+              <p className="text-muted small">
+                Documented twice after birth — record both. The 5-minute score carries the
+                interpretation that goes on the chart.
+              </p>
+              <div className="row g-3">
+                <ApgarColumn title="At 1 minute" set={apgar1} onChange={setApgar1} />
+                <ApgarColumn title="At 5 minutes" set={apgar5} onChange={setApgar5} />
               </div>
-              <div className="mt-3 p-3 rounded-3 d-flex align-items-center gap-3"
-                style={{ backgroundColor: apgarInterpretation.color + '15', borderLeft: `4px solid ${apgarInterpretation.color}` }}>
-                <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
-                  style={{ width: '56px', height: '56px', backgroundColor: apgarInterpretation.color, fontSize: '1.5rem' }}>
-                  {apgarTotal}
-                </div>
-                <div>
-                  <div className="fw-bold" style={{ color: apgarInterpretation.color }}>
-                    APGAR: {apgarInterpretation.interpretation}
-                  </div>
-                  <div className="text-muted small">Score at 1 minute & 5 minutes after birth</div>
-                </div>
+              <div className="d-flex align-items-center gap-2 mt-3">
+                <span className="badge rounded-pill" style={{ backgroundColor: apgarInterpretation.color }}>
+                  {apgarInterpretation.interpretation}
+                </span>
+                <span className="text-muted small">from the 5-minute score ({apgar5Total})</span>
+                <button className="btn btn-sm btn-outline-info rounded-pill ms-auto"
+                  disabled={!selectedPatient || saveAssessment.isPending}
+                  title={selectedPatient ? 'File both APGAR scores in the patient chart' : 'Select a patient first'}
+                  onClick={() => saveToChart({
+                    kind: 'apgar',
+                    apgar: {
+                      oneMinute: {
+                        appearance: Number(apgar1.appearance), pulse: Number(apgar1.pulse),
+                        grimace: Number(apgar1.grimace), activity: Number(apgar1.activity),
+                        respiration: Number(apgar1.respiration),
+                      },
+                      fiveMinute: {
+                        appearance: Number(apgar5.appearance), pulse: Number(apgar5.pulse),
+                        grimace: Number(apgar5.grimace), activity: Number(apgar5.activity),
+                        respiration: Number(apgar5.respiration),
+                      },
+                    },
+                  })}>
+                  <i className="bi bi-folder-plus me-1"></i>
+                  {saveAssessment.isPending ? 'Saving…' : `Save APGAR (1min ${apgar1Total} / 5min ${apgar5Total})`}
+                </button>
               </div>
             </div>
           </div>
@@ -374,6 +625,68 @@ export default function MidwifeDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Recorded against the selected chart */}
+      {selectedPatient && (
+        <div className="card border-0 shadow-sm rounded-4 mt-4">
+          <div className="card-header bg-white py-3 rounded-top-4 d-flex justify-content-between align-items-center">
+            <h6 className="mb-0 fw-bold">
+              <i className="bi bi-archive me-2" style={{ color: '#6f42c1' }}></i>
+              Recorded for {selectedPatient.fname} {selectedPatient.lname}
+            </h6>
+            <span className="badge bg-secondary rounded-pill">{assessments.length}</span>
+          </div>
+          <div className="card-body p-0">
+            {assessments.length === 0 ? (
+              <div className="text-center py-4 text-muted small">
+                <i className="bi bi-inbox fs-3 d-block mb-2"></i>
+                Nothing recorded for this patient yet.
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm table-hover mb-0" style={{ fontSize: '0.8rem' }}>
+                  <thead className="table-light">
+                    <tr>
+                      <th>When</th><th>Type</th><th>Result</th><th>By</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assessments.map((a: any) => (
+                      <tr key={a.id}>
+                        <td className="text-muted">
+                          {a.recorded_at ? new Date(a.recorded_at).toLocaleString() : '—'}
+                        </td>
+                        <td>
+                          <span className="badge bg-light text-dark border text-uppercase">{a.kind}</span>
+                        </td>
+                        <td>
+                          <span className={
+                            a.level === 'high' || a.level === 'Severely Depressed' ? 'text-danger fw-semibold'
+                              : a.level === 'moderate' || a.level === 'Moderately Depressed' ? 'text-warning fw-semibold'
+                              : a.level === 'low' || a.level === 'Normal' ? 'text-success fw-semibold'
+                              : ''
+                          }>
+                            {a.summary}
+                          </span>
+                        </td>
+                        <td className="text-muted">{a.author_name || '—'}</td>
+                        <td className="text-end">
+                          <button className="btn btn-sm btn-outline-danger rounded-pill"
+                            title="Remove this record"
+                            disabled={deleteAssessment.isPending}
+                            onClick={() => deleteAssessment.mutate(a.id)}>
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Shared: Recently Approved Patients — propagates from registrar */}
       <div className="mt-4">

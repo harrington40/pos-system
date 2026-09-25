@@ -29,6 +29,7 @@ import { NursingModule } from './nursing/nursing.module';
 import { PatientChatModule } from './patient-chat/patient-chat.module';
 import { ReferralsModule } from './referrals/referrals.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { MidwifeModule } from './midwife/midwife.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { LabReportsModule } from './labreports/labreports.module';
 import { InpatientModule } from './inpatient/inpatient.module';
@@ -91,6 +92,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     PatientChatModule,
     ReferralsModule,
     InventoryModule,
+    MidwifeModule,
   ],
 })
 export class AppModule {}

@@ -17,6 +17,7 @@ import MedicationsTab from './tabs/MedicationsTab';
 import ConditionsTab from './tabs/ConditionsTab';
 import ImmunizationsTab from './tabs/ImmunizationsTab';
 import VitalsTab from './tabs/VitalsTab';
+import MaternityTab from './tabs/MaternityTab';
 import QuickAssign from './components/QuickAssign';
 import NotesTab from './tabs/NotesTab';
 import ObservationsTab from './tabs/ObservationsTab';
@@ -25,13 +26,14 @@ import { formatPatientName, formatPatientNameLastFirst } from '../../utils/patie
 import { formatDateOnly } from '../../utils/date';
 import Barcode from '../../components/shared/Barcode';
 
-type TabId = 'summary' | 'observations' | 'notes' | 'vitals' | 'allergies' | 'medications' | 'conditions' | 'immunizations' | 'demographics' | 'insurance';
+type TabId = 'summary' | 'observations' | 'notes' | 'vitals' | 'allergies' | 'medications' | 'conditions' | 'immunizations' | 'demographics' | 'insurance' | 'maternity';
 
 const tabs: { id: TabId; label: string; icon: string; color: string }[] = [
   { id: 'summary', label: 'Overview', icon: 'bi-person-vcard', color: '#0d6efd' },
   { id: 'observations', label: 'Observations', icon: 'bi-journal-check', color: '#198754' },
   { id: 'notes', label: 'Notes', icon: 'bi-pencil-square', color: '#e83e8c' },
   { id: 'vitals', label: 'Vitals', icon: 'bi-heart-pulse', color: '#dc3545' },
+  { id: 'maternity', label: 'Maternity', icon: 'bi-clipboard-heart', color: '#d63384' },
   { id: 'allergies', label: 'Allergies', icon: 'bi-exclamation-triangle', color: '#fd7e14' },
   { id: 'medications', label: 'Medications', icon: 'bi-capsule', color: '#6f42c1' },
   { id: 'conditions', label: 'Diagnoses', icon: 'bi-clipboard2-pulse', color: '#0dcaf0' },
@@ -332,6 +334,7 @@ export default function PatientDetailPage() {
               {activeTab === 'notes' && <NotesTab patientId={String(patient.pid)} patientName={formatPatientName(patient)} patientAge={age} conditions={conditions || []} medications={medications || []} allergies={allergies || []} />}
               {activeTab === 'demographics' && <DemographicsTab patient={patient} />}
               {activeTab === 'vitals' && <VitalsTab vitals={vitals || []} patientId={String(patient.pid)} />}
+              {activeTab === 'maternity' && <MaternityTab pid={String(patient.pid)} />}
               {activeTab === 'allergies' && <AllergiesTab patientId={String(patient.pid)} allergies={allergies || []} enriched={enrichedAllergies || []} readOnly={isNurse} />}
               {activeTab === 'medications' && <MedicationsTab patientId={String(patient.pid)} medications={medications || []} allergies={allergies || []} conditions={conditions || []} readOnly={isNurse} />}
               {activeTab === 'conditions' && <ConditionsTab patientId={String(patient.pid)} conditions={conditions || []} readOnly={isNurse} />}
