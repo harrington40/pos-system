@@ -34,6 +34,7 @@ import PatientMessagePage from './features/portal/PatientMessagePage';
 import PatientPaymentPage from './features/portal/PatientPaymentPage';
 import PatientRecordsPage from './features/portal/PatientRecordsPage';
 import PatientRegistrationPage from './features/portal/PatientRegistrationPage';
+import PatientChangePasswordPage from './features/portal/PatientChangePasswordPage';
 import DisclosuresPage from './features/disclosures/DisclosuresPage';
 import GroupTherapyPage from './features/therapy/GroupTherapyPage';
 import TemplatesPage from './features/templates/TemplatesPage';
@@ -90,6 +91,7 @@ export default function App() {
         <Route path="/portal/payment" element={<PatientPaymentPage />} />
         <Route path="/portal/records" element={<PatientRecordsPage />} />
         <Route path="/portal/register" element={<PatientRegistrationPage />} />
+        <Route path="/portal/change-password" element={<PatientChangePasswordPage />} />
 
         {/* Public routes */}
         <Route path="/vendor/portal/:token" element={<VendorPortalPage />} />

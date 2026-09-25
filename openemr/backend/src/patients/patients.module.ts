@@ -5,10 +5,12 @@ import { PatientsController } from './patients.controller';
 import { PortalController } from './portal.controller';
 import { PatientsService } from './patients.service';
 import { Patient } from './patient.entity';
+import { PatientPortalModule } from '../patient-portal/patient-portal.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Patient]),
+    PatientPortalModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'openrx-secret-key-2024',
       signOptions: { expiresIn: '8h' },

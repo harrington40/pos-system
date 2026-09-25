@@ -4,6 +4,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminService } from './admin.service';
 import { MessageProducer } from '../messaging/message-producer.service';
+import { PatientPortalService } from '../patient-portal/patient-portal.service';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,12 +13,27 @@ export class AdminController {
   constructor(
     private readonly admin: AdminService,
     private readonly messageProducer: MessageProducer,
+    private readonly portal: PatientPortalService,
   ) {}
 
   // --- Pending Registrations (admin + registrar review) ---
   @Get('admin/pending-registrations')
   @Roles('admin', 'front_desk')
   getPendingRegistrations() { return this.admin.getPendingRegistrations(); }
+
+  /**
+   * Issues or reissues a patient portal password, returned once for the desk to
+   * hand over, and forces a change at first sign-in.
+   *
+   * Portal login requires a password, so a patient who registered before that
+   * became true has no credentials at all. This is how the desk gives them one
+   * — and how a patient who has forgotten theirs gets back in.
+   */
+  @Post('admin/patients/:pid/portal-password')
+  @Roles('admin', 'front_desk')
+  issuePortalPassword(@Param('pid') pid: string) {
+    return this.portal.issuePassword(Number(pid));
+  }
 
   @Put('admin/users/:id/approve')
   @Roles('admin', 'front_desk')

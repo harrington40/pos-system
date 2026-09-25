@@ -6,26 +6,33 @@ import {
   Req,
   BadRequestException,
   ConflictException,
-  NotFoundException,
+  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { PatientsService } from './patients.service';
+import { PatientPortalService } from '../patient-portal/patient-portal.service';
 
 /**
  * Public patient portal endpoints (no staff JWT required).
  *
- * Self-registration creates a patient record and returns the public Patient ID
- * (e.g. RX-2608-00001). Login verifies that ID against date of birth and
- * returns a short-lived portal token. The portal token is then used to fetch
- * the patient's own medical records.
+ * Registration creates the patient record and issues a portal password, shown
+ * once for the desk to hand over. Login exchanges the Patient ID and that
+ * password for a short-lived portal token, which is then used to fetch the
+ * patient's own records.
+ *
+ * The password took the place of date of birth as the credential. DOB was the
+ * only check before, and patient IDs are sequential (RX-2608-00001), so knowing
+ * or guessing an ID was enough to read a chart. DOB is still verified when it is
+ * supplied, but it is no longer the thing standing in the way.
  */
 @Controller('portal')
 export class PortalController {
   constructor(
     private readonly patients: PatientsService,
+    private readonly portal: PatientPortalService,
     private readonly jwtService: JwtService,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
@@ -62,24 +69,45 @@ export class PortalController {
     }
 
     const created = await this.patients.create(dto, 'Patient Portal');
+
+    // Issue the portal password. This response is the only place the plaintext
+    // exists — only a bcrypt hash is kept, so it cannot be looked up later.
+    // `firstLogin` tells the portal to force a change before showing records.
+    const credentials = await this.portal.issuePassword(created.pid);
+
     return {
       publicId: created.publicId,
       pid: created.pid,
       name: `${fname} ${lname}`,
+      password: credentials.password,
+      firstLogin: true,
+      note: 'Write this password down now — it cannot be shown again. You will be asked to change it when you first sign in.',
     };
   }
 
   @Post('login')
-  async login(@Body() body: { publicId?: string; dob?: string }) {
+  async login(@Body() body: { publicId?: string; password?: string; dob?: string }) {
     const publicId = String(body.publicId || '').trim();
-    if (!publicId) {
-      throw new BadRequestException('Patient ID is required');
+    const password = String(body.password || '');
+
+    if (!publicId || !password) {
+      throw new BadRequestException('Patient ID and password are required');
     }
+
     const rows = await this.patients.findByPublicId(publicId);
-    if (!rows.length) {
-      throw new NotFoundException('Patient not found. Please check your Patient ID.');
-    }
+
+    // One message for every failure below — unknown Patient ID, no portal
+    // account, wrong password, locked account. Distinguishing them would let an
+    // anonymous caller confirm which Patient IDs exist, and IDs are sequential.
+    const invalid = new UnauthorizedException('Patient ID or password is incorrect.');
+
+    if (!rows.length) throw invalid;
     const p = rows[0];
+
+    if (!(await this.portal.verify(p.pid, password))) throw invalid;
+
+    // DOB is checked after the password, so it adds a second factor for a
+    // legitimate patient without being the only thing protecting the record.
     const toDateOnly = (d: any): string => {
       if (!d) return '';
       const dt = d instanceof Date ? d : new Date(d);
@@ -94,12 +122,17 @@ export class PortalController {
       throw new UnauthorizedException('Date of birth does not match our records.');
     }
 
+    // Read from the database rather than trusting a claim in the request, so a
+    // password changed mid-session is reflected immediately.
+    const mustChangePassword = await this.portal.mustChangePassword(p.pid);
+
     const token = this.jwtService.sign({
       sub: p.pid,
       role: 'patient',
       publicId: p.public_id,
       name: `${p.fname} ${p.lname}`,
       dob: patientDob,
+      must_change_password: mustChangePassword,
     });
 
     return {
@@ -108,12 +141,38 @@ export class PortalController {
       publicId: p.public_id,
       name: `${p.fname} ${p.lname}`,
       dob: patientDob,
+      mustChangePassword,
+    };
+  }
+
+  /**
+   * Replaces the portal password.
+   *
+   * The current password is required even though the caller already holds a
+   * valid token — a token left on an unlocked workstation must not be enough to
+   * take the account over.
+   */
+  @Post('change-password')
+  async changePassword(@Req() req: any, @Body() body: { currentPassword?: string; newPassword?: string }) {
+    const pid = this.verifyPortalToken(req);
+    await this.portal.changePassword(pid, String(body.currentPassword || ''), String(body.newPassword || ''));
+    return {
+      message: 'Password updated. Sign in with your new password next time.',
+      mustChangePassword: false,
     };
   }
 
   @Get('records')
   async records(@Req() req: any) {
     const pid = this.verifyPortalToken(req);
+
+    // A password issued at the desk is a one-login credential. Until it is
+    // replaced this session can change the password but cannot read the chart —
+    // otherwise a password someone else has seen would keep working.
+    if (await this.portal.mustChangePassword(pid)) {
+      throw new ForbiddenException('Change your password before viewing your records.');
+    }
+
     const [appointments, medications, vitals, allergies, conditions, procedures] =
       await Promise.all([
         this.dataSource.query(

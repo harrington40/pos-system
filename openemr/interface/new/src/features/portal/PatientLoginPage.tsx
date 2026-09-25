@@ -5,6 +5,7 @@ import nestClient from '../../api/nest-client';
 export default function PatientLoginPage() {
   const navigate = useNavigate();
   const [pid, setPid] = useState('');
+  const [password, setPassword] = useState('');
   const [dob, setDob] = useState('');
   const [error, setError] = useState('');
 
@@ -12,12 +13,29 @@ export default function PatientLoginPage() {
     e.preventDefault();
     setError('');
     try {
-      const res = await nestClient.post('/portal/login', { publicId: pid.trim(), dob: dob || undefined });
+      const res = await nestClient.post('/portal/login', {
+        publicId: pid.trim(),
+        password,
+        // Date of birth is an optional second check for a patient who supplies
+        // it. The password is the credential.
+        dob: dob || undefined,
+      });
       const patient = res.data;
-      localStorage.setItem('portal_patient', JSON.stringify({ pid: patient.pid, name: patient.name, dob: patient.dob, token: patient.token }));
-      navigate('/portal/dashboard', { replace: true });
+      localStorage.setItem('portal_patient', JSON.stringify({
+        pid: patient.pid,
+        name: patient.name,
+        dob: patient.dob,
+        token: patient.token,
+        mustChangePassword: patient.mustChangePassword,
+      }));
+      // A password issued at the desk has to be replaced before the chart
+      // opens, so send the patient straight to the change screen.
+      navigate(
+        patient.mustChangePassword ? '/portal/change-password' : '/portal/dashboard',
+        { replace: true },
+      );
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Patient not found. Please check your Patient ID.');
+      setError(err?.response?.data?.message || 'Patient ID or password is incorrect.');
     }
   };
 
@@ -36,10 +54,17 @@ export default function PatientLoginPage() {
           <form onSubmit={handleLogin}>
             <div className="mb-3 text-start">
               <label className="form-label">Patient ID</label>
-              <input type="text" className="form-control" value={pid} onChange={e => setPid(e.target.value)} placeholder="Enter your patient ID" required />
+              <input type="text" className="form-control" value={pid} onChange={e => setPid(e.target.value)} placeholder="e.g. RX-2608-00001" required autoComplete="username" />
             </div>
             <div className="mb-3 text-start">
-              <label className="form-label">Date of Birth</label>
+              <label className="form-label">Password</label>
+              <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your portal password" required autoComplete="current-password" />
+              <div className="form-text">
+                Given to you when you registered. You will be asked to choose your own on first sign-in.
+              </div>
+            </div>
+            <div className="mb-3 text-start">
+              <label className="form-label">Date of Birth <span className="text-muted fw-normal">(optional)</span></label>
               <input type="date" className="form-control" value={dob} onChange={e => setDob(e.target.value)} />
             </div>
             <button type="submit" className="btn btn-success btn-lg w-100">Sign In</button>

@@ -9,22 +9,56 @@ import { isInvalidLiberiaNationalNumber } from '../../utils/liberia';
 export default function PatientRegistrationPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ fname:'', lname:'', DOB:'', sex:'', email:'', phone_contact:'', street:'', city:'', country:'' });
-  const [registered, setRegistered] = useState<{id:number,name:string}|null>(null);
+  const [registered, setRegistered] = useState<{ id: number; name: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
   const register = useMutation({
     mutationFn: (d: any) => nestClient.post('/portal/register', d),
-    onSuccess: (res: any) => setRegistered({ id: res.data.publicId, name: res.data.name || `${form.fname} ${form.lname}` }),
+    onSuccess: (res: any) => setRegistered({
+      id: res.data.publicId,
+      name: res.data.name || `${form.fname} ${form.lname}`,
+      password: res.data.password || '',
+    }),
     onError: (e: any) => setError(e?.response?.data?.message || 'Registration failed. Please try again.'),
   });
 
   if (registered) {
     return (<div className="min-vh-100 d-flex align-items-center justify-content-center position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a2540 0%, #0d6efd 45%, #00c9a7 100%)' }}>
-      <div className="card shadow text-center position-relative" style={{width:'400px', borderRadius:'24px', background:'rgba(255,255,255,0.88)', backdropFilter:'blur(18px)', WebkitBackdropFilter:'blur(18px)', border:'1px solid rgba(255,255,255,0.6)'}}><div className="card-body py-5">
+      <div className="card shadow text-center position-relative" style={{width:'420px', borderRadius:'24px', background:'rgba(255,255,255,0.88)', backdropFilter:'blur(18px)', WebkitBackdropFilter:'blur(18px)', border:'1px solid rgba(255,255,255,0.6)'}}><div className="card-body py-5">
         <i className="bi bi-check-circle text-success" style={{fontSize:'4rem'}}></i>
         <h4 className="mt-3">Registration Complete!</h4>
         <p className="text-muted">Welcome, {registered.name}.</p>
-        <p className="small">Your Patient ID is: <strong>{registered.id}</strong></p>
+        <div className="text-start small">
+          <div className="mb-2">
+            <span className="text-muted">Patient ID</span>
+            <div className="fw-bold fs-5">{registered.id}</div>
+          </div>
+          {registered.password && (
+            <div className="mb-2">
+              <span className="text-muted">Portal password</span>
+              <div className="d-flex align-items-center gap-2">
+                <code className="fs-6 flex-grow-1 p-2 rounded bg-light border text-break">{registered.password}</code>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(registered.password);
+                    setCopied(true);
+                  }}>
+                  <i className={`bi ${copied ? 'bi-check2' : 'bi-clipboard'}`}></i>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* The password is not stored anywhere in readable form, so this screen
+            is the only chance to record it. */}
+        <div className="alert alert-warning small py-2 mt-3 text-start">
+          <i className="bi bi-exclamation-triangle me-1"></i>
+          <strong>Write this password down now.</strong> It cannot be shown again, and you will
+          be asked to choose your own the first time you sign in.
+        </div>
         <button className="btn btn-success w-100" onClick={() => navigate('/portal/login')}>Sign In to Portal</button>
       </div></div></div>);
   }
