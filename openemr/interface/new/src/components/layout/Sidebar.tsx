@@ -183,6 +183,22 @@ export default function Sidebar() {
     setAdminAvatarClicks((c) => (c >= 5 ? 5 : c + 1));
   };
 
+  // The signed-in user's own photo. Avatars belong to users and the SPA is not
+  // told its own id at login, so ask the API who "me" is.
+  const { data: myAvatar } = useQuery({
+    queryKey: ['avatar', 'me'],
+    queryFn: async () => {
+      try {
+        const r = await nestClient.get('/avatars/me');
+        return r.data;
+      } catch {
+        return null;
+      }
+    },
+  });
+  const myAvatarUrl: string | undefined = myAvatar?.url || undefined;
+  const myUserId: number | undefined = myAvatar?.userId;
+
   // Role-based menu access: admin can toggle menu items per role.
   const { data: menuPermissions } = useQuery({
     queryKey: ['menu-permissions', user?.role],
@@ -342,7 +358,16 @@ export default function Sidebar() {
             title="Click the avatar"
             style={{ cursor: 'pointer', userSelect: 'none' }}
           >
-            <i className="bi bi-person-circle" style={{ fontSize: '1.4rem' }}></i>
+            {myAvatarUrl ? (
+              <img
+                src={myAvatarUrl}
+                alt=""
+                className="rounded-circle flex-shrink-0"
+                style={{ width: '1.6rem', height: '1.6rem', objectFit: 'cover' }}
+              />
+            ) : (
+              <i className="bi bi-person-circle" style={{ fontSize: '1.4rem' }}></i>
+            )}
             <span className="text-truncate">{user.displayName}</span>
             {user.role && (
               <span className="badge ms-auto" style={{ fontSize: '0.65rem', background: 'linear-gradient(90deg, #0d6efd, #00c9a7)', color: '#fff' }}>
@@ -350,6 +375,19 @@ export default function Sidebar() {
               </span>
             )}
           </div>
+          {/* Your own photo is changed on your profile page, which is reached by
+              user id — the sidebar is the only place that knows it. Only the
+              roles the profile endpoint accepts are offered the link. */}
+          {myUserId && user.role && ['admin', 'physician', 'front_desk'].includes(user.role) ? (
+            <NavLink
+              to={`/providers/${myUserId}`}
+              className="d-flex align-items-center gap-1 mt-1 text-decoration-none"
+              style={{ fontSize: '0.7rem', color: '#0d6efd' }}
+            >
+              <i className="bi bi-person-badge"></i>
+              {myAvatarUrl ? 'My profile & photo' : 'Add your photo'}
+            </NavLink>
+          ) : null}
           {adminAvatarClicks >= 3 && !dbAdminUnlocked && (
             <div className="text-center mt-2" style={{ fontSize: '0.7rem', color: '#0d6efd' }}>
               <i className="bi bi-unlock me-1"></i>

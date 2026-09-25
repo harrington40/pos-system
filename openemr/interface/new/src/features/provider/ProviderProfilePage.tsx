@@ -92,7 +92,6 @@ export default function ProviderProfilePage() {
               {isMyProfile ? (
                 <div className="bg-white bg-opacity-25 rounded-circle p-1">
                   <AvatarUpload
-                    userId={Number(id)}
                     currentAvatarUrl={avatarUrl}
                     size={96}
                     onAvatarChanged={() => queryClient.invalidateQueries({ queryKey: ['provider-avatar', id] })}

@@ -3,8 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
 interface AvatarUploadProps {
-  /** Kept for the cache key; the API always writes the caller's own avatar. */
-  userId: number;
   currentAvatarUrl?: string;
   /** Fired after a successful upload so the parent can refetch its own query. */
   onAvatarChanged?: () => void;
@@ -12,7 +10,6 @@ interface AvatarUploadProps {
 }
 
 export default function AvatarUpload({
-  userId,
   currentAvatarUrl,
   onAvatarChanged,
   size = 96,
@@ -33,7 +30,9 @@ export default function AvatarUpload({
       return r.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['avatar', userId] });
+      // Invalidate the whole ['avatar'] prefix: it covers this component's key,
+      // the sidebar's ['avatar', 'me'] and the profile page's own query.
+      queryClient.invalidateQueries({ queryKey: ['avatar'] });
       // The caller's page holds its own query (e.g. ['provider-avatar', id]),
       // which this component cannot know about — so let it refresh itself.
       onAvatarChanged?.();
