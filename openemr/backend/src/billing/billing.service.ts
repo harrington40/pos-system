@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { resolveVisitCategoryId } from '../common/calendar-categories.util';
 
 export interface BillingPatient {
   pid: number;
@@ -2293,10 +2294,12 @@ export class BillingService implements OnModuleInit {
         `SELECT COALESCE(MAX(encounter), 0) + 1 AS next FROM form_encounter`,
       );
       const next = Number(mx?.next) || 1;
+      // Same fix as the intake encounter: the literal 5 may no longer exist.
+      const visitCategoryId = await resolveVisitCategoryId(this.dataSource, 5);
       await this.dataSource.query(
         `INSERT INTO form_encounter (pid, encounter, date, reason, facility, pc_catid, provider_id, sensitivity)
-         VALUES (?, ?, NOW(), 'Auto-created encounter for billing', 'Default', 5, 1, 'normal')`,
-        [pid, next],
+         VALUES (?, ?, NOW(), 'Auto-created encounter for billing', 'Default', ?, 1, 'normal')`,
+        [pid, next, visitCategoryId],
       );
       this.logger.log(`Auto-created encounter ${next} for patient ${pid} (billing link)`);
       return next;

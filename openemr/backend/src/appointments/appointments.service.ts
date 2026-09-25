@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { resolveVisitCategoryId } from '../common/calendar-categories.util';
 
 export interface AppointmentRow {
   pc_eid: number;
@@ -60,7 +61,9 @@ export class AppointmentsService {
         e.pc_apptstatus, e.pc_facility,
         e.pc_billing_location,
         LOWER(HEX(e.uuid)) as pc_uuid,
-        c.pc_catname as category,
+        -- An appointment whose category row is missing used to read as NULL and
+        -- vanish from any UI that filters or groups by category. Say so instead.
+        COALESCE(c.pc_catname, CONCAT('Unknown category #', e.pc_catid)) as category,
         pd.fname as fname,
         pd.lname as lname,
         pd.pid as pid,
@@ -141,6 +144,9 @@ export class AppointmentsService {
   }
 
   async create(pid: string, dto: CreateAppointmentDto): Promise<{ id: number }> {
+    // Never file an appointment against a category that does not exist — that is
+    // exactly how the 23 orphaned appointments happened.
+    const categoryId = await resolveVisitCategoryId(this.dataSource, dto.pc_catid);
     const result = await this.dataSource.query(
       `INSERT INTO openemr_postcalendar_events
         (pc_catid, pc_aid, pc_pid, pc_title, pc_hometext, pc_eventDate,
@@ -148,7 +154,7 @@ export class AppointmentsService {
          pc_time, pc_eventstatus, pc_multiple)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0, 1)`,
       [
-        dto.pc_catid,
+        categoryId,
         dto.pc_aid || '1',
         pid,
         dto.pc_title,

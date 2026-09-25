@@ -2,6 +2,7 @@
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { withChartStatus } from './chart-completeness.util';
+import { resolveVisitCategoryId } from '../common/calendar-categories.util';
 
 export interface PatientRow {
   id: number;
@@ -318,10 +319,13 @@ export class PatientsService {
         `SELECT COALESCE(MAX(encounter), 0) + 1 AS nextEnc FROM form_encounter`,
       );
       const nextEncounter = Number(maxEnc?.nextEnc) || 1;
+      // Resolved rather than hardcoded: the previous literal 5 was deleted from
+      // the categories table, leaving every encounter with no category.
+      const visitCategoryId = await resolveVisitCategoryId(this.dataSource, 5);
       const enc = await this.dataSource.query(
         `INSERT INTO form_encounter (pid, date, reason, encounter, pc_catid, provider_id, encounter_type_code, encounter_type_description)
-         VALUES (?, NOW(), 'Intake / Triage', ?, 5, ?, 'AMB', 'Intake / Triage')`,
-        [patient.pid, nextEncounter, finalProviderId || 0],
+         VALUES (?, NOW(), 'Intake / Triage', ?, ?, ?, 'AMB', 'Intake / Triage')`,
+        [patient.pid, nextEncounter, visitCategoryId, finalProviderId || 0],
       );
       encounterId = enc.insertId;
 
