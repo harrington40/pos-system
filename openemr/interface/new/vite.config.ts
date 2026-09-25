@@ -7,7 +7,10 @@ export default defineConfig({
   build: {
     outDir: '../../public/dist',
     emptyOutDir: true,
-    sourcemap: true,
+    // Source maps must not ship: they contain the original application source and
+    // are served straight off the web root, so anyone can fetch them. Opt in with
+    // SOURCEMAP=true when you need a debuggable build.
+    sourcemap: process.env.SOURCEMAP === 'true',
   },
   server: {
     port: 5173,
