@@ -105,7 +105,6 @@ export default function PatientDetailPage() {
     },
     enabled: !!patient?.pid,
   });
-  const { data: avatarData } = useQuery({ queryKey: ['patient-avatar', id], queryFn: async () => { try { const r = await nestClient.get(`/avatars/${id}`); return r.data; } catch { return null; } }, enabled: !!id });
 
   if (isLoading) return <div className="text-center py-5"><div className="spinner-grow text-primary" style={{ width: '3rem', height: '3rem' }} /><p className="text-muted mt-2">Loading chart...</p></div>;
   if (error || !patient) {
@@ -199,8 +198,10 @@ export default function PatientDetailPage() {
         <div className="position-relative">
           <div className="d-flex align-items-start gap-4 flex-wrap">
             <div className="flex-shrink-0">
-              {avatarData?.url ? <img src={avatarData.url} alt="" className="rounded-circle shadow" style={{ width: '88px', height: '88px', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.4)' }} />
-                : <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold shadow" style={{ width: '88px', height: '88px', fontSize: '2rem', background: 'rgba(255,255,255,0.2)', border: '3px solid rgba(255,255,255,0.4)' }}>{initials}</div>}
+              {/* Initials only. The avatars table is keyed by users.id, so asking
+                  it for a patient returned whichever staff member happened to
+                  share that id — patient 8 was showing the registrar's photo. */}
+              <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold shadow" style={{ width: '88px', height: '88px', fontSize: '2rem', background: 'rgba(255,255,255,0.2)', border: '3px solid rgba(255,255,255,0.4)' }}>{initials}</div>
             </div>
             <div className="flex-grow-1">
               <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">

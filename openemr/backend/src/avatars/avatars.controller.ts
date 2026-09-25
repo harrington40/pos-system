@@ -31,6 +31,20 @@ export class AvatarsController {
     return { id: avatar.id, originalName: avatar.originalName, b2Path: avatar.b2Path };
   }
 
+  /**
+   * The caller's own avatar.
+   *
+   * Avatars belong to users, and the SPA is not told its own user id at login —
+   * so the profile page asks for "me" rather than guessing. MUST stay above the
+   * `:userId` route or "me" would be parsed as an id.
+   */
+  @Get('me')
+  async getMine(@Req() req: any) {
+    const userId = Number(req.user?.sub || req.user?.id || 0);
+    const result = await this.avatarsService.getAvatar(userId);
+    return { ...result, userId };
+  }
+
   @Get(':userId')
   async get(@Param('userId') userId: string) {
     return this.avatarsService.getAvatar(parseInt(userId, 10));

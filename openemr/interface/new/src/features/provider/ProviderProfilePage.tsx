@@ -1,10 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
+import AvatarUpload from '../../components/common/AvatarUpload';
 
 export default function ProviderProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: provider, isLoading } = useQuery({
     queryKey: ['provider-profile', id],
@@ -23,6 +25,22 @@ export default function ProviderProfilePage() {
     },
     enabled: !!id,
   });
+
+  // Avatars belong to users and the SPA is not told its own user id at login, so
+  // ask the API who "me" is. Only your own profile may be changed — the upload
+  // endpoint writes the caller's avatar regardless of the id in the URL.
+  const { data: myAvatar } = useQuery({
+    queryKey: ['avatar', 'me'],
+    queryFn: async () => {
+      try {
+        const r = await nestClient.get('/avatars/me');
+        return r.data;
+      } catch {
+        return null;
+      }
+    },
+  });
+  const isMyProfile = !!id && Number(id) === Number(myAvatar?.userId);
 
   if (isLoading) {
     return (
@@ -69,9 +87,18 @@ export default function ProviderProfilePage() {
         </div>
         <div className="position-relative">
           <div className="d-flex align-items-start gap-4 flex-wrap">
-            {/* Avatar */}
+            {/* Avatar — editable only on your own profile */}
             <div className="flex-shrink-0">
-              {avatarUrl ? (
+              {isMyProfile ? (
+                <div className="bg-white bg-opacity-25 rounded-circle p-1">
+                  <AvatarUpload
+                    userId={Number(id)}
+                    currentAvatarUrl={avatarUrl}
+                    size={96}
+                    onAvatarChanged={() => queryClient.invalidateQueries({ queryKey: ['provider-avatar', id] })}
+                  />
+                </div>
+              ) : avatarUrl ? (
                 <img src={avatarUrl} alt="" className="rounded-circle shadow"
                   style={{ width: '96px', height: '96px', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.4)' }} />
               ) : (
