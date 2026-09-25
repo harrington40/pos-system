@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
 interface AvatarUploadProps {
+  /** Whose photo to set. Your own by default; another user needs the privilege. */
+  userId?: number;
   currentAvatarUrl?: string;
   /** Fired after a successful upload so the parent can refetch its own query. */
   onAvatarChanged?: () => void;
@@ -10,6 +12,7 @@ interface AvatarUploadProps {
 }
 
 export default function AvatarUpload({
+  userId,
   currentAvatarUrl,
   onAvatarChanged,
   size = 96,
@@ -23,6 +26,9 @@ export default function AvatarUpload({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
+      // Omitted means "my own avatar"; the API only accepts another user's id
+      // from roles allowed to manage other people's profiles.
+      if (userId) formData.append('userId', String(userId));
 
       const r = await nestClient.post('/avatars/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -30,8 +36,8 @@ export default function AvatarUpload({
       return r.data;
     },
     onSuccess: () => {
-      // Invalidate the whole ['avatar'] prefix: it covers this component's key,
-      // the sidebar's ['avatar', 'me'] and the profile page's own query.
+      // Invalidate the whole ['avatar'] prefix: it covers the sidebar and top
+      // bar (['avatar', 'me']) plus the 'me' record itself.
       queryClient.invalidateQueries({ queryKey: ['avatar'] });
       // The caller's page holds its own query (e.g. ['provider-avatar', id]),
       // which this component cannot know about — so let it refresh itself.
@@ -39,8 +45,12 @@ export default function AvatarUpload({
       setPreview(null);
       setError('');
     },
-    onError: () => {
-      setError('Upload failed. Please try a smaller image (max 5MB).');
+    onError: (err: any) => {
+      // Surface the API's reason (e.g. "You can only change your own photo").
+      setError(
+        err?.response?.data?.message ||
+          'Upload failed. Please try a smaller image (max 5MB).',
+      );
       setPreview(null);
     },
   });

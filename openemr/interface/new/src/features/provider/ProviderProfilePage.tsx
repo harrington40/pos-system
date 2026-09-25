@@ -41,6 +41,9 @@ export default function ProviderProfilePage() {
     },
   });
   const isMyProfile = !!id && Number(id) === Number(myAvatar?.userId);
+  // Administrators (and front desk with provider-edit rights) may set another
+  // user's photo; the API re-checks, this only decides what to offer.
+  const canEditThisAvatar = isMyProfile || !!myAvatar?.canManageOthers;
 
   if (isLoading) {
     return (
@@ -87,15 +90,21 @@ export default function ProviderProfilePage() {
         </div>
         <div className="position-relative">
           <div className="d-flex align-items-start gap-4 flex-wrap">
-            {/* Avatar — editable only on your own profile */}
+            {/* Avatar — editable on your own profile, or by a user manager */}
             <div className="flex-shrink-0">
-              {isMyProfile ? (
+              {canEditThisAvatar ? (
                 <div className="bg-white bg-opacity-25 rounded-circle p-1">
                   <AvatarUpload
+                    userId={Number(id)}
                     currentAvatarUrl={avatarUrl}
                     size={96}
                     onAvatarChanged={() => queryClient.invalidateQueries({ queryKey: ['provider-avatar', id] })}
                   />
+                  {!isMyProfile && (
+                    <div className="text-center text-white-50 mt-1" style={{ fontSize: '0.65rem' }}>
+                      Editing another user's photo
+                    </div>
+                  )}
                 </div>
               ) : avatarUrl ? (
                 <img src={avatarUrl} alt="" className="rounded-circle shadow"

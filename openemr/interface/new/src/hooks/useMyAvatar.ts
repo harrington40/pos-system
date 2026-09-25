@@ -5,6 +5,8 @@ export interface MyAvatar {
   /** The caller's own user id — needed to link to their profile page. */
   userId?: number;
   url?: string | null;
+  /** Whether the caller may set another user's photo (admin / provider-edit). */
+  canManageOthers?: boolean;
 }
 
 /**

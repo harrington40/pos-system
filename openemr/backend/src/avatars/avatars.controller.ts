@@ -4,11 +4,13 @@ import {
   Post,
   Delete,
   Param,
+  Body,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   Req,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -24,11 +26,40 @@ export class AvatarsController {
   async upload(
     @UploadedFile() file: any,
     @Req() req: any,
+    @Body('userId') requestedUserId?: string,
   ) {
     if (!file) throw new BadRequestException('File is required');
-    const userId = req.user?.sub || req.user?.id || 0;
-    const avatar = await this.avatarsService.uploadAvatar(userId, file);
-    return { id: avatar.id, originalName: avatar.originalName, b2Path: avatar.b2Path };
+
+    const me = Number(req.user?.sub || req.user?.id || 0);
+    // Defaults to your own avatar; an explicit userId targets someone else and
+    // is only honoured for roles allowed to manage other people's profiles.
+    const target = requestedUserId !== undefined && requestedUserId !== ''
+      ? Number(requestedUserId)
+      : me;
+
+    if (!Number.isFinite(target) || target <= 0) {
+      throw new BadRequestException('Invalid user id');
+    }
+    if (target !== me) {
+      this.assertMayManageOthers(req.user);
+    }
+
+    const avatar = await this.avatarsService.uploadAvatar(target, file);
+    return { id: avatar.id, userId: target, originalName: avatar.originalName, b2Path: avatar.b2Path };
+  }
+
+  /**
+   * Who may change someone else's photo. Mirrors the provider-edit rule used by
+   * the admin user endpoints: an administrator always, front desk only with the
+   * explicit privilege.
+   */
+  private assertMayManageOthers(user: any): void {
+    if (!user) throw new ForbiddenException('Not authenticated');
+    if (user.role === 'admin') return;
+    if (user.role === 'front_desk' && user.can_edit_providers) return;
+    throw new ForbiddenException(
+      'You can only change your own photo. Ask an administrator to change this one.',
+    );
   }
 
   /**
@@ -42,7 +73,19 @@ export class AvatarsController {
   async getMine(@Req() req: any) {
     const userId = Number(req.user?.sub || req.user?.id || 0);
     const result = await this.avatarsService.getAvatar(userId);
-    return { ...result, userId };
+    return {
+      ...result,
+      userId,
+      // Lets the profile page decide whether it may offer the upload control for
+      // someone else's photo, instead of the UI re-deriving the rule.
+      canManageOthers: this.mayManageOthers(req.user),
+    };
+  }
+
+  private mayManageOthers(user: any): boolean {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    return user.role === 'front_desk' && !!user.can_edit_providers;
   }
 
   @Get(':userId')
@@ -51,8 +94,19 @@ export class AvatarsController {
   }
 
   @Delete(':userId')
-  async delete(@Param('userId') userId: string) {
-    await this.avatarsService.deleteAvatar(parseInt(userId, 10));
-    return { message: 'Avatar deleted' };
+  async delete(@Param('userId') userId: string, @Req() req: any) {
+    const target = parseInt(userId, 10);
+    if (!Number.isFinite(target) || target <= 0) {
+      throw new BadRequestException('Invalid user id');
+    }
+    // Same rule as uploading: your own photo, or someone else's only with the
+    // privilege to manage other profiles. This route previously carried no check
+    // at all, so any signed-in user could delete anyone's photo.
+    const me = Number(req.user?.sub || req.user?.id || 0);
+    if (target !== me) {
+      this.assertMayManageOthers(req.user);
+    }
+    await this.avatarsService.deleteAvatar(target);
+    return { message: 'Avatar deleted', userId: target };
   }
 }
