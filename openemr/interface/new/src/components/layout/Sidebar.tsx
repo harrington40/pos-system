@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import { useNotificationSummary } from '../../hooks/useNotifications';
+import { useMyAvatar } from '../../hooks/useMyAvatar';
 
 /** The numeric counters from /notifications/summary that can carry a badge. */
 type BadgeKey = 'messages' | 'referrals' | 'drugInfo' | 'pharmacy' | 'patientFlow';
@@ -183,19 +184,8 @@ export default function Sidebar() {
     setAdminAvatarClicks((c) => (c >= 5 ? 5 : c + 1));
   };
 
-  // The signed-in user's own photo. Avatars belong to users and the SPA is not
-  // told its own id at login, so ask the API who "me" is.
-  const { data: myAvatar } = useQuery({
-    queryKey: ['avatar', 'me'],
-    queryFn: async () => {
-      try {
-        const r = await nestClient.get('/avatars/me');
-        return r.data;
-      } catch {
-        return null;
-      }
-    },
-  });
+  // The signed-in user's own photo (shared query key with the top bar).
+  const { data: myAvatar } = useMyAvatar();
   const myAvatarUrl: string | undefined = myAvatar?.url || undefined;
   const myUserId: number | undefined = myAvatar?.userId;
 
