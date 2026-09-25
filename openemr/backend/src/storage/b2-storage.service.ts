@@ -156,10 +156,14 @@ export class B2StorageService {
     const auth = await this.getAuth();
 
     await firstValueFrom(
-      this.http.post(`${auth.apiUrl}/b2api/v2/b2_delete_file_version`, {
-        fileId,
-        fileName,
-      }),
+      // The Authorization header is required — without it B2 answers 401
+      // "bad_auth_token: Authorization header is missing" and every delete
+      // failed, which is why removing an avatar returned a 500.
+      this.http.post(
+        `${auth.apiUrl}/b2api/v2/b2_delete_file_version`,
+        { fileId, fileName },
+        { headers: { Authorization: auth.authorizationToken } },
+      ),
     );
 
     this.logger.log(`Deleted from B2: ${fileName}`);

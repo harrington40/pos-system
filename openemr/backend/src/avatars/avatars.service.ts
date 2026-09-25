@@ -74,7 +74,18 @@ export class AvatarsService {
     const avatar = await this.avatarRepo.findOne({ where: { userId } });
     if (!avatar) throw new BadRequestException('Avatar not found');
 
-    await this.b2.deleteFile(avatar.b2FileId, avatar.b2Path);
+    try {
+      await this.b2.deleteFile(avatar.b2FileId, avatar.b2Path);
+    } catch (e) {
+      // Still remove the record. "Remove my photo" has to work — leaving the row
+      // behind means it cannot be removed from the UI at all and the request
+      // surfaced as a 500. The object is logged so it can be cleaned up by hand.
+      this.logger.error(
+        `Could not delete B2 object ${avatar.b2FileId} (${avatar.b2Path}) for user ${userId}: ` +
+          (e instanceof Error ? e.message : String(e)),
+      );
+    }
+
     await this.avatarRepo.remove(avatar);
     this.logger.log(`Avatar deleted for user ${userId}`);
   }
