@@ -27,6 +27,11 @@ export interface SaveAssessmentDto {
     hasDiabetes: boolean; hasPreeclampsia: boolean;
   };
   lmp?: string;
+  /**
+   * Cycle length for the EDD correction, in days. Optional; omitted means the
+   * 28-day assumption of Naegele's rule.
+   */
+  cycleLengthDays?: number;
   /** APGAR is documented twice: at one minute and at five minutes. */
   apgar?: { oneMinute?: ApgarSet; fiveMinute?: ApgarSet };
 }
@@ -117,11 +122,22 @@ export class MidwifeService implements OnModuleInit {
       detail = { inputs: r };
     } else if (dto.kind === 'edd') {
       if (!dto.lmp) throw new BadRequestException('lmp is required');
-      const edd = eddFromLmp(dto.lmp);
+      // Naegele's rule assumes a 28-day cycle; a longer cycle dates later. The
+      // cycle length is validated here as well as clamped in the utility, so an
+      // impossible value is rejected rather than silently ignored.
+      if (dto.cycleLengthDays != null) {
+        const cycle = Number(dto.cycleLengthDays);
+        if (!Number.isFinite(cycle) || cycle < 20 || cycle > 45) {
+          throw new BadRequestException('cycleLengthDays must be between 20 and 45');
+        }
+      }
+      const edd = eddFromLmp(dto.lmp, dto.cycleLengthDays);
       if (!edd) throw new BadRequestException('lmp is not a usable date');
       const gest = gestationFromLmp(dto.lmp);
-      summary = `EDD ${edd} (${gest.weeks}w ${gest.days}d at recording)`;
-      detail = { lmp: dto.lmp, edd, gestationWeeks: gest.weeks, gestationDays: gest.days };
+      const cycleNote = dto.cycleLengthDays != null ? `, ${dto.cycleLengthDays}-day cycle` : '';
+      summary = `EDD ${edd} (${gest.weeks}w ${gest.days}d at recording${cycleNote})`;
+      detail = { lmp: dto.lmp, edd, gestationWeeks: gest.weeks, gestationDays: gest.days,
+        cycleLengthDays: dto.cycleLengthDays ?? null };
     } else {
       const set1 = dto.apgar?.oneMinute;
       const set5 = dto.apgar?.fiveMinute;

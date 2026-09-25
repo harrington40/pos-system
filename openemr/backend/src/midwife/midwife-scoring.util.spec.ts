@@ -4,6 +4,8 @@ import {
   gestationFromLmp,
   apgarTotal,
   interpretApgar,
+  apgarGuidance,
+  RISK_MAX_SCORE,
   type RiskInputs,
 } from './midwife-scoring.util';
 
@@ -51,6 +53,73 @@ describe('eddFromLmp', () => {
   it('returns blank for an unusable date', () => {
     expect(eddFromLmp('')).toBe('');
     expect(eddFromLmp('not-a-date')).toBe('');
+  });
+
+  it('dates a long cycle later and a short cycle earlier', () => {
+    // Naegele assumes ovulation on day 14 of 28; a 35-day cycle ovulates a week
+    // later, so the due date moves out by 7 days.
+    expect(eddFromLmp('2026-01-01', 35)).toBe('2026-10-15');
+    expect(eddFromLmp('2026-01-01', 21)).toBe('2026-10-01');
+  });
+
+  it('ignores a 28-day cycle, matching the unadjusted answer', () => {
+    expect(eddFromLmp('2026-01-01', 28)).toBe(eddFromLmp('2026-01-01'));
+  });
+
+  it('ignores an impossible cycle length rather than shifting the date', () => {
+    // A stray keystroke must not move a due date by months.
+    expect(eddFromLmp('2026-01-01', 0)).toBe('2026-10-08');
+    expect(eddFromLmp('2026-01-01', 400)).toBe('2026-10-08');
+    expect(eddFromLmp('2026-01-01', NaN)).toBe('2026-10-08');
+  });
+});
+
+describe('risk breakdown', () => {
+  it('attributes every point to a named factor', () => {
+    const r = computeRisk({ ...base, bpSystolic: 168, bpDiastolic: 112, hemoglobin: 6 });
+    expect(r.score).toBe(9);
+    expect(r.factors.map(f => f.label)).toEqual(['Severe hypertension', 'Severe anaemia']);
+    expect(r.factors.reduce((s, f) => s + f.points, 0)).toBe(r.score);
+  });
+
+  it('carries the reading behind each factor', () => {
+    const r = computeRisk({ ...base, bpSystolic: 145, bpDiastolic: 95 });
+    expect(r.factors[0]).toMatchObject({ label: 'Hypertension', detail: '145/95 mmHg', points: 3 });
+  });
+
+  it('returns no factors for a woman with nothing wrong', () => {
+    expect(computeRisk(base).factors).toEqual([]);
+  });
+
+  it('reports the maximum so the UI denominator is not stale', () => {
+    // Worst case in every category must actually reach the reported maximum.
+    const worst = computeRisk({
+      age: 44, parity: 6, gestationWeeks: 26,
+      bpSystolic: 170, bpDiastolic: 115, hemoglobin: 6,
+      hasDiabetes: true, hasPreeclampsia: true,
+    });
+    expect(worst.score).toBe(RISK_MAX_SCORE);
+    expect(worst.maxScore).toBe(RISK_MAX_SCORE);
+    expect(worst.level).toBe('high');
+  });
+});
+
+describe('apgarGuidance', () => {
+  it('calls for repeat scoring when the 5-minute score stays low', () => {
+    expect(apgarGuidance(6, 5)).toContain('every 5 minutes');
+    expect(apgarGuidance(5, 5)).toContain('every 5 minutes');
+  });
+
+  it('does not ask for a repeat when the 5-minute score is normal', () => {
+    expect(apgarGuidance(9, 5)).not.toContain('every 5 minutes');
+  });
+
+  it('flags resuscitation ahead of everything else for a very low score', () => {
+    // 3 is below the resuscitation threshold, so "call for help" must take
+    // priority over the note about repeating the score.
+    expect(apgarGuidance(2, 1)).toContain('Resuscitation');
+    expect(apgarGuidance(3, 5)).toContain('Resuscitation');
+    expect(apgarGuidance(3, 5)).not.toContain('every 5 minutes');
   });
 });
 

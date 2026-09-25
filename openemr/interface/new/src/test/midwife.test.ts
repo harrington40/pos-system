@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeRiskScore, calculateEDD, interpretApgar } from '../utils/midwife';
+import { computeRiskScore, calculateEDD, interpretApgar, apgarGuidance, RISK_MAX_SCORE } from '../utils/midwife';
 
 /** Baseline: a low-risk 28-year-old at 30 weeks, normal BP and haemoglobin. */
 const base = {
@@ -112,6 +112,72 @@ describe('calculateEDD', () => {
   it('returns a blank EDD for an unusable date instead of NaN', () => {
     expect(calculateEDD('')).toMatchObject({ edd: '', gestationWeeks: 0 });
     expect(calculateEDD('not-a-date')).toMatchObject({ edd: '' });
+  });
+});
+
+describe('computeRiskScore — breakdown', () => {
+  it('attributes every point to a named factor', () => {
+    const r = score({ bpSystolic: 168, bpDiastolic: 112, hemoglobin: 6 });
+    expect(r.score).toBe(9);
+    expect(r.factors.map(f => f.label)).toEqual(['Severe hypertension', 'Severe anaemia']);
+    expect(r.factors.reduce((s, f) => s + f.points, 0)).toBe(r.score);
+  });
+
+  it('carries the reading behind each factor', () => {
+    const r = score({ bpSystolic: 145, bpDiastolic: 95 });
+    expect(r.factors[0]).toMatchObject({ label: 'Hypertension', detail: '145/95 mmHg', points: 3 });
+  });
+
+  it('has no factors for a woman with nothing wrong', () => {
+    expect(score().factors).toEqual([]);
+  });
+
+  it('reports a maximum the worst case actually reaches', () => {
+    const worst = score({
+      age: 44, parity: 6, gestationWeeks: 26,
+      bpSystolic: 170, bpDiastolic: 115, hemoglobin: 6,
+      hasDiabetes: true, hasPreeclampsia: true,
+    });
+    expect(worst.score).toBe(RISK_MAX_SCORE);
+    expect(worst.maxScore).toBe(RISK_MAX_SCORE);
+    // The old UI showed "/ 20+", which understated a 27-point scale.
+    expect(worst.maxScore).toBeGreaterThan(20);
+  });
+});
+
+describe('calculateEDD — cycle length', () => {
+  it('dates a long cycle later and a short cycle earlier', () => {
+    expect(calculateEDD('2026-01-01', new Date(), 35).edd).toBe('2026-10-15');
+    expect(calculateEDD('2026-01-01', new Date(), 21).edd).toBe('2026-10-01');
+  });
+
+  it('leaves the answer alone at 28 days', () => {
+    // The default must stay identical to the previous behaviour.
+    expect(calculateEDD('2026-01-01', new Date(), 28).edd).toBe(calculateEDD('2026-01-01').edd);
+    expect(calculateEDD('2026-01-01').edd).toBe('2026-10-08');
+  });
+
+  it('ignores an impossible cycle length rather than shifting the date', () => {
+    expect(calculateEDD('2026-01-01', new Date(), 0).edd).toBe('2026-10-08');
+    expect(calculateEDD('2026-01-01', new Date(), 400).edd).toBe('2026-10-08');
+    expect(calculateEDD('2026-01-01', new Date(), NaN).edd).toBe('2026-10-08');
+  });
+});
+
+describe('apgarGuidance', () => {
+  it('calls for repeat scoring when the 5-minute score stays low', () => {
+    expect(apgarGuidance(6, 5)).toContain('every 5 minutes');
+    expect(apgarGuidance(5, 5)).toContain('every 5 minutes');
+  });
+
+  it('does not ask for a repeat when the 5-minute score is normal', () => {
+    expect(apgarGuidance(9, 5)).not.toContain('every 5 minutes');
+  });
+
+  it('flags resuscitation ahead of everything else for a very low score', () => {
+    expect(apgarGuidance(2, 1)).toContain('Resuscitation');
+    expect(apgarGuidance(3, 5)).toContain('Resuscitation');
+    expect(apgarGuidance(3, 5)).not.toContain('every 5 minutes');
   });
 });
 

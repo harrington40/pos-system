@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import RecentApprovalsPanel from '../../components/shared/RecentApprovalsPanel';
 import { formatPatientName } from '../../utils/patientName';
-import { computeRiskScore, calculateEDD, interpretApgar } from '../../utils/midwife';
+import { computeRiskScore, calculateEDD, interpretApgar, apgarGuidance } from '../../utils/midwife';
 
 interface SelectedPatient {
   pid: number;
@@ -104,6 +104,8 @@ export default function MidwifeDashboardPage() {
   const [saveNote, setSaveNote] = useState<{ text: string; ok: boolean } | null>(null);
 
   const [lmpInput, setLmpInput] = useState('');
+  /** Cycle length for the EDD correction. Defaults to the 28-day Naegele assumption. */
+  const [cycleLength, setCycleLength] = useState('28');
   const [eddResult, setEddResult] = useState<ReturnType<typeof calculateEDD> | null>(null);
   const [riskForm, setRiskForm] = useState({
     age: '28', parity: '1', gestationWeeks: '30',
@@ -206,7 +208,7 @@ export default function MidwifeDashboardPage() {
 
   const handleEddCalc = () => {
     if (!lmpInput) return;
-    setEddResult(calculateEDD(lmpInput));
+    setEddResult(calculateEDD(lmpInput, new Date(), Number(cycleLength)));
   };
 
   const handleRiskCalc = () => {
@@ -228,10 +230,91 @@ export default function MidwifeDashboardPage() {
   const monthlyDeliveries = deliveries.length;
 
   return (
-    <div>
+    /* Glass needs something coloured behind it to blur. The layout provides a
+       flat bg-light, over which translucent white is invisible, so this page
+       carries its own soft wash — the same approach the other glass pages use. */
+    <div
+      className="mw-glass position-relative overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, #fdf2f8 0%, #f6f5ff 45%, #eef7f5 100%)',
+        borderRadius: '20px',
+        minHeight: '100vh',
+        padding: '16px',
+      }}
+    >
+      {/* Decorative colour, purely to give the glass something to pick up. */}
+      <div className="position-absolute rounded-circle" style={{ width: '320px', height: '320px', top: '-90px', right: '-70px', background: 'radial-gradient(circle, rgba(232,62,140,0.32), transparent 70%)', filter: 'blur(20px)', zIndex: 0 }}></div>
+      <div className="position-absolute rounded-circle" style={{ width: '380px', height: '380px', bottom: '8%', left: '-120px', background: 'radial-gradient(circle, rgba(111,66,193,0.26), transparent 70%)', filter: 'blur(20px)', zIndex: 0 }}></div>
+      <style>{`
+        /* Fluid glass cards, scoped to this dashboard. Sizes are clamp() rather
+           than fixed so the radii and inner spacing scale with the viewport
+           instead of stepping at breakpoints. */
+        .mw-glass .card {
+          position: relative;
+          z-index: 1;
+          border-radius: clamp(0.9rem, 0.62rem + 0.85vw, 1.4rem) !important;
+          border: 1px solid rgba(255, 255, 255, 0.9) !important;
+          /* !important is required here: these cards carry Bootstrap utilities
+             such as .bg-white, which ship as !important and would otherwise
+             leave the card opaque white and hide the glass completely. */
+          background-color: rgba(255, 255, 255, 0.62) !important;
+          background-image: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.10) 55%, rgba(255,255,255,0) 100%);
+          backdrop-filter: blur(16px) saturate(150%);
+          -webkit-backdrop-filter: blur(16px) saturate(150%);
+          box-shadow: 0 18px 40px rgba(10, 37, 64, 0.16), 0 4px 12px rgba(10, 37, 64, 0.08);
+          transition: transform 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease;
+        }
+        /* The gloss: a hairline highlight along the top rounded edge. */
+        .mw-glass .card::before {
+          content: '';
+          position: absolute;
+          inset: 0 0 auto 0;
+          height: 1px;
+          border-radius: clamp(0.9rem, 0.62rem + 0.85vw, 1.4rem) clamp(0.9rem, 0.62rem + 0.85vw, 1.4rem) 0 0;
+          background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.95) 18%, rgba(255,255,255,0.95) 82%, transparent 100%);
+          pointer-events: none;
+        }
+        .mw-glass .card:hover {
+          transform: translateY(-3px);
+          background-color: rgba(255, 255, 255, 0.72) !important;
+          box-shadow: 0 26px 55px rgba(10, 37, 64, 0.22), 0 8px 18px rgba(10, 37, 64, 0.12);
+        }
+        /* Card headers carry .bg-white, so without this they stay opaque white
+           slabs sitting on top of a translucent body. */
+        .mw-glass .card-header,
+        .mw-glass .card-header.bg-white {
+          background: rgba(255, 255, 255, 0.34) !important;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
+        }
+        /* Fluid inner spacing, matched to the fluid radius. */
+        .mw-glass .card > .card-body {
+          padding: clamp(0.85rem, 0.62rem + 0.55vw, 1.25rem);
+        }
+        /* Keep focus rings visible on the sheen — these screens are used by
+           keyboard as much as by mouse. */
+        .mw-glass .card :focus-visible {
+          outline: 2px solid #0d6efd;
+          outline-offset: 2px;
+          border-radius: 0.35rem;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mw-glass .card { transition: none; }
+          .mw-glass .card:hover { transform: none; }
+        }
+        /* Print: the glass is meaningless on paper and the shadow wastes toner. */
+        @media print {
+          .mw-glass .card {
+            background: #fff !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+          }
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="rounded-4 p-4 mb-4 text-white" style={{
+      <div className="rounded-4 p-4 mb-4 text-white position-relative" style={{
         background: 'linear-gradient(135deg, #e83e8c 0%, #d63384 50%, #6f42c1 100%)',
+        zIndex: 1,
       }}>
         <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
@@ -408,12 +491,21 @@ export default function MidwifeDashboardPage() {
                     onChange={e => setLmpInput(e.target.value)} />
                 </div>
                 <div className="col-md-3">
+                  <label className="form-label small fw-semibold">Cycle length (days)</label>
+                  <input type="number" min="20" max="45" className="form-control" value={cycleLength}
+                    onChange={e => setCycleLength(e.target.value)} />
+                </div>
+                <div className="col-md-3">
                   <button className="btn btn-pink w-100" style={{ backgroundColor: '#e83e8c', color: '#fff' }}
                     onClick={handleEddCalc}>
                     <i className="bi bi-calculator me-1"></i>Calculate
                   </button>
                 </div>
                 <div className="col-md-3"></div>
+              </div>
+              <div className="form-text">
+                Naegele&apos;s rule assumes a 28-day cycle. A longer cycle ovulates later, so the due
+                date moves out by the difference.
               </div>
               {eddResult && (
                 <div className="mt-3 p-3 rounded-3" style={{ backgroundColor: '#f8f9fa' }}>
@@ -438,7 +530,7 @@ export default function MidwifeDashboardPage() {
                       style={{ backgroundColor: '#e83e8c' }}
                       disabled={!selectedPatient || saveAssessment.isPending}
                       title={selectedPatient ? 'File this EDD in the patient chart' : 'Select a patient first'}
-                      onClick={() => saveToChart({ kind: 'edd', lmp: lmpInput })}>
+                      onClick={() => saveToChart({ kind: 'edd', lmp: lmpInput, cycleLengthDays: Number(cycleLength) })}>
                       <i className="bi bi-folder-plus me-1"></i>
                       {saveAssessment.isPending ? 'Saving…' : 'Save EDD to chart'}
                     </button>
@@ -515,7 +607,20 @@ export default function MidwifeDashboardPage() {
                   </div>
                   <div className="flex-grow-1">
                     <div className="fw-bold" style={{ color: riskResult.color }}>{riskResult.label}</div>
-                    <div className="text-muted small">PARs Score: {riskResult.score} / 20+</div>
+                    <div className="text-muted small">
+                      PARs Score: {riskResult.score} of {riskResult.maxScore}
+                    </div>
+                    {/* Shows the score against the scale, so 5 of 27 does not look
+                        the same as 5 of 10. */}
+                    <div className="progress mt-1" style={{ height: '4px', maxWidth: '220px' }}>
+                      <div
+                        className="progress-bar"
+                        style={{
+                          width: `${Math.min(100, (riskResult.score / riskResult.maxScore) * 100)}%`,
+                          backgroundColor: riskResult.color,
+                        }}
+                      />
+                    </div>
                   </div>
                   <button className="btn btn-sm btn-outline-danger rounded-pill"
                     disabled={!selectedPatient || saveAssessment.isPending}
@@ -536,6 +641,30 @@ export default function MidwifeDashboardPage() {
                     <i className="bi bi-folder-plus me-1"></i>
                     {saveAssessment.isPending ? 'Saving…' : 'Save to chart'}
                   </button>
+                </div>
+              )}
+              {riskResult && riskResult.factors.length > 0 && (
+                /* Why the score is what it is. Without this the midwife sees a
+                   number with no attribution and cannot check it against the
+                   notes. */
+                <div className="mt-3 pt-3 border-top">
+                  <div className="text-muted small fw-semibold mb-2">Score breakdown</div>
+                  <ul className="list-unstyled mb-0 small">
+                    {riskResult.factors.map(f => (
+                      <li key={f.label} className="d-flex justify-content-between align-items-start gap-3 py-1">
+                        <span>
+                          {f.label}
+                          <span className="text-muted"> · {f.detail}</span>
+                        </span>
+                        <span className="badge rounded-pill text-bg-light">+{f.points}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {riskResult && riskResult.factors.length === 0 && (
+                <div className="mt-3 pt-3 border-top text-muted small">
+                  No risk factors recorded — every input is within normal limits.
                 </div>
               )}
             </div>
@@ -587,6 +716,19 @@ export default function MidwifeDashboardPage() {
                   <i className="bi bi-folder-plus me-1"></i>
                   {saveAssessment.isPending ? 'Saving…' : `Save APGAR (1min ${apgar1Total} / 5min ${apgar5Total})`}
                 </button>
+              </div>
+              {/* What to do next, based on the minute the score was taken. A
+                  5-minute score below 7 is the case that needs ongoing
+                  reassessment, and that is easy to miss once saved. */}
+              <div className="mt-2 small">
+                <div className="text-muted">
+                  <span className="fw-semibold">At 1 min:</span>{' '}
+                  {apgarGuidance(apgar1Total, 1)}
+                </div>
+                <div className="text-muted">
+                  <span className="fw-semibold">At 5 min:</span>{' '}
+                  {apgarGuidance(apgar5Total, 5)}
+                </div>
               </div>
             </div>
           </div>
