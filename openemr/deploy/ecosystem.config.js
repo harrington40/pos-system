@@ -18,6 +18,9 @@ module.exports = {
       },
       watch: false,
       autorestart: true,
+      // An app that dies immediately is treated as unstable, so a boot failure
+      // (e.g. dist mid-swap) cannot rack up hundreds of restarts.
+      min_uptime: '10s',
       max_restarts: 30,
       restart_delay: 4000,
       max_memory_restart: '512M',

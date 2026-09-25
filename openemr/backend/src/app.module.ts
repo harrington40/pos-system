@@ -54,7 +54,12 @@ import { NotificationsModule } from './notifications/notifications.module';
         database: config.get<string>('database.database'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
-        logging: process.env.NODE_ENV !== 'production',
+        // Explicit opt-in. Keyed off NODE_ENV, this silently switched ON whenever
+        // the variable went missing — which a deploy did by restarting pm2 with
+        // --update-env from a shell that had no NODE_ENV. TypeORM then logged
+        // every statement with its parameters, writing patient names, dates of
+        // birth and phone numbers into plaintext log files (78 MB of them).
+        logging: process.env.DB_LOGGING === 'true',
         extra: { charset: 'utf8mb4_unicode_ci' },
       }),
     }),

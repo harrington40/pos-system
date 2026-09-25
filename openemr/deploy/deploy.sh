@@ -116,13 +116,19 @@ deploy_one() {                        # $1=kind $2=tarball
     ok "archived → releases/openrx-${kind}-dist-${TS}.tar.gz"
   fi
 
+  # Stage the replacement next to its destination first, so the swap itself is a
+  # single rename. Previously the old dist was moved away and only then the new
+  # one moved in, leaving a window with no dist at all — any restart in that
+  # window died with "Cannot find module dist/main.js" and pm2 kept retrying.
+  run mv "$distdir" "$target/dist.incoming"
+
   run mkdir -p "$BACKUPS_DIR/$kind"
   if [[ -d "$target/dist" ]]; then
     run mv "$target/dist" "$BACKUPS_DIR/$kind/dist-${TS}"
     ok "previous $kind dist backed up → backups/$kind/dist-${TS}"
   fi
 
-  run mv "$distdir" "$target/dist"
+  run mv "$target/dist.incoming" "$target/dist"
   run rm -rf "$stage"
   if [[ "$DRY" -eq 0 && ! -f "$target/dist/$marker" ]]; then
     die "$kind deploy verification failed"
@@ -141,7 +147,11 @@ restart_backend() {
     run pm2 start "$APP_DIR/ecosystem.config.js" --only "$PM2_APP" >/dev/null
     ok "pm2: $PM2_APP recreated from ecosystem.config.js"
   elif pm2 describe "$PM2_APP" >/dev/null 2>&1; then
-    run pm2 restart "$PM2_APP" --update-env >/dev/null
+    # NOT --update-env: that replaces the process environment with this shell's,
+    # which over SSH has no NODE_ENV, silently discarding the `env` block from
+    # ecosystem.config.js. Dropping NODE_ENV is what turned per-query SQL logging
+    # (including patient parameters) back on after every deploy.
+    run pm2 restart "$PM2_APP" >/dev/null
     ok "pm2: $PM2_APP restarted"
   else
     run pm2 start "$APP_DIR/ecosystem.config.js" --only "$PM2_APP" >/dev/null
