@@ -164,7 +164,17 @@ export default function MidwifeDashboardPage() {
       nestClient.post(`/midwife/patients/${selectedPatient!.pid}/assessments`, body),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['midwife-assessments', selectedPatient?.pid] });
-      setSaveNote({ text: `Saved to chart — ${res?.data?.summary || 'recorded'}`, ok: true });
+      const saved = res?.data || {};
+      // The API refuses an identical assessment recorded moments ago, so say that
+      // rather than reporting a save that did not happen.
+      if (saved.duplicate) {
+        setSaveNote({
+          text: `Already on the chart — "${saved.summary}" was recorded a few minutes ago, so no duplicate was added.`,
+          ok: true,
+        });
+        return;
+      }
+      setSaveNote({ text: `Saved to chart — ${saved.summary || 'recorded'}`, ok: true });
     },
     onError: (err: any) => {
       setSaveNote({

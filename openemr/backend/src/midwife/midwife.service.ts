@@ -152,6 +152,29 @@ export class MidwifeService implements OnModuleInit {
       detail = { oneMinute: set1 ?? null, fiveMinute: set5 ?? null };
     }
 
+    // Guard against duplicate records — a double-clicked Save, or an impatient
+    // re-click, otherwise files the same assessment repeatedly. Matches the
+    // existing billing guard, widened a little because this is a clinical entry.
+    // Compared on the scalar columns rather than the JSON payload, so a re-sent
+    // request with the same inputs in a different key order still matches.
+    const duplicate = await this.dataSource.query(
+      `SELECT id, pid, kind, summary, score, level, apgar_1_total, apgar_5_total, recorded_at
+         FROM midwife_assessments
+        WHERE pid = ? AND kind = ? AND summary = ?
+          AND score <=> ? AND level <=> ?
+          AND apgar_1_total <=> ? AND apgar_5_total <=> ?
+          AND recorded_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+        ORDER BY id ASC LIMIT 1`,
+      [patient.pid, dto.kind, summary, score, level, apgar1, apgar5],
+    );
+    if (duplicate.length) {
+      this.logger.warn(
+        `Duplicate ${dto.kind} assessment skipped for pid=${patient.pid}: "${summary}" ` +
+          `already recorded as #${duplicate[0].id}`,
+      );
+      return { ...duplicate[0], duplicate: true };
+    }
+
     const result = await this.dataSource.query(
       `INSERT INTO midwife_assessments
         (pid, patient_id, kind, summary, score, level, apgar_1_total, apgar_5_total,
