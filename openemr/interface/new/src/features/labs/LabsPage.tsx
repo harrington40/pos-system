@@ -93,6 +93,49 @@ export function findTestData(instructions: string): typeof LAB_TESTS[string] | n
 
 export const LAB_UNITS = ['mg/dL', 'mmol/L', 'mEq/L', 'g/dL', 'g/L', 'U/L', 'IU/L', '%', 'x10³/µL', 'x10⁶/µL', 'fL', 'pg', 'ng/mL', 'µg/mL', 'mIU/L', 'µIU/mL', 'pg/mL', 'pmol/L', 'ng/dL', 'seconds', 'mm/hr', 'mmol/mol', 'CFU/mL', 'mg/L', 'cells/µL', 'Non-Reactive', 'Reactive', 'Negative', 'Positive', 'Not Detected', 'Detected', 'Normal', 'Abnormal'];
 
+// ── Catalog-driven result entry (mirrors LabResultFormPage) ────────────────
+const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+/** Normal value text, from the catalog's threshold columns. */
+function refText(t: any): string {
+  return (
+    t?.ref_text ||
+    (t?.ref_min != null && t?.ref_max != null
+      ? `${t.ref_min} - ${t.ref_max}`
+      : t?.ref_min != null
+        ? `≥ ${t.ref_min}`
+        : t?.ref_max != null
+          ? `≤ ${t.ref_max}`
+          : '—')
+  );
+}
+
+/** Flag a value against the catalog thresholds. */
+function computeFlag(t: any, value: string): string {
+  if (!value) return '';
+  if (t?.result_type === 'NUMERIC' && (t.ref_min != null || t.ref_max != null)) {
+    const num = Number(value);
+    if (isNaN(num)) return 'TEXT';
+    if (t.ref_min != null && num < Number(t.ref_min)) return 'LOW';
+    if (t.ref_max != null && num > Number(t.ref_max)) return 'HIGH';
+    return 'NORMAL';
+  }
+  if (t?.result_type === 'POSITIVE_NEGATIVE') {
+    const v = value.toLowerCase();
+    if (['negative', 'non-reactive', 'non reactive'].includes(v)) return 'NEGATIVE';
+    if (['positive', 'reactive'].includes(v)) return 'POSITIVE';
+  }
+  return '';
+}
+
+const flagBadge = (f: string) =>
+  f === 'LOW' ? 'bg-warning text-dark'
+  : f === 'HIGH' ? 'bg-danger'
+  : f === 'NORMAL' ? 'bg-success'
+  : f === 'POSITIVE' ? 'bg-danger'
+  : f === 'NEGATIVE' ? 'bg-success'
+  : 'bg-secondary';
+
 export default function LabsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -123,6 +166,22 @@ export default function LabsPage() {
     queryFn: async () => { const r = await nestClient.get(`/procedures/${selectedOrder}/results`); return r.data; },
     enabled: !!selectedOrder,
   });
+
+  // Lab catalog — drives the same catalog-based test/value dropdown as the
+  // result form, instead of the hard-coded test list.
+  const { data: catalog = [] } = useQuery({
+    queryKey: ['lab-catalog'],
+    queryFn: async () => { const r = await nestClient.get('/lab/catalog'); return r.data; },
+  });
+  const groupedCatalog = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const t of (catalog as any[])) {
+      const cat = t.category || t.sheet || 'Other';
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(t);
+    }
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+  }, [catalog]);
 
   // Add result (lab tech only)
   const addResult = useMutation({
@@ -540,73 +599,75 @@ export default function LabsPage() {
                 )}
 
                 {isLabTech && (() => {
-                  const selOrder = allOrders.find((o: any) => o.id === selectedOrder);
-                  const testName = selOrder?.instructions || '';
-                  const testData = Object.values(LAB_TESTS).find((t: any) => t.code === resultForm.result_code)
-                    || findTestData(testName);
-                  const resultKey = Object.keys(LAB_TESTS).find(k => LAB_TESTS[k].code === resultForm.result_code) || '';
-                  if (testData && resultForm.result_code !== testData.code) {
-                    setTimeout(() => setResultForm({
-                      result_code: testData.code,
-                      result_text: testData.name,
-                      result: '',
-                      units: testData.units[0] || '',
-                      range: testData.range,
-                    }), 0);
-                  }
+                  const picked = (catalog as any[]).find((t: any) => String(t.code || t.id) === String(resultForm.result_code));
                   return (
                   <div className="border-top pt-3">
-                    <small className="fw-bold text-muted text-uppercase">
-                      Enter Result {testName && `— ${testName}`}
-                    </small>
+                    <small className="fw-bold text-muted text-uppercase">Enter Result</small>
                     <div className="row g-2 mt-1">
-                      <div className="col-2">
-                        <label className="form-label small mb-0">Code</label>
-                        <div className="form-control form-control-sm bg-light fw-bold small">{resultForm.result_code || '—'}</div>
-                      </div>
-                      <div className="col-4">
+                      <div className="col-6">
                         <label className="form-label small mb-0">Test *</label>
-                        <select className="form-select form-select-sm" value={resultKey}
+                        <select className="form-select form-select-sm" value={resultForm.result_code}
                           onChange={e => {
-                            const picked = LAB_TESTS[e.target.value];
+                            const t = (catalog as any[]).find((c: any) => String(c.code || c.id) === e.target.value);
                             setResultForm({
-                              result_code: picked?.code || '',
-                              result_text: picked?.name || e.target.value,
+                              result_code: t ? String(t.code || '') : '',
+                              result_text: t?.name || '',
                               result: '',
-                              units: picked?.units?.[0] || '',
-                              range: picked?.range || '',
+                              units: t?.unit || '',
+                              range: t ? refText(t) : '',
                             });
                           }}>
                           <option value="">— Select Test —</option>
-                          {Object.keys(LAB_TESTS).sort().map(k => <option key={k} value={k}>{k}</option>)}
+                          {groupedCatalog.map(([cat, tests]) => (
+                            <optgroup key={cat} label={cat}>
+                              {tests.map((t: any) => (
+                                <option key={t.code || t.id} value={String(t.code || t.id)}>{t.name}</option>
+                              ))}
+                            </optgroup>
+                          ))}
                         </select>
                       </div>
-                      <div className="col-3">
+                      <div className="col-6">
                         <label className="form-label small mb-0">Value *</label>
-                        {testData ? (
+                        {picked?.result_type === 'POSITIVE_NEGATIVE' ? (
                           <select className="form-select form-select-sm" value={resultForm.result}
-                            onChange={e => setResultForm({...resultForm, result: e.target.value})}>
-                            <option value="">— Select —</option>
-                            {testData.values.map((v: string) => <option key={v} value={v}>{v}</option>)}
+                            onChange={e => setResultForm({ ...resultForm, result: e.target.value })}>
+                            <option value="">—</option>
+                            <option>Negative</option><option>Positive</option><option>Non-Reactive</option><option>Reactive</option>
+                          </select>
+                        ) : picked?.result_type === 'BLOOD_GROUP' ? (
+                          <select className="form-select form-select-sm" value={resultForm.result}
+                            onChange={e => setResultForm({ ...resultForm, result: e.target.value })}>
+                            <option value="">—</option>
+                            {BLOOD_GROUPS.map(g => <option key={g}>{g}</option>)}
+                          </select>
+                        ) : picked?.result_type === 'SELECT' && picked?.options ? (
+                          <select className="form-select form-select-sm" value={resultForm.result}
+                            onChange={e => setResultForm({ ...resultForm, result: e.target.value })}>
+                            <option value="">—</option>
+                            {String(picked.options).split(',').map(o => <option key={o}>{o.trim()}</option>)}
                           </select>
                         ) : (
-                          <input className="form-control form-control-sm" placeholder="Value" value={resultForm.result}
-                            onChange={e => setResultForm({...resultForm, result: e.target.value})} />
+                          <input className="form-control form-control-sm" type={picked?.result_type === 'NUMERIC' ? 'number' : 'text'} step="any"
+                            value={resultForm.result} onChange={e => setResultForm({ ...resultForm, result: e.target.value })} />
                         )}
                       </div>
                       <div className="col-3">
                         <label className="form-label small mb-0">Units</label>
-                        <select className="form-select form-select-sm" value={resultForm.units}
-                          onChange={e => setResultForm({...resultForm, units: e.target.value})}>
-                          <option value="">—</option>
-                          {(testData?.units || LAB_UNITS).map((u: string) => <option key={u} value={u}>{u}</option>)}
-                        </select>
+                        <input className="form-control form-control-sm" value={resultForm.units}
+                          onChange={e => setResultForm({ ...resultForm, units: e.target.value })} />
                       </div>
-                      <div className="col-2 mt-1">
-                        <label className="form-label small mb-0">Range</label>
+                      <div className="col-4">
+                        <label className="form-label small mb-0">Normal value</label>
                         <div className="form-control form-control-sm bg-light small" style={{fontSize:'0.65rem'}}>{resultForm.range || '—'}</div>
                       </div>
-                      <div className="col-4 mt-1">
+                      <div className="col-2">
+                        <label className="form-label small mb-0">Flag</label>
+                        <div className="form-control form-control-sm bg-light small">
+                          {picked ? <span className={`badge ${flagBadge(computeFlag(picked, resultForm.result))}`}>{computeFlag(picked, resultForm.result) || '—'}</span> : '—'}
+                        </div>
+                      </div>
+                      <div className="col-3">
                         <label className="form-label small mb-0">&nbsp;</label>
                         <button className="btn btn-success btn-sm w-100"
                           onClick={() => addResult.mutate(resultForm)}
