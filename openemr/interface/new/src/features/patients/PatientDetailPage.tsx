@@ -25,8 +25,10 @@ import nestClient from '../../api/nest-client';
 import { formatPatientName, formatPatientNameLastFirst } from '../../utils/patientName';
 import { formatDateOnly } from '../../utils/date';
 import Barcode from '../../components/shared/Barcode';
+import EmergencyTab from './tabs/EmergencyTab';
+import { emergencyBanner } from '../../utils/triage';
 
-type TabId = 'summary' | 'observations' | 'notes' | 'vitals' | 'allergies' | 'medications' | 'conditions' | 'immunizations' | 'demographics' | 'insurance' | 'maternity';
+type TabId = 'summary' | 'observations' | 'notes' | 'vitals' | 'allergies' | 'medications' | 'conditions' | 'immunizations' | 'demographics' | 'insurance' | 'maternity' | 'triage';
 
 const tabs: { id: TabId; label: string; icon: string; color: string }[] = [
   { id: 'summary', label: 'Overview', icon: 'bi-person-vcard', color: '#0d6efd' },
@@ -34,6 +36,7 @@ const tabs: { id: TabId; label: string; icon: string; color: string }[] = [
   { id: 'notes', label: 'Notes', icon: 'bi-pencil-square', color: '#e83e8c' },
   { id: 'vitals', label: 'Vitals', icon: 'bi-heart-pulse', color: '#dc3545' },
   { id: 'maternity', label: 'Maternity', icon: 'bi-clipboard-heart', color: '#d63384' },
+  { id: 'triage', label: 'Emergency', icon: 'bi-clipboard2-pulse', color: '#fd7e14' },
   { id: 'allergies', label: 'Allergies', icon: 'bi-exclamation-triangle', color: '#fd7e14' },
   { id: 'medications', label: 'Medications', icon: 'bi-capsule', color: '#6f42c1' },
   { id: 'conditions', label: 'Diagnoses', icon: 'bi-clipboard2-pulse', color: '#0dcaf0' },
@@ -132,6 +135,13 @@ export default function PatientDetailPage() {
 
   const initials = `${patient.fname?.[0] || ''}${patient.lname?.[0] || ''}`;
   const age = patient.dob ? Math.floor((Date.now() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+
+  // Emergency: surface the tab (and the in-department banner) only when the
+  // chart actually has triage history — an always-present empty tab is clutter.
+  const emergency = (patient as any)?.emergency as { total?: number } | undefined;
+  const hasEmergency = (emergency?.total || 0) > 0;
+  const banner = emergencyBanner(emergency);
+  const visibleTabs = tabs.filter((t) => (t.id === 'triage' ? hasEmergency : true));
 
   // ── Clinical safety algorithm (error prevention) ─────────────────────────
   const latestVital = (vitals || [])[0];
@@ -298,6 +308,26 @@ export default function PatientDetailPage() {
 
       <QuickAssign patientId={id!} currentProviderId={patient.provider != null ? String(patient.provider) : undefined} currentProviderName={patient.provider_name || patient.providerName} />
 
+      {/* Emergency banner: shown only while the patient is actually in the
+          department. Silence for past attendances — those live in the tab. */}
+      {banner && (
+        <div className="alert mb-3 d-flex flex-wrap align-items-center gap-2"
+          style={{ borderLeft: `8px solid ${banner.color}`, background: `${banner.color}18` }} role="status">
+          <i className="bi bi-heart-pulse-fill" style={{ color: banner.color, fontSize: '1.3rem' }}></i>
+          <div className="flex-grow-1">
+            <div className="fw-bold">{banner.headline}</div>
+            <div className="small text-muted">{banner.detail}</div>
+            <div className="small fw-semibold mt-1">{banner.action}</div>
+          </div>
+          <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => setActiveTab('triage')}>
+            <i className="bi bi-clock-history me-1"></i>Triage history
+          </button>
+          <button className="btn btn-sm btn-outline-danger rounded-pill" onClick={() => navigate('/emergency')}>
+            <i className="bi bi-box-arrow-up-right me-1"></i>Open the board
+          </button>
+        </div>
+      )}
+
       <div className="row g-3">
         <div className="col-lg-3">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px', overflow: 'hidden' }}>
@@ -305,7 +335,7 @@ export default function PatientDetailPage() {
               <h6 className="mb-0 fw-bold"><i className="bi bi-journal-medical me-2" style={{ color: activeColor }}></i>Medical Chart</h6>
             </div>
             <div className="list-group list-group-flush" style={{ boxShadow: `inset 0 0 0 2px ${activeColor}26` }}>
-              {tabs.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <button key={tab.id} className={`list-group-item list-group-item-action border-0 d-flex align-items-center gap-3 py-3 px-3 ${activeTab === tab.id ? 'active' : ''}`}
                   style={{
                     borderLeft: `4px solid ${activeTab === tab.id ? tab.color : 'transparent'}`,
@@ -335,6 +365,7 @@ export default function PatientDetailPage() {
               {activeTab === 'demographics' && <DemographicsTab patient={patient} />}
               {activeTab === 'vitals' && <VitalsTab vitals={vitals || []} patientId={String(patient.pid)} />}
               {activeTab === 'maternity' && <MaternityTab pid={String(patient.pid)} />}
+              {activeTab === 'triage' && <EmergencyTab pid={String(patient.pid)} />}
               {activeTab === 'allergies' && <AllergiesTab patientId={String(patient.pid)} allergies={allergies || []} enriched={enrichedAllergies || []} readOnly={isNurse} />}
               {activeTab === 'medications' && <MedicationsTab patientId={String(patient.pid)} medications={medications || []} allergies={allergies || []} conditions={conditions || []} readOnly={isNurse} />}
               {activeTab === 'conditions' && <ConditionsTab patientId={String(patient.pid)} conditions={conditions || []} readOnly={isNurse} />}

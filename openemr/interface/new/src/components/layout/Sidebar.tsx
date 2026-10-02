@@ -94,7 +94,7 @@ const menuSections: MenuSection[] = [
     ],
   },
   {
-    label: 'Emergency', icon: 'bi-activity',
+    label: 'Emergency', icon: 'bi-heart-pulse-fill',
     roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk'],
     children: [
       { to: '/emergency', label: 'Triage Board', icon: 'bi-clipboard2-pulse', roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk'] },
