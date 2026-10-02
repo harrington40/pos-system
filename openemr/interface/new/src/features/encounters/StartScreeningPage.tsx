@@ -169,9 +169,13 @@ const LAB_ORDER_CATEGORIES: { title: string; groups: { subtitle?: string; tests:
   {
     title: 'URINALYSIS',
     groups: [
-      { subtitle: 'MACROSCOPIC EXAMINATION', tests: ['Color', 'Character'] },
-      { subtitle: 'CHEMISTRY EXAMINATION', tests: ['Urobilinogen', 'Bilirubin', 'Ketone', 'Glucose', 'Protein', 'Blood', 'Nitrite', 'pH', 'S.G.', 'Leukocytes'] },
-      { subtitle: 'MICROSCOPIC EXAMINATION', tests: ['WBC', 'RBC', 'Ep. Cells', 'Casts', 'Crystals', 'Parasite', 'Yeasts', 'Bacteria', 'Others'] },
+      {
+        tests: [
+          'Color', 'Character',
+          'Urobilinogen', 'Bilirubin', 'Ketone', 'Glucose', 'Protein', 'Blood', 'Nitrite', 'pH', 'S.G.', 'Leukocytes',
+          'WBC', 'RBC', 'Ep. Cells', 'Casts', 'Crystals', 'Parasite', 'Yeasts', 'Bacteria', 'Others',
+        ],
+      },
     ],
   },
   {
@@ -712,6 +716,18 @@ export default function StartScreeningPage() {
   };
 
   const removeLab = (name: string) => setSelectedLabs(prev => prev.filter(l => l.testName !== name));
+
+  /** Add every named test that is not already selected (used by "Select all"). */
+  const selectLabs = (names: string[]) =>
+    setSelectedLabs(prev => {
+      const have = new Set(prev.map(l => l.testName));
+      const add = names
+        .filter(n => !have.has(n))
+        .map(n => ({ testName: n, priority: 'routine' as const, notes: '' }));
+      return add.length ? [...prev, ...add] : prev;
+    });
+  const clearLabs = (names: string[]) =>
+    setSelectedLabs(prev => prev.filter(l => !names.includes(l.testName)));
 
   // ── Med helpers ─────────────────────────────────────────────
 
@@ -1547,6 +1563,18 @@ export default function StartScreeningPage() {
                           </button>
                           {open && (
                             <div className="p-2 pt-0">
+                              {cat.title === 'URINALYSIS' && (
+                                <div className="d-flex align-items-center gap-1 mb-1">
+                                  <button type="button" className="btn btn-sm btn-outline-success rounded-pill"
+                                    onClick={() => selectLabs(cat.groups.flatMap(g => g.tests))}>
+                                    <i className="bi bi-check2-all me-1"></i>Select all urinalysis
+                                  </button>
+                                  <button type="button" className="btn btn-sm btn-outline-secondary rounded-pill"
+                                    onClick={() => clearLabs(cat.groups.flatMap(g => g.tests))}>
+                                    Clear
+                                  </button>
+                                </div>
+                              )}
                               {visibleGroups.map((g, gi) => (
                                 <div key={gi}>
                                   {g.subtitle && <div className="small fw-semibold text-muted text-uppercase mt-2 mb-1" style={{ fontSize: '0.65rem' }}>{g.subtitle}</div>}
