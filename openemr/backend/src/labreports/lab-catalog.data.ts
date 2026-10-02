@@ -105,6 +105,27 @@ const URINE_MICRO = 'URINALYSIS — MICROSCOPIC EXAMINATION';
 const STOOL_MACRO = 'PARASITOLOGY STOOL (WET MOUNT) — MACROSCOPIC EXAMINATION';
 const STOOL_MICRO = 'PARASITOLOGY STOOL (WET MOUNT) — MICROSCOPIC EXAMINATION';
 
+/**
+ * Tests retired from the CBC / haematology request list.
+ *
+ * Applied as a POST-BUILD filter on `LAB_CATALOG_SEED` (not by deleting the
+ * `t(...)` rows below) on purpose: `code` is positional (MJ-nnn), so removing a
+ * row from the middle of the array would renumber every later test and silently
+ * repoint each SHEET_MEMBERS entry to the wrong test. Filtering after the array
+ * is built keeps every surviving code exactly where it was.
+ *
+ * The service also deletes the matching MJ-nnn rows from the database on boot
+ * (it drops `MJ-nnn` codes that are no longer in the seed), so the retired tests
+ * disappear from the ordering menu, /labs, and the printed result sheets.
+ */
+const RETIRED_LAB_TEST_NAMES = new Set<string>([
+  'Malaria Smear',
+  'Sickle Cells Identification (rapid)',
+  'ABO& Rh) Blood Group',
+  'ESR',
+  'Malaria RDT',
+]);
+
 export const LAB_CATALOG_SEED: CatalogSeed[] = [
   // ============================================================
   // HAEMATOLOGY/ IMMUNO-HAEMATOLOGY
@@ -354,7 +375,7 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
 
   // URINE CHEMISTRY — the form lists SEDIMENT under VISUAL ANALYSIS
   t('Sediment', URINE_MACRO, 'TEXT'),
-];
+].filter((t) => !RETIRED_LAB_TEST_NAMES.has(t.name));
 
 export const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -407,13 +428,9 @@ const SHEET_MEMBERS: Record<ResultSheet, string[]> = {
     'MJ-001', // HGB
     'MJ-031', // FBS  (also on Blood Biochemistry)
     'MJ-032', // RBS  (also on Blood Biochemistry)
-    'MJ-004', // M/S
-    'MJ-006', // Blood / Group
-    'MJ-005', // Sickle Cell
     'MJ-152', // Skin Test
     'MJ-153', // Stool Test
     'MJ-036', // Total Cholesterol (also on Blood Biochemistry)
-    'MJ-008', // RDT
     'MJ-154', // MTT
     'MJ-003', // Count WBC (also on Complete Hemogram)
   ],
