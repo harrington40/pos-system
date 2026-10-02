@@ -50,10 +50,7 @@ export const LAB_TREE: LabSection[] = [
         ],
       },
       {
-        items: [
-          { code: 'MJ-001', label: 'HGB / Hemoglobin' },
-          { code: 'MJ-005', label: 'Sickle Cell' },
-        ],
+        items: [{ code: 'MJ-005', label: 'Sickle Cell' }],
       },
     ],
   },
