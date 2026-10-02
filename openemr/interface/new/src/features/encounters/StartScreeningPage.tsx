@@ -157,17 +157,17 @@ const DX_PHRASES = [
 const LAB_ORDER_CATEGORIES: { title: string; groups: { subtitle?: string; tests: string[] }[] }[] = [
   {
     title: 'HAEMATOLOGY/ IMMUNO-HAEMATOLOGY',
-    groups: [{ tests: ['HB Hemoglobin', 'CBC Complete blood count', 'WBC white Blood Cells'] }],
+    groups: [{ tests: ['HB Hemoglobin', 'CBC Complete blood count', 'WBC Count'] }],
   },
   {
     title: 'IMMUNOLOGY & SEROLOGY',
-    groups: [{ tests: ['Widal panel', 'Salmonella typhi O Ag', 'Salmonella typhi H Ag', 'Salmonella typhi AO Ag', 'Salmonella typhi BO Ag', 'Salmonella typhi CH Ag', 'Salmonella typhi AH Ag', 'Syphilis', 'Chlamydia (Ag) Swab', 'Filariasis (IgG+IgM)', 'Helicobacter pylori (IgG+IgM)', 'Hepatitis B Virus (screening)', 'HBsAg', 'HBsAb', 'HBcAb', 'HBeAb', 'HBeAg', 'Hepatitis C Virus (IgM+IgG)', 'Human Immunodeficiency Virus (HIV1+2)', 'Determine', 'SD Bioline', 'Uni-Gold'] }],
+    groups: [{ tests: ['Widal panel', 'Widal TO', 'Widal TH', 'Salmonella typhi AO Ag', 'Salmonella typhi BO Ag', 'Salmonella typhi CH Ag', 'Salmonella typhi AH Ag', 'Syphilis', 'Chlamydia (Ag) Swab', 'Filariasis (IgG+IgM)', 'H. Pylori', 'Hepatitis B', 'HBsAg', 'HBsAb', 'HBcAb', 'HBeAb', 'HBeAg', 'Hepatitis C', 'Human Immunodeficiency Virus (HIV1+2)', 'Determine', 'SD Bioline', 'Uni-Gold'] }],
   },
   {
     title: 'BIOCHEMISTRY',
     groups: [
       { subtitle: 'GLUCOSE METABOLISM/DIABETES', tests: ['Fasting Blood Glucose', 'Random Blood Glucose', 'HbA1c', 'OGTT', 'LH'] },
-      { subtitle: 'LIPID METABOLISM PANEL', tests: ['Cholesterol', 'Triglycerides', 'HDL Cholesterol', 'LDL Cholesterol'] },
+      { subtitle: 'LIPID METABOLISM PANEL', tests: ['Total Cholesterol', 'Triglycerides', 'HDL Cholesterol', 'LDL Cholesterol'] },
       { subtitle: 'HEART DISEASE PANEL', tests: ['CK & CK-MB', 'Myoglobin', 'Pro-BNP', 'CTNI', 'CTnT'] },
       { subtitle: 'LIVER FUNCTION TESTS', tests: ['SGOT/AST', 'SGPT/ALT', 'ALP', 'Bilirubin (Total & Direct)', 'Calcium', 'Total Serum protein/Albumin'] },
       { subtitle: 'KIDNEY FUNCTION TEST', tests: ['Creatinine – Creatinine Kinase', 'Urea', 'BUN', 'Uric Acid'] },

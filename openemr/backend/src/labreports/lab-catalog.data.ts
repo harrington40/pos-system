@@ -29,7 +29,7 @@ export interface CatalogSeed {
   refMin?: number | null;
   refMax?: number | null;
   refText?: string;
-  resultType: 'NUMERIC' | 'TEXT' | 'POSITIVE_NEGATIVE' | 'SELECT' | 'BLOOD_GROUP';
+  resultType: 'NUMERIC' | 'TEXT' | 'POSITIVE_NEGATIVE' | 'SELECT' | 'BLOOD_GROUP' | 'TITER';
   options?: string;
   displayOrder: number;
   /**
@@ -106,7 +106,7 @@ const STOOL_MACRO = 'PARASITOLOGY STOOL (WET MOUNT) — MACROSCOPIC EXAMINATION'
 const STOOL_MICRO = 'PARASITOLOGY STOOL (WET MOUNT) — MICROSCOPIC EXAMINATION';
 
 /**
- * Tests retired from the CBC / haematology request list.
+ * Tests retired from the catalog entirely.
  *
  * Applied as a POST-BUILD filter on `LAB_CATALOG_SEED` (not by deleting the
  * `t(...)` rows below) on purpose: `code` is positional (MJ-nnn), so removing a
@@ -115,15 +115,16 @@ const STOOL_MICRO = 'PARASITOLOGY STOOL (WET MOUNT) — MICROSCOPIC EXAMINATION'
  * is built keeps every surviving code exactly where it was.
  *
  * The service also deletes the matching MJ-nnn rows from the database on boot
- * (it drops `MJ-nnn` codes that are no longer in the seed), so the retired tests
- * disappear from the ordering menu, /labs, and the printed result sheets.
+ * (it drops `MJ-nnn` codes that are no longer in the seed), so a retired test
+ * disappears from the ordering menu, /labs, and the printed result sheets.
+ *
+ * Only ESR remains retired. The other four (M/S, Sickle Cell, Blood / Group,
+ * RDT) were briefly retired and are restored here so they print on the
+ * BIO-MEDICAL ANALYSIS LABORATORY serology sheet; they are kept out of the CBC
+ * ordering group on the Start Screening request form instead.
  */
 const RETIRED_LAB_TEST_NAMES = new Set<string>([
-  'Malaria Smear',
-  'Sickle Cells Identification (rapid)',
-  'ABO& Rh) Blood Group',
   'ESR',
-  'Malaria RDT',
 ]);
 
 export const LAB_CATALOG_SEED: CatalogSeed[] = [
@@ -132,9 +133,9 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   // ============================================================
   t('HB Hemoglobin', HAEMATOLOGY, 'NUMERIC', 'g/dl', '12.0 – 18.0', 12, 18),
   t('CBC Complete blood count', HAEMATOLOGY, 'TEXT'),
-  t('WBC white Blood Cells', HAEMATOLOGY, 'NUMERIC', 'x10^9/l', '4.0 – 10', 4, 10),
+  t('WBC Count', HAEMATOLOGY, 'NUMERIC', 'x10^9/l', '4.0 – 10', 4, 10),
   t('Malaria Smear', HAEMATOLOGY, 'TEXT', undefined, 'Negative'),
-  t('Sickle Cells Identification (rapid)', HAEMATOLOGY, 'TEXT', undefined, 'Negative'),
+  t('Sickle Cells Identification (rapid)', HAEMATOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
   t('ABO& Rh) Blood Group', HAEMATOLOGY, 'BLOOD_GROUP'),
   t('ESR', HAEMATOLOGY, 'NUMERIC', 'mm/hr'),
   t('Malaria RDT', HAEMATOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
@@ -143,8 +144,8 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   // IMMUNOLOGY & SEROLOGY
   // ============================================================
   t('Widal panel', IMMUNOLOGY, 'TEXT'),
-  t('Salmonella typhi O Ag', IMMUNOLOGY, 'TEXT', undefined, '1/100 Negative'),
-  t('Salmonella typhi H Ag', IMMUNOLOGY, 'TEXT', undefined, '1/100 Negative'),
+  t('Widal TO', IMMUNOLOGY, 'TITER', undefined, '1/100 Negative'),
+  t('Widal TH', IMMUNOLOGY, 'TITER', undefined, '1/100 Negative'),
   t('Salmonella typhi AO Ag', IMMUNOLOGY, 'TEXT'),
   t('Salmonella typhi BO Ag', IMMUNOLOGY, 'TEXT'),
   t('Salmonella typhi CH Ag', IMMUNOLOGY, 'TEXT'),
@@ -152,14 +153,14 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('Syphilis', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
   t('Chlamydia (Ag) Swab', IMMUNOLOGY, 'TEXT'),
   t('Filariasis (IgG+IgM)', IMMUNOLOGY, 'TEXT'),
-  t('Helicobacter pylori (IgG+IgM)', IMMUNOLOGY, 'TEXT', undefined, 'Negative'),
-  t('Hepatitis B Virus (screening)', IMMUNOLOGY, 'TEXT', undefined, 'Negative'),
+  t('H. Pylori', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
+  t('Hepatitis B', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
   t('HBsAg', IMMUNOLOGY, 'TEXT'),
   t('HBsAb', IMMUNOLOGY, 'TEXT'),
   t('HBcAb', IMMUNOLOGY, 'TEXT'),
   t('HBeAb', IMMUNOLOGY, 'TEXT'),
   t('HBeAg', IMMUNOLOGY, 'TEXT'),
-  t('Hepatitis C Virus (IgM+IgG)', IMMUNOLOGY, 'TEXT', undefined, 'Negative'),
+  t('Hepatitis C', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
   t('Human Immunodeficiency Virus (HIV1+2)', IMMUNOLOGY, 'TEXT'),
   t('Determine', IMMUNOLOGY, 'TEXT'),
   t('SD Bioline', IMMUNOLOGY, 'TEXT'),
@@ -175,7 +176,7 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('LH', BIO_GLUCOSE, 'TEXT'),
 
   // BIOCHEMISTRY — LIPID METABOLISM PANEL
-  t('Cholesterol', BIO_LIPID, 'NUMERIC', 'mg/dl', '130 – 200', 130, 200),
+  t('Total Cholesterol', BIO_LIPID, 'NUMERIC', 'mg/dl', '130 – 200', 130, 200),
   t('Triglycerides', BIO_LIPID, 'NUMERIC', 'mg/dl', '60 – 170', 60, 170),
   t('HDL Cholesterol', BIO_LIPID, 'NUMERIC', 'mg/dl', '40 – 60', 40, 60),
   // The form prints a bare "100mg/dl"; read as a ceiling so a high LDL flags.
@@ -342,7 +343,7 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('Phosphorus', BIO_ELECTRO, 'NUMERIC', 'mg/dl', '3.0 – 4.5', 3.0, 4.5),
 
   // COMPLETE HEMOGRAM
-  // `WBC Count (giga/1)` 4 – 10 is covered by 'WBC white Blood Cells' above.
+  // `WBC Count (giga/1)` 4 – 10 is covered by 'WBC Count' above.
   t('LYM (%)', HAEMATOLOGY, 'NUMERIC', '%', '20 – 40', 20, 40),
   t('Mid (%)', HAEMATOLOGY, 'NUMERIC', '%', '0 – 8', 0, 8),
   t('GR (%)', HAEMATOLOGY, 'NUMERIC', '%', '50 – 70', 50, 70),
@@ -370,7 +371,7 @@ export const LAB_CATALOG_SEED: CatalogSeed[] = [
   t('Spot Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
   t('Cold Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
   t('Skin Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
-  t('Stool Test', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
+  t('Stool Test', IMMUNOLOGY, 'TEXT', undefined, 'Negative'),
   t('MTT', IMMUNOLOGY, 'POSITIVE_NEGATIVE', undefined, 'Negative'),
 
   // URINE CHEMISTRY — the form lists SEDIMENT under VISUAL ANALYSIS
@@ -428,9 +429,13 @@ const SHEET_MEMBERS: Record<ResultSheet, string[]> = {
     'MJ-001', // HGB
     'MJ-031', // FBS  (also on Blood Biochemistry)
     'MJ-032', // RBS  (also on Blood Biochemistry)
+    'MJ-004', // M/S
+    'MJ-006', // Blood / Group
+    'MJ-005', // Sickle Cell
     'MJ-152', // Skin Test
     'MJ-153', // Stool Test
     'MJ-036', // Total Cholesterol (also on Blood Biochemistry)
+    'MJ-008', // RDT
     'MJ-154', // MTT
     'MJ-003', // Count WBC (also on Complete Hemogram)
   ],
