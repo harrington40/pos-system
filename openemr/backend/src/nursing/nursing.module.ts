@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { NursingController } from './nursing.controller';
 import { NursingService } from './nursing.service';
 import { SmartRoutingService } from './smart-routing.service';
+import { RnWorkbenchService } from './rn-workbench.service';
 import { MedicationAdministrationModule } from '../medication-administration/medication-administration.module';
 
 @Module({
@@ -9,7 +10,7 @@ import { MedicationAdministrationModule } from '../medication-administration/med
     // that service directly rather than re-implementing the MAR queries.
     imports: [MedicationAdministrationModule],
     controllers: [NursingController],
-    providers: [NursingService, SmartRoutingService],
+    providers: [NursingService, SmartRoutingService, RnWorkbenchService],
     exports: [SmartRoutingService],
 })
 export class NursingModule {}

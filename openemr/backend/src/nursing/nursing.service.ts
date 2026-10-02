@@ -10,6 +10,7 @@ import { DataSource } from 'typeorm';
 import { SmartRoutingService } from './smart-routing.service';
 import type { RoutingDecision, RoutingVitals } from './smart-routing.service';
 import { MedicationAdministrationService } from '../medication-administration/medication-administration.service';
+import { RnWorkbenchService } from './rn-workbench.service';
 
 export interface NoteAuthor {
     id?: number;
@@ -106,6 +107,7 @@ export class NursingService implements OnModuleInit {
         @InjectDataSource() private readonly dataSource: DataSource,
         private readonly routing: SmartRoutingService,
         private readonly mar: MedicationAdministrationService,
+        private readonly workbench: RnWorkbenchService,
     ) {}
 
     async onModuleInit(): Promise<void> {
@@ -300,6 +302,19 @@ export class NursingService implements OnModuleInit {
             );
         }
 
+        // Safety & workflow board: observations due, deterioration, sepsis
+        // screen, code/isolation flags, tasks and workload. Also resilient.
+        let workbench: Awaited<
+            ReturnType<RnWorkbenchService['getWorkbench']>
+        > | null = null;
+        try {
+            workbench = await this.workbench.getWorkbench(nurseId, patients);
+        } catch (err) {
+            this.logger.warn(
+                `RN workbench unavailable: ${(err as Error).message}`,
+            );
+        }
+
         return {
             nurse,
             patients,
@@ -307,6 +322,7 @@ export class NursingService implements OnModuleInit {
             sharedNotes,
             unreadCount,
             medicationAdministration,
+            workbench,
         };
     }
 

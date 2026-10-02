@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { formatDateTime } from '../../utils/date';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
@@ -9,6 +9,17 @@ import {
   ackMedicationAlert,
   hospitalizePatient,
 } from '../../api/endpoints/medicationAdministration';
+import {
+  getHandover,
+  getIO,
+  addIO,
+  getSafety,
+  saveSafety,
+  getFlags,
+  setFlags,
+  escalate,
+  completeTask,
+} from '../../api/endpoints/rnWorkbench';
 import {
   assessPatient,
   computeNEWS2,
@@ -140,7 +151,7 @@ export default function NurseRNDashboardPage() {
   // Delivered in the same /nurse/dashboard payload the ward view already polls.
   const mar: any = nurseData?.medicationAdministration;
   const [giveOrder, setGiveOrder] = useState<any>(null);
-  const [giveForm, setGiveForm] = useState({ overrideReason: '', witnessBy: '', notes: '' });
+  const [giveForm, setGiveForm] = useState({ overrideReason: '', witnessBy: '', notes: '', patientBarcode: '', drugBarcode: '' });
   const [giveIssues, setGiveIssues] = useState<any[]>([]);
 
   const giveMed = useMutation({
@@ -150,11 +161,13 @@ export default function NurseRNDashboardPage() {
         overrideReason: giveForm.overrideReason.trim() || undefined,
         witnessBy: giveForm.witnessBy ? Number(giveForm.witnessBy) : undefined,
         notes: giveForm.notes.trim() || undefined,
+        patientBarcode: giveForm.patientBarcode.trim() || undefined,
+        drugBarcode: giveForm.drugBarcode.trim() || undefined,
       }),
     onSuccess: () => {
       setGiveOrder(null);
       setGiveIssues([]);
-      setGiveForm({ overrideReason: '', witnessBy: '', notes: '' });
+      setGiveForm({ overrideReason: '', witnessBy: '', notes: '', patientBarcode: '', drugBarcode: '' });
       invalidate();
     },
     onError: (e: any) => {
@@ -177,10 +190,36 @@ export default function NurseRNDashboardPage() {
     onSuccess: () => invalidate(),
   });
 
+  // ── Safety & workflow workbench ────────────────────────────────────────
+  const wb: any = nurseData?.workbench;
+  const [ioForm, setIoForm] = useState({ kind: 'intake', category: '', volumeMl: '', note: '' });
+  const [escalateReason, setEscalateReason] = useState('');
+  const [handover, setHandover] = useState<any>(null);
+  const [fallForm, setFallForm] = useState<any>({ historyOfFalling: false, secondaryDiagnosis: false, ambulatoryAid: 0, ivLine: false, gait: 0, impairedJudgement: false });
+  const [bradenForm, setBradenForm] = useState<any>({ sensoryPerception: 4, moisture: 4, activity: 4, mobility: 4, nutrition: 4, frictionShear: 4 });
+  const [flagsForm, setFlagsForm] = useState({ codeStatus: '', isolation: '' });
+
+  const patientSafety = useQuery({ queryKey: ['safety', pid], enabled: !!pid, queryFn: async () => getSafety(pid as any) });
+  const patientIO = useQuery({ queryKey: ['io', pid], enabled: !!pid, queryFn: async () => getIO(pid as any) });
+  const patientFlags = useQuery({ queryKey: ['flags', pid], enabled: !!pid, queryFn: async () => getFlags(pid as any) });
+
+  useEffect(() => {
+    const f = patientFlags.data;
+    setFlagsForm({ codeStatus: f?.code_status || '', isolation: f?.isolation || '' });
+  }, [patientFlags.data]);
+
+  const doneTask = useMutation({ mutationFn: (id: number) => completeTask(id), onSuccess: () => invalidate() });
+  const escalatePt = useMutation({ mutationFn: (reason: string) => escalate(pid as any, reason), onSuccess: () => { setEscalateReason(''); invalidate(); } });
+  const addIo = useMutation({ mutationFn: (d: any) => addIO(pid as any, d), onSuccess: () => { setIoForm({ kind: 'intake', category: '', volumeMl: '', note: '' }); qc.invalidateQueries({ queryKey: ['io', pid] }); } });
+  const saveFall = useMutation({ mutationFn: (d: any) => saveSafety(pid as any, 'fall', d), onSuccess: () => qc.invalidateQueries({ queryKey: ['safety', pid] }) });
+  const saveBraden = useMutation({ mutationFn: (d: any) => saveSafety(pid as any, 'braden', d), onSuccess: () => qc.invalidateQueries({ queryKey: ['safety', pid] }) });
+  const loadHandover = useMutation({ mutationFn: () => getHandover(pid as any), onSuccess: (h: any) => setHandover(h) });
+  const saveFlags = useMutation({ mutationFn: (d: any) => setFlags(pid as any, d), onSuccess: () => qc.invalidateQueries({ queryKey: ['flags', pid] }) });
+
   const openGive = (o: any) => {
     setGiveOrder(o);
     setGiveIssues([]);
-    setGiveForm({ overrideReason: '', witnessBy: '', notes: '' });
+    setGiveForm({ overrideReason: '', witnessBy: '', notes: '', patientBarcode: '', drugBarcode: '' });
   };
 
   const statusBadge = (s: string) =>
@@ -339,6 +378,73 @@ export default function NurseRNDashboardPage() {
         </div>
       </div>
 
+      {/* Safety & workflow board */}
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+        <div className="card-header bg-white py-2 d-flex align-items-center justify-content-between">
+          <h6 className="mb-0 fw-bold small"><i className="bi bi-shield-check me-1"></i>Safety &amp; Workflow</h6>
+          <span className="badge bg-light text-dark border small">{wb?.tasks?.length || 0} open task(s)</span>
+        </div>
+        <div className="card-body">
+          {!wb ? (
+            <div className="text-center text-muted py-3 small">No workbench data.</div>
+          ) : (
+            <div className="row g-3">
+              <div className="col-md-4">
+                <h6 className="fw-bold small text-muted text-uppercase mb-2">My tasks</h6>
+                {(!wb.tasks || wb.tasks.length === 0) ? (
+                  <div className="text-muted small">No open tasks.</div>
+                ) : (
+                  <div className="list-group list-group-flush" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                    {wb.tasks.map((t: any) => (
+                      <div className="list-group-item px-0 d-flex justify-content-between align-items-start gap-2" key={t.id}>
+                        <div>
+                          <span className={`badge me-1 ${t.kind === 'escalation' ? 'bg-danger' : 'bg-secondary'}`}>{t.kind}</span>
+                          <span className="small">{t.title}</span>
+                          {t.row?.detail && <div className="text-muted" style={{ fontSize: '0.72rem' }}>{t.row.detail}</div>}
+                        </div>
+                        <button className="btn btn-sm btn-outline-success rounded-pill py-0" onClick={() => doneTask.mutate(t.id)}>Done</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="col-md-4">
+                <h6 className="fw-bold small text-muted text-uppercase mb-2">Signals</h6>
+                <div className="small mb-1">
+                  <span className="badge bg-warning text-dark me-1">obs</span>{wb.vitalsDue?.length || 0} due/overdue
+                  <span className="badge bg-danger ms-2 me-1">NEWS2</span>{wb.deterioration?.length || 0} worsening
+                  <span className="badge bg-danger ms-2 me-1">sepsis</span>{wb.sepsis?.length || 0} screen positive
+                </div>
+                <div className="list-group list-group-flush" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {[
+                    ...(wb.deterioration || []).map((d: any) => ({ ...d, label: 'NEWS2 ↑' })),
+                    ...(wb.sepsis || []).map((s: any) => ({ ...s, label: 'Sepsis' })),
+                    ...(wb.vitalsDue || []).map((v: any) => ({ ...v, label: 'Obs' })),
+                  ].slice(0, 12).map((x: any, i: number) => (
+                    <div className="list-group-item px-0 py-1" key={i} style={{ fontSize: '0.75rem' }}>
+                      <span className="fw-semibold">{x.label}</span> {x.patient_name}
+                      {x.room ? ` · Rm ${x.room}` : ''}
+                      {x.flags?.length ? <span className="text-muted"> — {x.flags.join(', ')}</span> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="col-md-4">
+                <h6 className="fw-bold small text-muted text-uppercase mb-2">Workload</h6>
+                <table className="table table-sm mb-0 small">
+                  <thead><tr><th>RN</th><th>Pts</th><th>Tasks</th></tr></thead>
+                  <tbody>
+                    {(wb.workload || []).map((w: any) => (
+                      <tr key={w.id}><td>{w.name}</td><td>{w.patients}</td><td>{w.tasks}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="row g-3">
         {/* Patient list */}
         <div className="col-md-4">
@@ -402,6 +508,7 @@ export default function NurseRNDashboardPage() {
                       ['meds', 'Medications', 'bi-capsule'],
                       ['plan', 'Care Plan', 'bi-clipboard-check'],
                       ['notes', 'Notes', 'bi-journal-text'],
+                      ['safety', 'Safety', 'bi-shield-check'],
                     ].map(([id, label, icon]) => (
                       <button key={id} className={`btn btn-sm rounded-pill ${tab === id ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setTab(id)}>
                         <i className={`bi ${icon} me-1`}></i>{label}
@@ -530,6 +637,101 @@ export default function NurseRNDashboardPage() {
                   </div>
                 )}
 
+                {/* Safety & workflow */}
+                {tab === 'safety' && (
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Code status &amp; isolation</h6></div>
+                        <div className="card-body">
+                          <label className="form-label small mb-1">Code status</label>
+                          <input className="form-control form-control-sm mb-2" value={flagsForm.codeStatus} onChange={e => setFlagsForm({ ...flagsForm, codeStatus: e.target.value })} placeholder="Full / DNAR / …" />
+                          <label className="form-label small mb-1">Isolation</label>
+                          <input className="form-control form-control-sm mb-2" value={flagsForm.isolation} onChange={e => setFlagsForm({ ...flagsForm, isolation: e.target.value })} placeholder="None / contact / droplet…" />
+                          <button className="btn btn-sm btn-primary rounded-pill" onClick={() => saveFlags.mutate(flagsForm)}>Save flags</button>
+                          <div className="small mt-2">
+                            <span className="badge bg-secondary me-1">Fall</span>{patientSafety.data?.fall ? `${patientSafety.data.fall.level} (${patientSafety.data.fall.score})` : 'not assessed'}
+                            <span className="badge bg-secondary ms-2 me-1">Braden</span>{patientSafety.data?.braden ? `${patientSafety.data.braden.level} (${patientSafety.data.braden.score})` : 'not assessed'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Risk assessments</h6></div>
+                        <div className="card-body small">
+                          <div className="fw-semibold mb-1">Fall risk (Morse)</div>
+                          <div className="d-flex flex-wrap gap-3 mb-2">
+                            <label className="form-check"><input className="form-check-input" type="checkbox" checked={fallForm.historyOfFalling} onChange={e => setFallForm({ ...fallForm, historyOfFalling: e.target.checked })} /><span className="form-check-label">Fell before</span></label>
+                            <label className="form-check"><input className="form-check-input" type="checkbox" checked={fallForm.ivLine} onChange={e => setFallForm({ ...fallForm, ivLine: e.target.checked })} /><span className="form-check-label">IV line</span></label>
+                            <label className="form-check"><input className="form-check-input" type="checkbox" checked={fallForm.impairedJudgement} onChange={e => setFallForm({ ...fallForm, impairedJudgement: e.target.checked })} /><span className="form-check-label">Impaired judgement</span></label>
+                          </div>
+                          <div className="d-flex gap-1 mb-3">
+                            <select className="form-select form-select-sm" value={fallForm.gait} onChange={e => setFallForm({ ...fallForm, gait: Number(e.target.value) })}>
+                              <option value={0}>Gait: normal</option><option value={10}>Gait: weak</option><option value={20}>Gait: impaired</option>
+                            </select>
+                            <select className="form-select form-select-sm" value={fallForm.ambulatoryAid} onChange={e => setFallForm({ ...fallForm, ambulatoryAid: Number(e.target.value) })}>
+                              <option value={0}>Aid: none</option><option value={15}>Aid: cane/walker</option><option value={30}>Aid: furniture</option>
+                            </select>
+                            <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={() => saveFall.mutate(fallForm)}>Score</button>
+                          </div>
+                          <div className="fw-semibold mb-1">Pressure injury (Braden)</div>
+                          <div className="d-flex flex-wrap gap-1 align-items-center">
+                            {['sensoryPerception', 'moisture', 'activity', 'mobility', 'nutrition', 'frictionShear'].map((k) => (
+                              <select key={k} className="form-select form-select-sm" style={{ maxWidth: '110px' }} value={bradenForm[k]} onChange={e => setBradenForm({ ...bradenForm, [k]: Number(e.target.value) })}>
+                                <option value={4}>4</option><option value={3}>3</option><option value={2}>2</option><option value={1}>1</option>
+                              </select>
+                            ))}
+                            <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={() => saveBraden.mutate(bradenForm)}>Score</button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Escalate</h6></div>
+                        <div className="card-body">
+                          <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Reason for escalation…" value={escalateReason} onChange={e => setEscalateReason(e.target.value)} />
+                          <button className="btn btn-sm btn-danger rounded-pill w-100" disabled={!escalateReason.trim() || escalatePt.isPending} onClick={() => escalatePt.mutate(escalateReason)}>
+                            <i className="bi bi-exclamation-octagon me-1"></i>Escalate patient
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                          <h6 className="mb-0 fw-bold small">Fluid balance (24h)</h6>
+                          <span className="badge bg-light text-dark border small">{patientIO.data?.balance ? `net ${patientIO.data.balance.netMl} ml` : '—'}</span>
+                        </div>
+                        <div className="card-body">
+                          <div className="d-flex gap-1 mb-2">
+                            <select className="form-select form-select-sm" value={ioForm.kind} onChange={e => setIoForm({ ...ioForm, kind: e.target.value })}>
+                              <option value="intake">Intake</option><option value="output">Output</option>
+                            </select>
+                            <input className="form-control form-control-sm" style={{ maxWidth: '90px' }} placeholder="ml" value={ioForm.volumeMl} onChange={e => setIoForm({ ...ioForm, volumeMl: e.target.value })} />
+                            <input className="form-control form-control-sm" placeholder="category" value={ioForm.category} onChange={e => setIoForm({ ...ioForm, category: e.target.value })} />
+                            <button className="btn btn-sm btn-primary rounded-pill" disabled={!ioForm.volumeMl || addIo.isPending} onClick={() => addIo.mutate({ kind: ioForm.kind, volumeMl: Number(ioForm.volumeMl), category: ioForm.category, note: ioForm.note })}>Add</button>
+                          </div>
+                          <div style={{ maxHeight: '140px', overflowY: 'auto' }} className="small">
+                            {(patientIO.data?.entries || []).map((e: any) => (
+                              <div key={e.id} className="d-flex justify-content-between">
+                                <span>{e.kind} {e.category || ''} {e.volume_ml} ml</span>
+                                <span className="text-muted">{e.recorded_at}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                          <h6 className="mb-0 fw-bold small">Handover (SBAR)</h6>
+                          <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={() => loadHandover.mutate()} disabled={loadHandover.isPending}>Generate</button>
+                        </div>
+                        <div className="card-body">
+                          <pre className="small mb-0" style={{ whiteSpace: 'pre-wrap' }}>{handover?.text || 'Click Generate to build an SBAR from the chart.'}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Notes */}
                 {tab === 'notes' && (
                   <div className="row g-3">
@@ -608,6 +810,19 @@ export default function NurseRNDashboardPage() {
                 <input className="form-control form-control-sm mb-2" value={giveForm.overrideReason}
                   onChange={e => setGiveForm({ ...giveForm, overrideReason: e.target.value })}
                   placeholder="Clinical justification if overriding a hard stop" />
+
+                <div className="row g-2 mb-2">
+                  <div className="col-6">
+                    <label className="form-label small mb-1">Scan wristband</label>
+                    <input className="form-control form-control-sm" value={giveForm.patientBarcode}
+                      onChange={e => setGiveForm({ ...giveForm, patientBarcode: e.target.value })} placeholder="Two-identifier check" />
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label small mb-1">Scan drug</label>
+                    <input className="form-control form-control-sm" value={giveForm.drugBarcode}
+                      onChange={e => setGiveForm({ ...giveForm, drugBarcode: e.target.value })} placeholder="Drug barcode" />
+                  </div>
+                </div>
 
                 <div className="row g-2">
                   <div className="col-6">

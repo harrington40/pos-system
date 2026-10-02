@@ -61,6 +61,8 @@ export async function administerMedicationOrder(
     overrideReason?: string;
     witnessBy?: number | string;
     notes?: string;
+    patientBarcode?: string;
+    drugBarcode?: string;
   },
 ): Promise<any> {
   const response = await nestClient.post(

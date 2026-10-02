@@ -127,4 +127,36 @@ export class MedicationAdministrationController {
             req.user?.role === 'admin',
         );
     }
+
+    /** PRN doses given recently that still need an effect reassessment. */
+    @Get('medication-administration/follow-ups')
+    @Roles(...READ_ROLES)
+    followUps(@Req() req: MarRequest) {
+        return this.mar.getFollowUps(Number(req.user?.sub) || 0);
+    }
+
+    /** Recent controlled-drug counts for a patient. */
+    @Get('patients/:pid/controlled-counts')
+    @Roles(...READ_ROLES)
+    controlledCounts(@Param('pid') pid: string) {
+        return this.mar.getControlledCounts(+pid);
+    }
+
+    /** Record a controlled-drug count (a variance raises a critical notice). */
+    @Post('patients/:pid/controlled-counts')
+    @Roles(...ADMINISTER_ROLES)
+    recordControlledCount(
+        @Param('pid') pid: string,
+        @Body()
+        dto: {
+            drug?: string;
+            expectedQty?: number | string;
+            countedQty?: number | string;
+            witnessBy?: number | string | null;
+            note?: string | null;
+        },
+        @Req() req: MarRequest,
+    ) {
+        return this.mar.recordControlledCount(+pid, dto || {}, actor(req));
+    }
 }

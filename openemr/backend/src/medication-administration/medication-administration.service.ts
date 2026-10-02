@@ -112,6 +112,10 @@ export interface AdministrationDto {
     witnessBy?: number | string | null;
     site?: string | null;
     notes?: string | null;
+    /** Scanned wristband value; when supplied it must resolve to this patient. */
+    patientBarcode?: string | null;
+    /** Scanned drug barcode; when supplied it must match the order's drug. */
+    drugBarcode?: string | null;
 }
 
 /** The actor performing a change, supplied by the controller. */
@@ -194,6 +198,22 @@ export class MedicationAdministrationService implements OnModuleInit {
         INDEX idx_mar_alert_status (status),
         INDEX idx_mar_alert_assigned (assigned_to),
         INDEX idx_mar_alert_pid (pid)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+        await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS medication_controlled_counts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        pid INT NOT NULL,
+        drug VARCHAR(255) NOT NULL,
+        expected_qty INT NOT NULL DEFAULT 0,
+        counted_qty INT NOT NULL DEFAULT 0,
+        variance INT NOT NULL DEFAULT 0,
+        witness_by INT NULL,
+        counted_by INT NULL,
+        note VARCHAR(255) NULL,
+        counted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ctrl_pid (pid, counted_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
@@ -556,6 +576,40 @@ export class MedicationAdministrationService implements OnModuleInit {
             isHighAlert: order.high_alert === 1,
         });
 
+        // Two-identifier / barcode verification. Optional, but when a scan is
+        // supplied a mismatch is a hard stop just like a wrong-patient scan.
+        const norm = (s: unknown) =>
+            String(s ?? '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '');
+        if (dto?.patientBarcode) {
+            const bc = norm(dto.patientBarcode);
+            if (!bc || !bc.includes(String(order.pid))) {
+                verdict.issues.push({
+                    code: 'barcode_patient_mismatch',
+                    severity: 'critical',
+                    message: `Wristband barcode does not match patient #${order.pid}.`,
+                    hardStop: true,
+                });
+                verdict.requiresOverride = true;
+                verdict.decision = 'block';
+            }
+        }
+        if (dto?.drugBarcode) {
+            const bc = norm(dto.drugBarcode);
+            const drug = norm(order.drug);
+            if (!bc || !(bc.includes(drug) || drug.includes(bc))) {
+                verdict.issues.push({
+                    code: 'barcode_drug_mismatch',
+                    severity: 'critical',
+                    message: `Drug barcode does not match "${order.drug}".`,
+                    hardStop: true,
+                });
+                verdict.requiresOverride = true;
+                verdict.decision = 'block';
+            }
+        }
+
         const overrideReason = String(dto?.overrideReason ?? '').trim();
         if (verdict.requiresOverride && !overrideReason) {
             throw new BadRequestException({
@@ -707,6 +761,7 @@ export class MedicationAdministrationService implements OnModuleInit {
             },
             due: [...overdue, ...dueNow].slice(0, 50),
             highAlert,
+            prnFollowUp: await this.getFollowUps(nurseId),
             alerts: alerts.alerts,
             generatedAt: now.toISOString(),
         };
@@ -755,6 +810,115 @@ export class MedicationAdministrationService implements OnModuleInit {
             [isAdmin ? 1 : 0, nurseId],
         );
         return { updated: true };
+    }
+
+    // ── Controlled-substance counts ──────────────────────────────────────────
+
+    /** Record a controlled-drug count; a non-zero variance raises a critical alert. */
+    async recordControlledCount(
+        pid: number,
+        dto: {
+            drug?: string;
+            expectedQty?: number | string;
+            countedQty?: number | string;
+            witnessBy?: number | string | null;
+            note?: string | null;
+        },
+        nurse: MarActor = {},
+    ) {
+        const drug = String(dto?.drug || '').trim();
+        if (!drug) throw new BadRequestException('drug is required');
+        const expected = Math.max(0, Math.round(Number(dto?.expectedQty) || 0));
+        const counted = Math.max(0, Math.round(Number(dto?.countedQty) || 0));
+        const variance = counted - expected;
+
+        const row = await this.dataSource.query<AffectedRowsResult>(
+            `INSERT INTO medication_controlled_counts
+         (pid, drug, expected_qty, counted_qty, variance, witness_by, counted_by,
+          note, counted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [
+                pid,
+                drug.slice(0, 255),
+                expected,
+                counted,
+                variance,
+                Number(dto?.witnessBy) || null,
+                nurse.id ?? null,
+                dto?.note ? String(dto.note).slice(0, 255) : null,
+            ],
+        );
+
+        if (variance !== 0) {
+            await this.raiseAlert({
+                pid,
+                severity: 'critical',
+                kind: 'controlled_variance',
+                title: `Controlled count variance — ${drug}`,
+                detail: `Expected ${expected}, counted ${counted} (variance ${variance}).`,
+            });
+        }
+        return { id: row.insertId, pid, drug, expected, counted, variance };
+    }
+
+    /** Recent controlled-drug counts for a patient. */
+    async getControlledCounts(pid: number) {
+        return this.dataSource.query(
+            `SELECT id, drug, expected_qty, counted_qty, variance, witness_by,
+              counted_by, note,
+              DATE_FORMAT(counted_at, '%Y-%m-%d %H:%i') AS counted_at
+       FROM medication_controlled_counts
+       WHERE pid = ? ORDER BY counted_at DESC LIMIT 50`,
+            [pid],
+        );
+    }
+
+    // ── PRN follow-up ─────────────────────────────────────────────────────────
+
+    /**
+     * PRN doses given in the last 90 minutes that still need an effect
+     * reassessment — the safety gap that a PRN order otherwise leaves open.
+     */
+    async getFollowUps(nurseId: number) {
+        const rows = await this.dataSource.query<
+            {
+                record_id: number;
+                order_id: number;
+                pid: number;
+                drug: string;
+                administered_at: string;
+                minutes_since: number | string;
+                fname: string;
+                lname: string;
+                room: string | null;
+            }[]
+        >(
+            `SELECT r.id AS record_id, r.order_id, r.pid, o.drug,
+              DATE_FORMAT(r.administered_at, '%Y-%m-%d %H:%i') AS administered_at,
+              TIMESTAMPDIFF(MINUTE, r.administered_at, NOW()) AS minutes_since,
+              pd.fname, pd.lname, ca.room
+       FROM medication_administration_records r
+       JOIN medication_administration_orders o ON o.id = r.order_id
+       JOIN patient_data pd ON pd.pid = r.pid
+       LEFT JOIN patient_care_assignment ca ON ca.pid = r.pid
+       WHERE o.is_prn = 1
+         AND r.status = 'given'
+         AND r.administered_at >= (NOW() - INTERVAL 90 MINUTE)
+         AND (ca.assigned_nurse_id = ? OR ca.charge_nurse_id = ? OR ? = 0)
+       ORDER BY r.administered_at DESC`,
+            [nurseId, nurseId, nurseId],
+        );
+        return rows.map((r) => ({
+            record_id: r.record_id,
+            order_id: r.order_id,
+            pid: r.pid,
+            patient_name: `${r.fname || ''} ${r.lname || ''}`.trim(),
+            room: r.room ?? null,
+            drug: r.drug,
+            administered_at: r.administered_at,
+            minutes_since: Number(r.minutes_since) || 0,
+            reassess_due: (Number(r.minutes_since) || 0) >= 30,
+        }));
     }
 }
 
