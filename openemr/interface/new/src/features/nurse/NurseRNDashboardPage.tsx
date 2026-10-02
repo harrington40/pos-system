@@ -5,6 +5,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDebounce } from '../../hooks/useDebounce';
 import nestClient from '../../api/nest-client';
 import {
+  administerMedicationOrder,
+  ackMedicationAlert,
+  hospitalizePatient,
+} from '../../api/endpoints/medicationAdministration';
+import {
   assessPatient,
   computeNEWS2,
   riskBadge,
@@ -131,6 +136,56 @@ export default function NurseRNDashboardPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['nurse-dashboard'] }),
   });
 
+  // ── Medication administration (MAR) ────────────────────────────────────
+  // Delivered in the same /nurse/dashboard payload the ward view already polls.
+  const mar: any = nurseData?.medicationAdministration;
+  const [giveOrder, setGiveOrder] = useState<any>(null);
+  const [giveForm, setGiveForm] = useState({ overrideReason: '', witnessBy: '', notes: '' });
+  const [giveIssues, setGiveIssues] = useState<any[]>([]);
+
+  const giveMed = useMutation({
+    mutationFn: (o: any) =>
+      administerMedicationOrder(o.order_id, {
+        patientId: o.pid,
+        overrideReason: giveForm.overrideReason.trim() || undefined,
+        witnessBy: giveForm.witnessBy ? Number(giveForm.witnessBy) : undefined,
+        notes: giveForm.notes.trim() || undefined,
+      }),
+    onSuccess: () => {
+      setGiveOrder(null);
+      setGiveIssues([]);
+      setGiveForm({ overrideReason: '', witnessBy: '', notes: '' });
+      invalidate();
+    },
+    onError: (e: any) => {
+      const data = e?.response?.data;
+      setGiveIssues(
+        Array.isArray(data?.issues)
+          ? data.issues
+          : [{ code: 'error', severity: 'critical', message: data?.message || 'Administration failed.' }],
+      );
+    },
+  });
+
+  const ackAlert = useMutation({
+    mutationFn: (id: number) => ackMedicationAlert(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nurse-dashboard'] }),
+  });
+
+  const admit = useMutation({
+    mutationFn: ({ pid: p, room }: any) => hospitalizePatient(p, room),
+    onSuccess: () => invalidate(),
+  });
+
+  const openGive = (o: any) => {
+    setGiveOrder(o);
+    setGiveIssues([]);
+    setGiveForm({ overrideReason: '', witnessBy: '', notes: '' });
+  };
+
+  const statusBadge = (s: string) =>
+    s === 'overdue' ? 'bg-danger' : s === 'due' ? 'bg-warning text-dark' : 'bg-secondary';
+
   const fmtDate = (d: string | null | undefined) => formatDateTime(d);
 
   return (
@@ -189,6 +244,10 @@ export default function NurseRNDashboardPage() {
           { label: 'Critical', value: criticalCount, icon: 'bi-exclamation-octagon-fill', color: '#dc3545' },
           { label: 'High Risk', value: highCount, icon: 'bi-exclamation-triangle-fill', color: '#fd7e14' },
           { label: 'Unread Notes', value: unreadCount, icon: 'bi-envelope-fill', color: '#6f42c1' },
+          { label: 'Hospitalized', value: mar?.summary?.hospitalized ?? 0, icon: 'bi-hospital-fill', color: '#0dcaf0' },
+          { label: 'Medications Due', value: mar?.summary?.dueNow ?? 0, icon: 'bi-alarm-fill', color: '#fd7e14' },
+          { label: 'Overdue Doses', value: mar?.summary?.overdue ?? 0, icon: 'bi-exclamation-circle-fill', color: '#d63384' },
+          { label: 'High-alert Meds', value: mar?.summary?.highAlert ?? 0, icon: 'bi-shield-exclamation', color: '#6f42c1' },
         ].map((k, i) => (
           <div className="col-md-3" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
@@ -201,6 +260,83 @@ export default function NurseRNDashboardPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Medication Administration board — hospitalized patients, due/overdue/high-alert + alerts */}
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+        <div className="card-header bg-white py-2 d-flex align-items-center justify-content-between">
+          <h6 className="mb-0 fw-bold small"><i className="bi bi-capsule-pill me-1"></i>Medication Administration</h6>
+          <span className="badge bg-light text-dark border small">
+            {mar?.summary?.scheduled ?? 0} scheduled · {mar?.summary?.unreadAlerts ?? 0} unread alert{(mar?.summary?.unreadAlerts ?? 0) === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div className="card-body">
+          {!mar ? (
+            <div className="text-center text-muted py-4 small">No medication-administration data.</div>
+          ) : (
+            <div className="row g-3">
+              <div className="col-md-8">
+                {(!mar.due || mar.due.length === 0) ? (
+                  <div className="text-center text-muted py-4 small">
+                    No doses due or overdue. Admit a patient (below) to build their medication administration record.
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-sm table-hover align-middle mb-0 small">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Patient</th><th>Room</th><th>Medicine</th><th>Dose</th><th>Route</th><th>Scheduled</th><th>Status</th><th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mar.due.map((o: any) => (
+                          <tr key={o.order_id} className={o.high_alert ? 'table-warning' : ''}>
+                            <td>{o.patient_name}</td>
+                            <td>{o.room || '—'}</td>
+                            <td className="fw-semibold">
+                              {o.drug}
+                              {o.high_alert && <span className="badge bg-danger ms-1" title="High-alert medicine">H</span>}
+                            </td>
+                            <td>{o.dose || '—'}</td>
+                            <td>{o.route || '—'}</td>
+                            <td>{fmtDate(o.scheduled_at)}</td>
+                            <td><span className={`badge rounded-pill ${statusBadge(o.status)}`}>{o.status}</span></td>
+                            <td>
+                              <button className="btn btn-sm btn-primary rounded-pill" onClick={() => openGive(o)}>
+                                <i className="bi bi-check2-circle me-1"></i>Give
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              <div className="col-md-4">
+                <h6 className="fw-bold small text-muted text-uppercase mb-2">Notifications</h6>
+                {(!mar.alerts || mar.alerts.length === 0) ? (
+                  <div className="text-center text-muted py-3 small">No medication notifications.</div>
+                ) : (
+                  <div className="list-group list-group-flush" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                    {mar.alerts.map((a: any) => (
+                      <div className="list-group-item px-0" key={a.id}>
+                        <div className="d-flex justify-content-between align-items-start gap-2">
+                          <span className={`badge ${a.severity === 'critical' ? 'bg-danger' : a.severity === 'warning' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>{a.kind}</span>
+                          {a.status === 'New' && (
+                            <button className="btn btn-sm btn-outline-secondary rounded-pill py-0" onClick={() => ackAlert.mutate(a.id)}>Ack</button>
+                          )}
+                        </div>
+                        <div className="small fw-semibold mt-1">{a.title}</div>
+                        {a.detail && <div className="text-muted" style={{ fontSize: '0.72rem' }}>{a.detail}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="row g-3">
@@ -247,7 +383,20 @@ export default function NurseRNDashboardPage() {
               <div className="card-header bg-white py-2">
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
                   <h6 className="mb-0 fw-bold">{formatPatientName(selectedPatient)}</h6>
-                  <div className="d-flex gap-1">
+                  <div className="d-flex gap-1 align-items-center">
+                    <button
+                      className="btn btn-sm btn-outline-primary rounded-pill"
+                      title="Hospitalize this patient and build their medication administration record"
+                      onClick={() => {
+                        const room = window.prompt(
+                          `Room / bed for ${formatPatientName(selectedPatient)}?`,
+                          selectedPatient.room || '',
+                        );
+                        if (room && room.trim()) admit.mutate({ pid: selectedPatient.pid, room: room.trim() });
+                      }}
+                    >
+                      <i className="bi bi-hospital me-1"></i>Admit
+                    </button>
                     {[
                       ['vitals', 'Vitals', 'bi-heart-pulse'],
                       ['meds', 'Medications', 'bi-capsule'],
@@ -426,6 +575,63 @@ export default function NurseRNDashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Bedside administration modal — the smart safety check runs server-side */}
+      {giveOrder && (
+        <div className="modal fade show d-block" tabIndex={-1} role="dialog" style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <div className="modal-dialog modal-dialog-centered" role="document">
+            <div className="modal-content" style={{ borderRadius: '16px' }}>
+              <div className="modal-header">
+                <h6 className="modal-title fw-bold">
+                  Administer — {giveOrder.drug}
+                  {giveOrder.high_alert && <span className="badge bg-danger ms-2">High-alert</span>}
+                </h6>
+                <button type="button" className="btn-close" onClick={() => { setGiveOrder(null); setGiveIssues([]); }}></button>
+              </div>
+              <div className="modal-body">
+                <div className="small text-muted mb-2">
+                  {giveOrder.patient_name} · Room {giveOrder.room || '—'} · {giveOrder.dose || '—'} · {giveOrder.route || '—'}
+                </div>
+
+                {giveIssues.length > 0 && (
+                  <div className="alert alert-danger py-2 small mb-2">
+                    <div className="fw-semibold mb-1">Safety check requires attention:</div>
+                    <ul className="mb-0 ps-3">
+                      {giveIssues.map((i: any, idx: number) => (<li key={idx}>{i.message}</li>))}
+                    </ul>
+                  </div>
+                )}
+
+                <label className="form-label small mb-1">
+                  Override reason {giveIssues.length > 0 ? '(required to proceed)' : '(optional)'}
+                </label>
+                <input className="form-control form-control-sm mb-2" value={giveForm.overrideReason}
+                  onChange={e => setGiveForm({ ...giveForm, overrideReason: e.target.value })}
+                  placeholder="Clinical justification if overriding a hard stop" />
+
+                <div className="row g-2">
+                  <div className="col-6">
+                    <label className="form-label small mb-1">Witness (staff id)</label>
+                    <input className="form-control form-control-sm" value={giveForm.witnessBy}
+                      onChange={e => setGiveForm({ ...giveForm, witnessBy: e.target.value })} placeholder="For high-alert meds" />
+                  </div>
+                  <div className="col-6">
+                    <label className="form-label small mb-1">Note</label>
+                    <input className="form-control form-control-sm" value={giveForm.notes}
+                      onChange={e => setGiveForm({ ...giveForm, notes: e.target.value })} placeholder="Site, reaction…" />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => { setGiveOrder(null); setGiveIssues([]); }}>Cancel</button>
+                <button className="btn btn-sm btn-primary rounded-pill" disabled={giveMed.isPending} onClick={() => giveMed.mutate(giveOrder)}>
+                  {giveMed.isPending ? 'Recording…' : <><i className="bi bi-check2-circle me-1"></i>Confirm administration</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
