@@ -24,8 +24,9 @@ export const LAB_TREE: LabSection[] = [
   {
     title: '🩸 HEMATOLOGY',
     groups: [
+      { items: [{ code: 'MJ-001' }] },
       {
-        subsection: 'CBC / Complete Hemogram',
+        subsection: 'CBC Complete Blood Count',
         items: [
           { code: 'MJ-003' },
           { code: 'MJ-131' },
@@ -36,7 +37,7 @@ export const LAB_TREE: LabSection[] = [
           { code: 'MJ-136' },
           { code: 'MJ-137' },
           { code: 'MJ-138' },
-          { code: 'MJ-139', label: 'HCT' },
+          { code: 'MJ-139' },
           { code: 'MJ-140', label: 'MCV' },
           { code: 'MJ-141', label: 'MCH' },
           { code: 'MJ-142', label: 'MCHC' },
@@ -49,6 +50,7 @@ export const LAB_TREE: LabSection[] = [
           { code: 'MJ-149', label: 'PLCC' },
         ],
       },
+      { subsection: 'Sickle Cell Testing', items: [{ code: 'MJ-005' }] },
     ],
   },
   {
@@ -126,10 +128,6 @@ export const LAB_TREE: LabSection[] = [
         ],
       },
     ],
-  },
-  {
-    title: '🧬 SICKLE CELL TESTING',
-    groups: [{ items: [{ code: 'MJ-005', label: 'Sickle Cell' }] }],
   },
   {
     title: '🩸 IMMUNOHEMATOLOGY',
@@ -651,8 +649,8 @@ export default function LabResultFormPage() {
           <p className="text-muted mb-3" style={{ fontSize: '0.78rem' }}>
             <i className="bi bi-info-circle me-1"></i>
             Results are recorded under the laboratory sections — Haematology, Clinical Chemistry, Serology, Microbiology,
-            Malaria / Parasitology, Sickle Cell Testing, Immunohaematology, Immunology / Allergy and Urine Chemistry. Tests
-            ordered from the laboratory request form that are not on this form are not recorded here.
+            Malaria / Parasitology, Immunohaematology, Immunology / Allergy and Urine Chemistry. Tests ordered from the
+            laboratory request form that are not on this form are not recorded here.
           </p>
 
           {!selectedPid ? (
