@@ -109,10 +109,6 @@ const SMART_TEMPLATES: Record<string, {
   },
 };
 
-const ALL_SYMPTOMS = ['Dysuria', 'Frequency', 'Urgency', 'Fever', 'Flank Pain', 'Hematuria', 'Pregnancy',
-  'Cough', 'Congestion', 'Sore Throat', 'Headache', 'Dizziness', 'Fatigue',
-  'Polyuria', 'Polydipsia', 'Lower Back Pain', 'Muscle Spasm', 'Chest Pain', 'Shortness of Breath'];
-
 const DURATIONS = ['<24h', '1-2 days', '3-7 days', '>7 days'];
 const SEVERITIES = ['Mild', 'Moderate', 'Severe'];
 
@@ -327,32 +323,6 @@ export default function StartScreeningPage() {
   const [duration, setDuration] = useState('');
   const [severity, setSeverity] = useState('');
 
-  // Per-symptom notes (opened from a symptom chip's note button)
-  const [symptomNotes, setSymptomNotes] = useState<Record<string, string>>({});
-  const [noteEnabled, setNoteEnabled] = useState<Record<string, boolean>>({});
-  const [noteModal, setNoteModal] = useState<string | null>(null);
-  const [noteDraft, setNoteDraft] = useState('');
-  const [noteDraftEnabled, setNoteDraftEnabled] = useState(false);
-
-  const openSymptomNote = (s: string) => {
-    setNoteModal(s);
-    setNoteDraft(symptomNotes[s] || '');
-    setNoteDraftEnabled(!!noteEnabled[s]);
-  };
-
-  const saveSymptomNote = () => {
-    if (!noteModal) return;
-    const note = noteDraft.trim();
-    setNoteEnabled(prev => ({ ...prev, [noteModal]: noteDraftEnabled && !!note }));
-    setSymptomNotes(prev => {
-      const next = { ...prev };
-      if (noteDraftEnabled && note) next[noteModal] = note;
-      else delete next[noteModal];
-      return next;
-    });
-    setNoteModal(null);
-  };
-
   // Physical Examination
   const [physicalExam, setPhysicalExam] = useState('');
   const [examOrderOpen, setExamOrderOpen] = useState(false);
@@ -536,12 +506,9 @@ export default function StartScreeningPage() {
 
   const saveSoap = useMutation({
     mutationFn: async () => nestClient.post(`/patients/${clinicalPid}/soap`, {
-      subjective: [
-        symptoms.length ? `Reports: ${symptoms.join(', ')}. Duration: ${duration}. Severity: ${severity}.` : '',
-        Object.entries(symptomNotes).filter(([, n]) => n && n.trim()).map(([s, n]) => `${s}: ${n}`).join('; '),
-      ].filter(Boolean).join(' '),
+      subjective: symptoms.length ? `Reports: ${symptoms.join(', ')}. Duration: ${duration}. Severity: ${severity}.` : '',
       objective: `Vitals: BP ${vitals.bp_systolic || '--'}/${vitals.bp_diastolic || '--'}, HR ${vitals.pulse || '--'}, Temp ${vitals.temp || '--'}`,
-      assessment: template || clinicalNote.slice(0, 100),
+      assessment: soap.assessment || template || clinicalNote.slice(0, 100),
       plan: `Labs: ${selectedLabs.map(l => l.testName).join(', ') || 'none'}. Meds: ${selectedMeds.map(m => m.drug).join(', ') || 'none'}. Imaging: ${selectedImaging.join(', ') || 'none'}.`,
     }),
   });
@@ -758,11 +725,7 @@ export default function StartScreeningPage() {
       `Vitals: BP ${vitals.bp_systolic || '--'}/${vitals.bp_diastolic || '--'}, HR ${vitals.pulse || '--'}, Temp ${vitals.temp || '--'}${vitals.o2_sat ? `, SpO2 ${vitals.o2_sat}%` : ''}.`;
     const plan = soap.plan ||
       `Labs: ${selectedLabs.map(l => l.testName).join(', ') || 'none'}. Meds: ${selectedMeds.map(m => m.drug).join(', ') || 'none'}. Imaging: ${selectedImaging.filter(i => i !== 'None').join(', ') || 'none'}.`;
-    const symptomNoteText = Object.entries(symptomNotes)
-      .filter(([, n]) => n && n.trim())
-      .map(([s, n]) => `${s}: ${n}`)
-      .join('; ');
-    const subjective = [soap.subjective, symptomNoteText].filter(Boolean).join(' ');
+    const subjective = soap.subjective;
     const parts = [
       subjective ? `S: ${subjective}` : '',
       `O: ${objective}`,
@@ -1147,54 +1110,14 @@ export default function StartScreeningPage() {
             </button>
           </div>
 
-          {/* Symptoms chips */}
-          <div className="d-flex flex-wrap gap-1 mb-2">
-            {ALL_SYMPTOMS.map(s => (
-              <span key={s} className="d-inline-flex align-items-center">
-                <button
-                  className={`btn btn-sm rounded-pill ${symptoms.includes(s) ? 'btn-primary' : 'btn-outline-secondary'}`}
-                  style={{ fontSize: '0.7rem', padding: '2px 10px' }}
-                  onClick={() => setSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}>
-                  {symptoms.includes(s) ? '✓ ' : ''}{s}
-                  {symptomNotes[s] && <i className="bi bi-pencil-fill ms-1 text-warning" style={{ fontSize: '0.6rem' }}></i>}
-                </button>
-                <button
-                  className="btn btn-sm btn-link p-0 ms-1"
-                  style={{ fontSize: '0.7rem', textDecoration: 'none' }}
-                  title={`Add a note for ${s}`}
-                  onClick={() => openSymptomNote(s)}>
-                  <i className="bi bi-pencil-square text-info"></i>
-                </button>
-              </span>
-            ))}
-          </div>
-
-          {/* Symptom note modal */}
-          {noteModal && (
-            <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1060, background: 'rgba(0,0,0,0.45)' }} onClick={(e) => { if (e.target === e.currentTarget) setNoteModal(null); }}>
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content" style={{ borderRadius: '16px' }}>
-                  <div className="modal-header py-2">
-                    <h6 className="modal-title"><i className="bi bi-pencil-square me-2 text-info"></i>Note — {noteModal}</h6>
-                    <button className="btn-close" onClick={() => setNoteModal(null)}></button>
-                  </div>
-                  <div className="modal-body">
-                    <div className="form-check mb-2">
-                      <input className="form-check-input" type="checkbox" id="symptom-note-enable" checked={noteDraftEnabled} onChange={(e) => setNoteDraftEnabled(e.target.checked)} />
-                      <label className="form-check-label small" htmlFor="symptom-note-enable">Enable a note for this symptom</label>
-                    </div>
-                    {noteDraftEnabled && (
-                      <textarea className="form-control" rows={4} placeholder={`Add details about ${noteModal} (onset, character, severity, etc.)…`} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} autoFocus />
-                    )}
-                  </div>
-                  <div className="modal-footer py-2">
-                    <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setNoteModal(null)}>Cancel</button>
-                    <button className="btn btn-info btn-sm rounded-pill text-white" onClick={saveSymptomNote}>Save Note</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Diagnosis — free text, written into the note (replaces the symptom chips) */}
+          <textarea
+            className="form-control form-control-sm mb-2"
+            rows={3}
+            placeholder="Diagnosis / impression — written into the note…"
+            value={soap.assessment}
+            onChange={e => setSoap({ ...soap, assessment: e.target.value })}
+          />
 
           {/* Duration + Severity row */}
           <div className="d-flex gap-3 flex-wrap align-items-center">
