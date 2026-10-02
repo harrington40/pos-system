@@ -157,7 +157,7 @@ const DX_PHRASES = [
 const LAB_ORDER_CATEGORIES: { title: string; groups: { subtitle?: string; tests: string[] }[] }[] = [
   {
     title: 'HAEMATOLOGY/ IMMUNO-HAEMATOLOGY',
-    groups: [{ tests: ['HB Hemoglobin', 'CBC Complete blood count', 'WBC white Blood Cells', 'Malaria Smear', 'Sickle Cells Identification (rapid)', 'ABO& Rh) Blood Group', 'ESR', 'Malaria RDT'] }],
+    groups: [{ tests: ['HB Hemoglobin', 'CBC Complete blood count', 'WBC white Blood Cells'] }],
   },
   {
     title: 'IMMUNOLOGY & SEROLOGY',
