@@ -19,6 +19,7 @@ import BillingDashboardPage from './features/billing/BillingDashboardPage';
 import ReportsPage from './features/reports/ReportsPage';
 import AdminPage from './features/admin/AdminPage';
 import LabsPage from './features/labs/LabsPage';
+import EmergencyBoardPage from './features/emergency/EmergencyBoardPage';
 import LabDashboardPage from './features/labs/LabDashboardPage';
 import RecallBoard from './features/appointments/RecallBoard';
 import DrugScreeningPage from './features/appointments/DrugScreeningPage';
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="/appointments/recall" element={<RecallBoard />} />
           <Route path="/appointments/screening" element={<DrugScreeningPage />} />
             <Route path="/inpatient" element={<InpatientDashboardPage />} />
+            <Route path="/emergency" element={<EmergencyBoardPage />} />
           <Route path="/billing" element={<BillingDashboardPage />} />
           <Route path="/billing/medical" element={<MedicalBillingPage />} />
           <Route path="/cds" element={<ClinicalDecisionSupport />} />

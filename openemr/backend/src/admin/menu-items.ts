@@ -59,6 +59,7 @@ export const MENU_ITEMS: MenuItemDef[] = [
         section: 'Appointments',
     },
     { key: '/inpatient', label: 'Inpatient / ADT', section: 'Appointments' },
+    { key: '/emergency', label: 'Emergency / Triage', section: 'Appointments' },
 
     { key: '/lab-dashboard', label: 'Lab Management', section: 'Laboratory' },
     { key: '/labs', label: 'Lab Orders', section: 'Laboratory' },
