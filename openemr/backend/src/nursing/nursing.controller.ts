@@ -5,6 +5,7 @@ import {
     Patch,
     Param,
     Body,
+    Query,
     Req,
     UseGuards,
 } from '@nestjs/common';
@@ -149,6 +150,18 @@ export class NursingController {
     @Roles('admin', 'physician', 'nurse', 'registered_nurse')
     getHandover(@Param('pid') pid: string) {
         return this.workbench.getHandover(+pid);
+    }
+
+    @Get('patients/:pid/360')
+    @Roles('admin', 'physician', 'nurse', 'registered_nurse')
+    getPatient360(@Param('pid') pid: string) {
+        return this.workbench.getPatient360(+pid);
+    }
+
+    @Get('patients/:pid/checklist')
+    @Roles('admin', 'physician', 'nurse', 'registered_nurse')
+    getChecklist(@Param('pid') pid: string, @Query('kind') kind?: string) {
+        return this.workbench.getChecklist(+pid, kind);
     }
 
     @Post('patients/:pid/escalate')

@@ -19,6 +19,8 @@ import {
   setFlags,
   escalate,
   completeTask,
+  getPatient360,
+  getChecklist,
 } from '../../api/endpoints/rnWorkbench';
 import {
   assessPatient,
@@ -202,6 +204,9 @@ export default function NurseRNDashboardPage() {
   const patientSafety = useQuery({ queryKey: ['safety', pid], enabled: !!pid, queryFn: async () => getSafety(pid as any) });
   const patientIO = useQuery({ queryKey: ['io', pid], enabled: !!pid, queryFn: async () => getIO(pid as any) });
   const patientFlags = useQuery({ queryKey: ['flags', pid], enabled: !!pid, queryFn: async () => getFlags(pid as any) });
+  const patient360 = useQuery({ queryKey: ['360', pid], enabled: !!pid, queryFn: async () => getPatient360(pid as any) });
+  const admissionList = useQuery({ queryKey: ['checklist', pid, 'admission'], enabled: !!pid, queryFn: async () => getChecklist(pid as any, 'admission') });
+  const dischargeList = useQuery({ queryKey: ['checklist', pid, 'discharge'], enabled: !!pid, queryFn: async () => getChecklist(pid as any, 'discharge') });
 
   useEffect(() => {
     const f = patientFlags.data;
@@ -509,6 +514,7 @@ export default function NurseRNDashboardPage() {
                       ['plan', 'Care Plan', 'bi-clipboard-check'],
                       ['notes', 'Notes', 'bi-journal-text'],
                       ['safety', 'Safety', 'bi-shield-check'],
+                      ['chart', 'Chart 360', 'bi-person-vcard'],
                     ].map(([id, label, icon]) => (
                       <button key={id} className={`btn btn-sm rounded-pill ${tab === id ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setTab(id)}>
                         <i className={`bi ${icon} me-1`}></i>{label}
@@ -631,6 +637,56 @@ export default function NurseRNDashboardPage() {
                               ))}
                             </div>
                           )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Patient 360 & checklists */}
+                {tab === 'chart' && (
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Patient 360</h6></div>
+                        <div className="card-body small">
+                          {!patient360.data ? <div className="text-muted">Loading…</div> : (
+                            <>
+                              <div className="mb-1">
+                                <span className="badge bg-secondary me-1">Room</span>{patient360.data.patient?.room || '—'}
+                                <span className="badge bg-secondary ms-2 me-1">LOS</span>{patient360.data.patient?.los_days ?? '—'}d
+                                <span className="badge bg-secondary ms-2 me-1">NEWS2</span>{patient360.data.news2 ?? '—'}
+                              </div>
+                              <div className="mb-1"><span className="badge bg-secondary me-1">Provider</span>{patient360.data.patient?.provider_name || '—'}</div>
+                              <div className="mb-1"><span className="badge bg-danger me-1">Allergies</span>{patient360.data.allergies?.length ? patient360.data.allergies.join(', ') : 'None recorded'}</div>
+                              <div className="mb-1"><span className="badge bg-info text-dark me-1">Problems</span>{patient360.data.problems?.length ? patient360.data.problems.join(', ') : 'None recorded'}</div>
+                              <div className="text-muted">Active meds: {patient360.data.counts?.meds ?? 0}</div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Admission checklist</h6></div>
+                        <div className="card-body small">
+                          {(admissionList.data?.items || []).map((i: any) => (
+                            <div key={i.key} className="d-flex align-items-center gap-2">
+                              <i className={`bi ${i.done ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}></i>
+                              <span className={i.done ? '' : 'text-muted'}>{i.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Discharge checklist</h6></div>
+                        <div className="card-body small">
+                          {(dischargeList.data?.items || []).map((i: any) => (
+                            <div key={i.key} className="d-flex align-items-center gap-2">
+                              <i className={`bi ${i.done ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}></i>
+                              <span className={i.done ? '' : 'text-muted'}>{i.label}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>

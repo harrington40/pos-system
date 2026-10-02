@@ -57,3 +57,15 @@ export async function getWorkload(): Promise<any[]> {
 export async function getMedicationFollowUps(): Promise<any[]> {
     return (await nestClient.get('/medication-administration/follow-ups')).data;
 }
+
+export async function getPatient360(pid: number | string): Promise<any> {
+    return (await nestClient.get(`/patients/${pid}/360`)).data;
+}
+
+export async function getChecklist(
+    pid: number | string,
+    kind: 'admission' | 'discharge' = 'admission',
+): Promise<any> {
+    return (await nestClient.get(`/patients/${pid}/checklist`, { params: { kind } })).data;
+}
+

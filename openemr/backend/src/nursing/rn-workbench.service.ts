@@ -8,6 +8,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { computeNews2 } from '../emergency/triage-acuity.util';
+import { MessageProducer } from '../messaging/message-producer.service';
 import {
     bradenScore,
     buildHandover,
@@ -128,8 +129,10 @@ function cadenceFor(acuity: string | null | undefined): number {
 export class RnWorkbenchService implements OnModuleInit {
     private readonly logger = new Logger(RnWorkbenchService.name);
 
-    constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
-
+    constructor(
+        @InjectDataSource() private readonly dataSource: DataSource,
+        private readonly messages: MessageProducer,
+    ) {}
     async onModuleInit(): Promise<void> {
         await this.ensureSchema();
     }
@@ -370,12 +373,19 @@ export class RnWorkbenchService implements OnModuleInit {
         return { id, status: 'done' };
     }
 
-    /** Escalate a patient: files a high-priority task for the responsible nurse. */
+    /** Escalate a patient: files a task AND pages the responsible nurses. */
     async escalate(pid: number, reason: string, actorId?: number) {
         const [pac] = await this.dataSource.query<
-            { assigned_nurse_id: number | null; fname: string; lname: string }[]
+            {
+                assigned_nurse_id: number | null;
+                charge_nurse_id: number | null;
+                fname: string;
+                lname: string;
+                room: string | null;
+            }[]
         >(
-            `SELECT ca.assigned_nurse_id, pd.fname, pd.lname
+            `SELECT ca.assigned_nurse_id, ca.charge_nurse_id, ca.room,
+              pd.fname, pd.lname
        FROM patient_data pd
        LEFT JOIN patient_care_assignment ca ON ca.pid = pd.pid
        WHERE pd.pid = ? LIMIT 1`,
@@ -394,8 +404,54 @@ export class RnWorkbenchService implements OnModuleInit {
             },
             actorId,
         );
+        await this.pageEscalation(
+            pid,
+            name,
+            pac.room,
+            pac.assigned_nurse_id,
+            pac.charge_nurse_id,
+            reason,
+        );
         this.logger.warn(`Patient #${pid} escalated: ${reason}`);
         return task;
+    }
+
+    /**
+     * Page the responsible nurses through the shared messaging pipeline (realtime
+     * to the clinic topic, email/SMS for STAT, dedup, durable mailbox entry) —
+     * the same channel the ED uses, so nobody is paged twice through two systems.
+     */
+    private async pageEscalation(
+        pid: number,
+        name: string,
+        room: string | null,
+        assignedNurseId: number | null | undefined,
+        chargeNurseId: number | null | undefined,
+        reason: string,
+    ): Promise<boolean> {
+        try {
+            const recipients = [assignedNurseId, chargeNurseId]
+                .map((x) => Number(x))
+                .filter((x) => Number.isFinite(x) && x > 0);
+            const targets: (number | undefined)[] = recipients.length
+                ? recipients
+                : [undefined];
+            for (const recipientId of targets) {
+                await this.messages.produceMessage({
+                    title: `[RN] Escalation — ${name || `Patient #${pid}`}`,
+                    body: `${room ? `Room ${room}. ` : ''}${reason || 'Escalated from the RN dashboard'}`,
+                    pid,
+                    recipientId,
+                    priority: 'STAT',
+                    type: 'clinic',
+                });
+            }
+            return true;
+        } catch (err) {
+            // Paging must never break the escalation itself.
+            this.logger.error(`Could not page escalation for patient #${pid}: ${err}`);
+            return false;
+        }
     }
 
 
@@ -540,6 +596,193 @@ export class RnWorkbenchService implements OnModuleInit {
         }));
     }
 
+
+    // ── Patient 360 ─────────────────────────────────────────────────────────
+
+    /** One-screen chart summary for the selected patient. */
+    async getPatient360(pid: number) {
+        const [patient] = await this.dataSource.query<
+            {
+                fname: string;
+                lname: string;
+                DOB: string | null;
+                sex: string | null;
+                public_id: string | null;
+                room: string | null;
+                acuity_level: string | null;
+                updated_at: string | null;
+                provider_name: string | null;
+            }[]
+        >(
+            `SELECT pd.fname, pd.lname, pd.DOB, pd.sex, pd.public_id,
+              ca.room, ca.acuity_level, ca.updated_at,
+              CONCAT(COALESCE(u.fname,''), ' ', COALESCE(u.lname,'')) AS provider_name
+       FROM patient_data pd
+       LEFT JOIN patient_care_assignment ca ON ca.pid = pd.pid
+       LEFT JOIN users u ON u.id = pd.providerID
+       WHERE pd.pid = ? LIMIT 1`,
+            [pid],
+        );
+        if (!patient) throw new NotFoundException(`Patient #${pid} not found`);
+
+        const [counts] = await this.dataSource.query<
+            { allergies: number | string; problems: number | string; meds: number | string }[]
+        >(
+            `SELECT
+              (SELECT COUNT(*) FROM lists WHERE pid = ? AND type = 'allergy' AND (activity IS NULL OR activity = 1)) AS allergies,
+              (SELECT COUNT(*) FROM lists WHERE pid = ? AND type = 'medical_problem') AS problems,
+              (SELECT COUNT(*) FROM prescriptions WHERE patient_id = ? AND active = 1) AS meds`,
+            [pid, pid, pid],
+        );
+
+        const problems = await this.dataSource.query<{ title: string }[]>(
+            `SELECT title FROM lists WHERE pid = ? AND type = 'medical_problem' LIMIT 10`,
+            [pid],
+        );
+        const allergies = await this.dataSource.query<{ title: string }[]>(
+            `SELECT title FROM lists WHERE pid = ? AND type = 'allergy' AND (activity IS NULL OR activity = 1) LIMIT 10`,
+            [pid],
+        );
+        const [vitals] = await this.dataSource.query<
+            {
+                date: string;
+                bps: string | null;
+                bpd: string | null;
+                pulse: string | null;
+                temperature: string | null;
+                respiration: string | null;
+                oxygen_saturation: string | null;
+            }[]
+        >(
+            `SELECT DATE_FORMAT(date, '%Y-%m-%d %H:%i') AS date, bps, bpd, pulse,
+              temperature, respiration, oxygen_saturation
+       FROM form_vitals WHERE pid = ? ORDER BY date DESC, id DESC LIMIT 1`,
+            [pid],
+        );
+
+        const news2 = vitals
+            ? computeNews2({
+                  respiration: vitals.respiration,
+                  oxygen_saturation: vitals.oxygen_saturation,
+                  temperature: vitals.temperature,
+                  bps: vitals.bps,
+                  pulse: vitals.pulse,
+              } as never)
+            : null;
+        const losDays = patient.updated_at
+            ? Math.max(
+                  0,
+                  Math.floor(
+                      (Date.now() - new Date(patient.updated_at).getTime()) / 86400000,
+                  ),
+              )
+            : null;
+        const flags = await this.getFlags(pid);
+
+        return {
+            patient: {
+                fname: patient.fname,
+                lname: patient.lname,
+                DOB: patient.DOB,
+                sex: patient.sex,
+                public_id: patient.public_id,
+                room: patient.room,
+                acuity_level: patient.acuity_level,
+                provider_name: patient.provider_name?.trim() || null,
+                los_days: losDays,
+            },
+            flags,
+            counts: {
+                allergies: Number(counts?.allergies) || 0,
+                problems: Number(counts?.problems) || 0,
+                meds: Number(counts?.meds) || 0,
+            },
+            problems: problems.map((p) => p.title),
+            allergies: allergies.map((a) => a.title),
+            latestVitals: vitals || null,
+            news2: news2 ? news2.total : null,
+        };
+    }
+
+    // ── Admission / discharge checklists ────────────────────────────────────
+
+    /**
+     * A checklist whose items are derived from chart signals, so it reflects
+     * what is actually done rather than a box someone ticked.
+     */
+    async getChecklist(pid: number, kind = 'admission') {
+        const k = String(kind || 'admission').toLowerCase();
+        const [c] = await this.dataSource
+            .query<Record<string, number | string>[]>(
+                `SELECT
+              (SELECT COUNT(*) FROM lists WHERE pid = ? AND type = 'allergy' AND (activity IS NULL OR activity = 1)) AS allergies,
+              (SELECT COUNT(*) FROM form_vitals WHERE pid = ?) AS vitals,
+              (SELECT COUNT(*) FROM form_vitals WHERE pid = ? AND DATE(date) = CURDATE()) AS vitals_today,
+              (SELECT COUNT(*) FROM medication_administration_orders WHERE pid = ?) AS mar_orders,
+              (SELECT COUNT(*) FROM medication_administration_orders WHERE pid = ? AND status = 'active') AS mar_active,
+              (SELECT COUNT(*) FROM patient_safety_assessments WHERE pid = ? AND kind = 'fall') AS falls,
+              (SELECT COUNT(*) FROM patient_safety_assessments WHERE pid = ? AND kind = 'braden') AS braden,
+              (SELECT COUNT(*) FROM patient_flags WHERE pid = ? AND code_status IS NOT NULL AND code_status <> '') AS code_status,
+              (SELECT COUNT(*) FROM booking_requests WHERE pid = ? AND preferred_date >= CURDATE()) AS upcoming`,
+                [pid, pid, pid, pid, pid, pid, pid, pid, pid],
+            )
+            .catch(() => [{} as Record<string, number | string>]);
+        const [pub] = await this.dataSource
+            .query<{ public_id: string | null }[]>(
+                `SELECT public_id FROM patient_data WHERE pid = ? LIMIT 1`,
+                [pid],
+            )
+            .catch(() => [{ public_id: null }]);
+        const hasId = !!pub?.public_id;
+        const n = (x: unknown) => Number(x) || 0;
+
+        if (k === 'discharge') {
+            return {
+                kind: 'discharge',
+                items: [
+                    {
+                        key: 'meds_reconciled',
+                        label: 'Medication administration stopped / reconciled',
+                        done: n(c?.mar_active) === 0 && n(c?.mar_orders) > 0,
+                    },
+                    {
+                        key: 'flags_reviewed',
+                        label: 'Code status reviewed',
+                        done: n(c?.code_status) > 0,
+                    },
+                    {
+                        key: 'follow_up',
+                        label: 'Follow-up appointment arranged',
+                        done: n(c?.upcoming) > 0,
+                    },
+                ],
+            };
+        }
+        return {
+            kind: 'admission',
+            items: [
+                { key: 'identity', label: 'Identity band applied', done: hasId },
+                { key: 'allergies', label: 'Allergies documented', done: n(c?.allergies) > 0 },
+                {
+                    key: 'vitals',
+                    label: 'Admission vitals taken',
+                    done: n(c?.vitals_today) > 0 || n(c?.vitals) > 0,
+                },
+                { key: 'code_status', label: 'Code status set', done: n(c?.code_status) > 0 },
+                {
+                    key: 'mar',
+                    label: 'Medication reconciliation (MAR built)',
+                    done: n(c?.mar_orders) > 0,
+                },
+                { key: 'fall', label: 'Fall risk (Morse) assessed', done: n(c?.falls) > 0 },
+                {
+                    key: 'braden',
+                    label: 'Pressure injury (Braden) assessed',
+                    done: n(c?.braden) > 0,
+                },
+            ],
+        };
+    }
 
     // ── Dashboard aggregation ───────────────────────────────────────────────
 

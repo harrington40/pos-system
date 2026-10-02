@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RnWorkbenchService } from './rn-workbench.service';
+import { MessageProducer } from '../messaging/message-producer.service';
 
 /**
  * The workbench turns chart signals into a shift board. The tests pin the
@@ -20,11 +21,17 @@ describe('RnWorkbenchService', () => {
         return { dataSource, queries };
     }
 
-    async function service(dataSource: unknown) {
+    async function service(
+        dataSource: unknown,
+        messages: unknown = {
+            produceMessage: async () => ({ eventId: 'evt', topic: 't' }),
+        },
+    ) {
         const module = await Test.createTestingModule({
             providers: [
                 RnWorkbenchService,
                 { provide: getDataSourceToken(), useValue: dataSource },
+                { provide: MessageProducer, useValue: messages },
             ],
         }).compile();
         return module.get(RnWorkbenchService);
@@ -147,6 +154,71 @@ describe('RnWorkbenchService', () => {
             expect(
                 (wb.vitalsDue[0] as { state: string }).state,
             ).toBe('never');
+        });
+    });
+
+    describe('escalate paging', () => {
+        it('pages the assigned nurse through the messaging producer', async () => {
+            const pages: any[] = [];
+            const messages = {
+                produceMessage: async (dto: any) => {
+                    pages.push(dto);
+                    return { eventId: 'e', topic: 't' };
+                },
+            };
+            const { dataSource } = build((sql) => {
+                if (sql.includes('FROM patient_data'))
+                    return [
+                        {
+                            assigned_nurse_id: 12,
+                            charge_nurse_id: null,
+                            room: '101A',
+                            fname: 'Test',
+                            lname: 'Patient',
+                        },
+                    ];
+                if (sql.includes('INSERT INTO nurse_tasks')) return { insertId: 7 };
+                return { affectedRows: 1 };
+            });
+            await (await service(dataSource, messages)).escalate(
+                17,
+                'NEWS2 rising',
+                99,
+            );
+            expect(pages).toHaveLength(1);
+            expect(pages[0]).toMatchObject({ priority: 'STAT', recipientId: 12, pid: 17 });
+        });
+    });
+
+    describe('getChecklist', () => {
+        it('derives admission items from chart signals', async () => {
+            const { dataSource } = build((sql) => {
+                if (sql.includes('public_id FROM patient_data'))
+                    return [{ public_id: 'P123' }];
+                if (sql.includes('booking_requests'))
+                    return [
+                        {
+                            allergies: 0,
+                            vitals: 0,
+                            vitals_today: 0,
+                            mar_orders: 0,
+                            mar_active: 0,
+                            falls: 0,
+                            braden: 0,
+                            code_status: 0,
+                            upcoming: 0,
+                        },
+                    ];
+                return [{}];
+            });
+            const list = await (
+                await service(dataSource)
+            ).getChecklist(17, 'admission');
+            const byKey = Object.fromEntries(
+                list.items.map((i: any) => [i.key, i.done]),
+            );
+            expect(byKey.identity).toBe(true);
+            expect(byKey.allergies).toBe(false);
         });
     });
 });
