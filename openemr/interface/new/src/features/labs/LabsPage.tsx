@@ -7,6 +7,7 @@ import { groupOrdersByPatient } from '../../utils/groupOrdersByPatient';
 import { canViewFinancials } from '../../utils/permissions';
 import Barcode from '../../components/shared/Barcode';
 import { formatDateHuman } from '../../utils/date';
+import { buildLabSections, LAB_CODE_INDEX } from '../labreports/labSections';
 
 // ── Lab Test Auto-Population Data ─────────────────────────────────
 export const LAB_TESTS: Record<string, { code: string; name: string; units: string[]; values: string[]; range: string }> = {
@@ -217,15 +218,8 @@ export default function LabsPage() {
     queryKey: ['lab-catalog'],
     queryFn: async () => { const r = await nestClient.get('/lab/catalog'); return r.data; },
   });
-  const groupedCatalog = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    for (const t of (catalog as any[])) {
-      const cat = t.category || t.sheet || 'Other';
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(t);
-    }
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
-  }, [catalog]);
+  /** Same sectioned tree the result form uses, resolved against the catalog. */
+  const treeSections = useMemo(() => buildLabSections(catalog as any[]), [catalog]);
 
   // Add result (lab tech only)
   const addResult = useMutation({
@@ -670,10 +664,13 @@ export default function LabsPage() {
 
                 {isLabTech && (() => {
                   const picked = (catalog as any[]).find((t: any) => String(t.code || t.id) === String(resultForm.result_code));
-                  const panelCat = picked?.category || picked?.sheet;
-                  const panelTests: any[] = panelCat
-                    ? ((groupedCatalog.find(([c]) => c === panelCat)?.[1] as any[]) || [])
-                    : [];
+                  const idx = picked ? LAB_CODE_INDEX[String(picked.code)] : null;
+                  const panelSection = idx ? treeSections.find(s => s.title === idx.section) : null;
+                  const panelGroup = panelSection && idx
+                    ? panelSection.groups.find(g => g.subsection === idx.subsection)
+                    : null;
+                  const panelTests: any[] = (panelGroup?.items || []).map(i => i.t);
+                  const panelLabel = idx ? (idx.subsection ? `${idx.section} · ${idx.subsection}` : idx.section) : '';
                   const bulkCount = panelTests.filter((t: any) => (bulkValues[testKey(t)] || '').trim() !== '').length;
                   return (
                   <div className="border-top pt-3">
@@ -693,13 +690,18 @@ export default function LabsPage() {
                             });
                           }}>
                           <option value="">— Select Test —</option>
-                          {groupedCatalog.map(([cat, tests]) => (
-                            <optgroup key={cat} label={cat}>
-                              {tests.map((t: any) => (
-                                <option key={t.code || t.id} value={String(t.code || t.id)}>{t.name}</option>
-                              ))}
-                            </optgroup>
-                          ))}
+                          {treeSections.map(sec =>
+                            sec.groups.map(g => {
+                              const label = g.subsection ? `${sec.title} · ${g.subsection}` : sec.title;
+                              return (
+                                <optgroup key={label} label={label}>
+                                  {g.items.map(({ t, label: l }) => (
+                                    <option key={t.code || t.id} value={String(t.code || t.id)}>{l}</option>
+                                  ))}
+                                </optgroup>
+                              );
+                            }),
+                          )}
                         </select>
                       </div>
                       <div className="col-6">
@@ -756,7 +758,7 @@ export default function LabsPage() {
                         <button type="button" className="btn btn-sm btn-outline-primary rounded-pill"
                           onClick={() => setBulkOpen(v => !v)}>
                           <i className="bi bi-lightning-charge-fill me-1"></i>
-                          {bulkOpen ? 'Hide bulk entry' : `Enter all ${panelTests.length} ${panelCat} results at once`}
+                          {bulkOpen ? 'Hide bulk entry' : `Enter all ${panelTests.length} ${panelLabel} results at once`}
                         </button>
                         {bulkOpen && (
                           <div className="border rounded-3 p-2 mt-2 bg-white">
