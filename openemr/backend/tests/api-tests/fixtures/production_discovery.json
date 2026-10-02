@@ -1,0 +1,2489 @@
+{
+  "api_url": "https://openrx.transtechologies.com/api",
+  "baseline": {
+    "/admin/users": {
+      "count": 12,
+      "error": null,
+      "kind": "list",
+      "path": "/admin/users",
+      "status": 200,
+      "structure": {
+        "item": {
+          "active": "int",
+          "assistant": "NoneType",
+          "cal_ui": "int",
+          "calendar": "int",
+          "calendar_color": "str",
+          "can_edit_charges": "int",
+          "can_edit_providers": "int",
+          "can_view_charts": "int",
+          "city": "NoneType",
+          "cpoe": "NoneType",
+          "date_created": "str",
+          "email": "NoneType",
+          "email_direct": "str",
+          "facility": "NoneType",
+          "facility_id": "int",
+          "fax": "NoneType",
+          "federaldrugid": "NoneType",
+          "fname": "str",
+          "id": "str",
+          "last_updated": "str",
+          "lname": "str",
+          "main_menu_role": "str",
+          "mname": "NoneType",
+          "newcrop_user_role": "NoneType",
+          "npi": "NoneType",
+          "organization": "NoneType",
+          "phone": "NoneType",
+          "phonecell": "NoneType",
+          "phonew1": "NoneType",
+          "phonew2": "NoneType",
+          "physician_type": "NoneType",
+          "specialty": "NoneType",
+          "state": "NoneType",
+          "state_license_number": "NoneType",
+          "street": "NoneType",
+          "suffix": "NoneType",
+          "taxonomy": "str",
+          "title": "NoneType",
+          "upin": "NoneType",
+          "username": "str",
+          "uuid": "NoneType",
+          "weno_prov_id": "NoneType",
+          "zip": "NoneType"
+        },
+        "kind": "list",
+        "length": 12
+      }
+    },
+    "/admin/users/{admin_user_id}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/admin/users/5",
+      "status": 200,
+      "structure": {
+        "active": "int",
+        "assistant": "NoneType",
+        "cal_ui": "int",
+        "calendar": "int",
+        "calendar_color": "str",
+        "city": "NoneType",
+        "cpoe": "NoneType",
+        "date_created": "str",
+        "email": "NoneType",
+        "email_direct": "str",
+        "facility": "NoneType",
+        "facility_id": "int",
+        "fax": "NoneType",
+        "federaldrugid": "NoneType",
+        "fname": "str",
+        "id": "str",
+        "last_updated": "str",
+        "lname": "str",
+        "mname": "NoneType",
+        "newcrop_user_role": "NoneType",
+        "npi": "NoneType",
+        "organization": "NoneType",
+        "phone": "NoneType",
+        "phonecell": "NoneType",
+        "phonew1": "NoneType",
+        "phonew2": "NoneType",
+        "physician_type": "NoneType",
+        "specialty": "NoneType",
+        "state": "NoneType",
+        "state_license_number": "NoneType",
+        "street": "NoneType",
+        "suffix": "NoneType",
+        "taxonomy": "str",
+        "title": "NoneType",
+        "upin": "NoneType",
+        "username": "str",
+        "uuid": "NoneType",
+        "weno_prov_id": "NoneType",
+        "zip": "NoneType"
+      }
+    },
+    "/appointments": {
+      "count": 46,
+      "error": null,
+      "kind": "list",
+      "path": "/appointments",
+      "status": 200,
+      "structure": {
+        "item": {
+          "category": "str",
+          "checked_in_at": "NoneType",
+          "eventDateStr": "str",
+          "fname": "str",
+          "lname": "str",
+          "patient_id": "str",
+          "patient_provider_name": "str",
+          "patient_public_id": "NoneType",
+          "pc_aid": "str",
+          "pc_apptstatus": "str",
+          "pc_billing_location": "int",
+          "pc_catid": "int",
+          "pc_duration": "str",
+          "pc_eid": "int",
+          "pc_endDate": "NoneType",
+          "pc_endTime": "NoneType",
+          "pc_eventDate": "str",
+          "pc_facility": "int",
+          "pc_hometext": "str",
+          "pc_pid": "str",
+          "pc_startTime": "str",
+          "pc_time": "str",
+          "pc_title": "str",
+          "pc_uuid": "NoneType",
+          "pid": "str",
+          "provider_color": "NoneType",
+          "provider_name": "NoneType",
+          "provider_title": "NoneType",
+          "wait_minutes": "NoneType"
+        },
+        "kind": "list",
+        "length": 46
+      }
+    },
+    "/appointments/{appointment_id}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/appointments/56",
+      "status": 200,
+      "structure": {
+        "pc_aid": "str",
+        "pc_apptstatus": "str",
+        "pc_billing_location": "int",
+        "pc_catid": "int",
+        "pc_duration": "str",
+        "pc_eid": "int",
+        "pc_endDate": "NoneType",
+        "pc_endTime": "NoneType",
+        "pc_eventDate": "str",
+        "pc_facility": "int",
+        "pc_hometext": "str",
+        "pc_pid": "str",
+        "pc_startTime": "str",
+        "pc_time": "str",
+        "pc_title": "str",
+        "pc_uuid": "NoneType"
+      }
+    },
+    "/billing/accounts-receivable": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/billing/accounts-receivable",
+      "status": 200,
+      "structure": {
+        "aging": {
+          "current": "float",
+          "days_30_60": "int",
+          "days_60_90": "int",
+          "days_90_plus": "int"
+        },
+        "balance": "float",
+        "totalCharges": "float",
+        "totalPayments": "float"
+      }
+    },
+    "/billing/patients": {
+      "count": 37,
+      "error": null,
+      "kind": "list",
+      "path": "/billing/patients",
+      "status": 200,
+      "structure": {
+        "item": {
+          "balance": "int",
+          "billingStatus": "str",
+          "claimCount": "int",
+          "daysSinceLastEncounter": "int",
+          "dischargeStatus": "str",
+          "dob": "str",
+          "encounterDate": "str",
+          "encounterId": "str",
+          "fname": "str",
+          "hasActiveEncounter": "bool",
+          "insuranceBalance": "int",
+          "insuranceType": "str",
+          "lastPayment": "NoneType",
+          "lname": "str",
+          "patientBalance": "int",
+          "patientPercent": "int",
+          "pendingClaimCount": "int",
+          "pid": "str",
+          "sex": "str",
+          "statusColor": "str",
+          "statusLabel": "str",
+          "totalCharges": "int",
+          "totalPayments": "int"
+        },
+        "kind": "list",
+        "length": 37
+      }
+    },
+    "/billing/stats": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/billing/stats",
+      "status": 200,
+      "structure": {
+        "patientsWithBalance": "int",
+        "pendingClaims": "int",
+        "recentDischarges": "int",
+        "totalOutstanding": "float",
+        "totalPatients": "int"
+      }
+    },
+    "/chat/access/{pid}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/chat/access/36",
+      "status": 200,
+      "structure": {
+        "access": "str",
+        "canShare": "bool",
+        "pid": "int"
+      }
+    },
+    "/chat/patients": {
+      "count": 37,
+      "error": null,
+      "kind": "list",
+      "path": "/chat/patients",
+      "status": 200,
+      "structure": {
+        "item": {
+          "fname": "str",
+          "last_date": "str",
+          "last_message": "str",
+          "lname": "str",
+          "pid": "str",
+          "unread": "str"
+        },
+        "kind": "list",
+        "length": 37
+      }
+    },
+    "/chat/thread/{pid}": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/chat/thread/36",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/chat/users": {
+      "count": 10,
+      "error": null,
+      "kind": "list",
+      "path": "/chat/users",
+      "status": 200,
+      "structure": {
+        "item": {
+          "fname": "str",
+          "id": "str",
+          "lname": "str",
+          "main_menu_role": "str",
+          "username": "str"
+        },
+        "kind": "list",
+        "length": 10
+      }
+    },
+    "/config": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/config",
+      "status": 200,
+      "structure": {
+        "appName": "str",
+        "language": "str",
+        "version": "str"
+      }
+    },
+    "/documents": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/documents",
+      "status": 200,
+      "structure": {
+        "item": {
+          "accessCount": "int",
+          "b2FileId": "str",
+          "b2Path": "str",
+          "category": "str",
+          "createdAt": "str",
+          "id": "int",
+          "lastAccessedAt": "NoneType",
+          "mimeType": "str",
+          "notes": "str",
+          "originalName": "str",
+          "pid": "int",
+          "recipientContact": "str",
+          "recipientName": "str",
+          "sizeBytes": "str",
+          "status": "str",
+          "updatedAt": "str",
+          "uploadedBy": "str",
+          "uploaderUserId": "int"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/documents/{document_id}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/documents/10",
+      "status": 200,
+      "structure": {
+        "accessCount": "int",
+        "b2FileId": "str",
+        "b2Path": "str",
+        "category": "str",
+        "createdAt": "str",
+        "id": "int",
+        "lastAccessedAt": "NoneType",
+        "mimeType": "str",
+        "notes": "str",
+        "originalName": "str",
+        "pid": "int",
+        "recipientContact": "str",
+        "recipientName": "str",
+        "sizeBytes": "str",
+        "status": "str",
+        "updatedAt": "str",
+        "uploadedBy": "str",
+        "uploaderUserId": "int"
+      }
+    },
+    "/drugs": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/drugs",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/emergency/board": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/emergency/board",
+      "status": 200,
+      "structure": {
+        "counts": {
+          "active": "int",
+          "awaitingFirstReview": "int",
+          "breached": "int",
+          "byLevel": {
+            "1": "int",
+            "2": "int",
+            "3": "int",
+            "4": "int",
+            "5": "int"
+          },
+          "escalated": "int",
+          "inTreatment": "int",
+          "needsVitals": "int",
+          "reassessOverdue": "int",
+          "waiting": "int"
+        },
+        "generatedAt": "str",
+        "levels": {
+          "1": {
+            "acuity": "str",
+            "color": "str",
+            "label": "str",
+            "level": "int",
+            "meaning": "str",
+            "reassessMinutes": "int",
+            "targetMinutes": "int"
+          },
+          "2": {
+            "acuity": "str",
+            "color": "str",
+            "label": "str",
+            "level": "int",
+            "meaning": "str",
+            "reassessMinutes": "int",
+            "targetMinutes": "int"
+          },
+          "3": {
+            "acuity": "str",
+            "color": "str",
+            "label": "str",
+            "level": "int",
+            "meaning": "str",
+            "reassessMinutes": "int",
+            "targetMinutes": "int"
+          },
+          "4": {
+            "acuity": "str",
+            "color": "str",
+            "label": "str",
+            "level": "int",
+            "meaning": "str",
+            "reassessMinutes": "int",
+            "targetMinutes": "int"
+          },
+          "5": {
+            "acuity": "str",
+            "color": "str",
+            "label": "str",
+            "level": "int",
+            "meaning": "str",
+            "reassessMinutes": "int",
+            "targetMinutes": "int"
+          }
+        },
+        "longestWaitMinutes": "int",
+        "visits": {
+          "item": null,
+          "kind": "list",
+          "length": 0
+        }
+      }
+    },
+    "/fhir/Patient": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/fhir/Patient",
+      "status": 200,
+      "structure": {
+        "entry": {
+          "item": {
+            "resource": {
+              "birthDate": "str",
+              "gender": "str",
+              "id": "str",
+              "name": "list",
+              "resourceType": "str"
+            }
+          },
+          "kind": "list",
+          "length": 37
+        },
+        "resourceType": "str",
+        "total": "int",
+        "type": "str"
+      }
+    },
+    "/imaging/patient/{pid}": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/imaging/patient/36",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/inpatient/overview": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/inpatient/overview",
+      "status": 200,
+      "structure": {
+        "inpatients": {
+          "item": {
+            "DOB": "str",
+            "acuity_level": "str",
+            "acuity_score": "int",
+            "assigned_nurse_id": "NoneType",
+            "fname": "str",
+            "id": "str",
+            "last_vital_date": "NoneType",
+            "lname": "str",
+            "los_days": "int",
+            "mname": "str",
+            "pid": "str",
+            "provider_name": "str",
+            "public_id": "str",
+            "risk": {
+              "flags": "list",
+              "level": "str",
+              "score": "int"
+            },
+            "room": "str",
+            "sex": "str",
+            "since": "str",
+            "suffix": "NoneType"
+          },
+          "kind": "list",
+          "length": 3
+        },
+        "summary": {
+          "highRisk": "int",
+          "lastUpdated": "str",
+          "longStay": "int",
+          "staleVitals": "int",
+          "total": "int"
+        }
+      }
+    },
+    "/inventory/dashboard": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/inventory/dashboard",
+      "status": 200,
+      "structure": {
+        "byCategory": {
+          "item": {
+            "category": "str",
+            "count": "int"
+          },
+          "kind": "list",
+          "length": 10
+        },
+        "expiring": {
+          "expired": {
+            "item": {
+              "barcode": "str",
+              "category": "str",
+              "created_at": "str",
+              "current_quantity": "int",
+              "days_to_expiration": "int",
+              "department": "str",
+              "description": "str",
+              "expiration_date": "str",
+              "expiration_status": "str",
+              "id": "int",
+              "is_active": "bool",
+              "item_code": "str",
+              "item_name": "str",
+              "lot_number": "str",
+              "minimum_quantity": "int",
+              "reorder_quantity": "NoneType",
+              "rfid_tag": "NoneType",
+              "status": "str",
+              "stock_status": "str",
+              "storage_location": "str",
+              "supplier": "str",
+              "unit": "str",
+              "unit_cost": "float",
+              "unit_price": "NoneType",
+              "updated_at": "str"
+            },
+            "kind": "list",
+            "length": 2
+          },
+          "within30": {
+            "item": {
+              "barcode": "str",
+              "category": "str",
+              "created_at": "str",
+              "current_quantity": "int",
+              "days_to_expiration": "int",
+              "department": "str",
+              "description": "str",
+              "expiration_date": "str",
+              "expiration_status": "str",
+              "id": "int",
+              "is_active": "bool",
+              "item_code": "str",
+              "item_name": "str",
+              "lot_number": "str",
+              "minimum_quantity": "int",
+              "reorder_quantity": "NoneType",
+              "rfid_tag": "NoneType",
+              "status": "str",
+              "stock_status": "str",
+              "storage_location": "str",
+              "supplier": "str",
+              "unit": "str",
+              "unit_cost": "float",
+              "unit_price": "NoneType",
+              "updated_at": "str"
+            },
+            "kind": "list",
+            "length": 1
+          },
+          "within60": {
+            "item": null,
+            "kind": "list",
+            "length": 0
+          },
+          "within90": {
+            "item": {
+              "barcode": "str",
+              "category": "str",
+              "created_at": "str",
+              "current_quantity": "int",
+              "days_to_expiration": "int",
+              "department": "str",
+              "description": "str",
+              "expiration_date": "str",
+              "expiration_status": "str",
+              "id": "int",
+              "is_active": "bool",
+              "item_code": "str",
+              "item_name": "str",
+              "lot_number": "str",
+              "minimum_quantity": "int",
+              "reorder_quantity": "NoneType",
+              "rfid_tag": "NoneType",
+              "status": "str",
+              "stock_status": "str",
+              "storage_location": "str",
+              "supplier": "str",
+              "unit": "str",
+              "unit_cost": "float",
+              "unit_price": "float",
+              "updated_at": "str"
+            },
+            "kind": "list",
+            "length": 1
+          }
+        },
+        "health": {
+          "expiredCount": "int",
+          "inStockCount": "int",
+          "inStockPercent": "int",
+          "lowStockCount": "int",
+          "outOfStockCount": "int",
+          "total": "int"
+        },
+        "lowStock": {
+          "item": {
+            "barcode": "str",
+            "category": "str",
+            "created_at": "str",
+            "current_quantity": "int",
+            "days_to_expiration": "int",
+            "department": "str",
+            "description": "str",
+            "expiration_date": "str",
+            "expiration_status": "str",
+            "id": "int",
+            "is_active": "bool",
+            "item_code": "str",
+            "item_name": "str",
+            "lot_number": "str",
+            "minimum_quantity": "int",
+            "reorder_quantity": "NoneType",
+            "rfid_tag": "NoneType",
+            "status": "str",
+            "stock_status": "str",
+            "storage_location": "str",
+            "supplier": "str",
+            "unit": "str",
+            "unit_cost": "float",
+            "unit_price": "NoneType",
+            "updated_at": "str"
+          },
+          "kind": "list",
+          "length": 4
+        },
+        "recentActivity": {
+          "item": {
+            "created_at": "str",
+            "destination_location": "NoneType",
+            "id": "int",
+            "inventory_item_id": "int",
+            "item_code": "str",
+            "item_name": "str",
+            "new_quantity": "str",
+            "notes": "NoneType",
+            "performed_by_name": "str",
+            "previous_quantity": "str",
+            "quantity": "str",
+            "reason": "str",
+            "source_location": "str",
+            "transaction_type": "str",
+            "unit": "str"
+          },
+          "kind": "list",
+          "length": 10
+        },
+        "summary": {
+          "expired": "int",
+          "expiringSoon": "int",
+          "inStock": "int",
+          "inventoryValue": "float",
+          "lowStock": "int",
+          "outOfStock": "int",
+          "total": "int"
+        }
+      }
+    },
+    "/lab/catalog": {
+      "count": 155,
+      "error": null,
+      "kind": "list",
+      "path": "/lab/catalog",
+      "status": 200,
+      "structure": {
+        "item": {
+          "active": "int",
+          "category": "str",
+          "code": "str",
+          "display_order": "int",
+          "id": "int",
+          "name": "str",
+          "options": "NoneType",
+          "ref_max": "str",
+          "ref_min": "str",
+          "ref_text": "str",
+          "result_type": "str",
+          "sheet": "str",
+          "unit": "str"
+        },
+        "kind": "list",
+        "length": 155
+      }
+    },
+    "/lab/patients/{pid}/results": {
+      "count": 5,
+      "error": null,
+      "kind": "list",
+      "path": "/lab/patients/36/results",
+      "status": 200,
+      "structure": {
+        "item": {
+          "abnormal": "str",
+          "comments": "str",
+          "date_ordered": "str",
+          "id": "str",
+          "orderId": "str",
+          "order_instructions": "str",
+          "order_status": "str",
+          "ref_range": "str",
+          "result": "str",
+          "result_code": "str",
+          "result_date": "str",
+          "result_status": "str",
+          "result_text": "str",
+          "review_status": "str",
+          "test_name": "str",
+          "units": "str"
+        },
+        "kind": "list",
+        "length": 5
+      }
+    },
+    "/lab/reports/{lab_report_id}": {
+      "count": 78,
+      "error": null,
+      "kind": "dict",
+      "path": "/lab/reports/5",
+      "status": 200,
+      "structure": {
+        "DOB": "str",
+        "created_at": "str",
+        "fname": "str",
+        "id": "int",
+        "items": {
+          "item": {
+            "category": "str",
+            "code": "str",
+            "comments": "NoneType",
+            "display_order": "int",
+            "flag": "NoneType",
+            "id": "int",
+            "name": "str",
+            "ref_max": "str",
+            "ref_min": "str",
+            "ref_text": "str",
+            "report_id": "int",
+            "result_value": "str",
+            "test_id": "int",
+            "unit": "str"
+          },
+          "kind": "list",
+          "length": 78
+        },
+        "lab_no": "str",
+        "lab_order_id": "NoneType",
+        "lname": "str",
+        "patient_id": "str",
+        "pid": "int",
+        "public_id": "str",
+        "sex": "str",
+        "status": "str",
+        "technician_id": "int",
+        "technician_name": "str",
+        "updated_at": "str",
+        "verified_at": "str"
+      }
+    },
+    "/labs/results": {
+      "count": 20,
+      "error": null,
+      "kind": "list",
+      "path": "/labs/results",
+      "status": 200,
+      "structure": {
+        "item": {
+          "abnormal": "str",
+          "date": "str",
+          "date_collected": "NoneType",
+          "date_report": "str",
+          "id": "str",
+          "order_priority": "str",
+          "patient_id": "str",
+          "patient_name": "str",
+          "patient_pid": "str",
+          "procedure_report_id": "str",
+          "result": "str",
+          "result_code": "str",
+          "result_date": "str",
+          "result_text": "str",
+          "test_name": "str",
+          "units": "str"
+        },
+        "kind": "list",
+        "length": 20
+      }
+    },
+    "/license/status": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/license/status",
+      "status": 200,
+      "structure": {
+        "customerName": "str",
+        "daysRemaining": "int",
+        "expiresAt": "str",
+        "maxUsers": "int",
+        "tier": "str",
+        "valid": "bool"
+      }
+    },
+    "/messages": {
+      "count": 87,
+      "error": null,
+      "kind": "list",
+      "path": "/messages",
+      "status": 200,
+      "structure": {
+        "item": {
+          "assigned_to": "str",
+          "body": "str",
+          "date": "str",
+          "groupname": "str",
+          "id": "str",
+          "message_status": "str",
+          "patientId": "str",
+          "patientName": "str",
+          "patientPid": "str",
+          "pid": "str",
+          "title": "str",
+          "user": "str"
+        },
+        "kind": "list",
+        "length": 87
+      }
+    },
+    "/midwife/patients/{pid}/assessments": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/midwife/patients/36/assessments",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/midwife/patients/{pid}/eligibility": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/midwife/patients/36/eligibility",
+      "status": 200,
+      "structure": {
+        "ageYears": "int",
+        "applicable": "bool",
+        "minAge": "int",
+        "patient": "str",
+        "pid": "str",
+        "reason": "str",
+        "sex": "str"
+      }
+    },
+    "/notifications/summary": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/notifications/summary",
+      "status": 200,
+      "structure": {
+        "drugInfo": "int",
+        "generatedAt": "str",
+        "messages": "int",
+        "patientFlow": "int",
+        "pharmacy": "int",
+        "referrals": "int"
+      }
+    },
+    "/nurse/dashboard": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/nurse/dashboard",
+      "status": 200,
+      "structure": {
+        "assignedPatients": {
+          "item": null,
+          "kind": "list",
+          "length": 0
+        },
+        "nurse": {
+          "fname": "str",
+          "id": "str",
+          "lname": "str",
+          "title": "NoneType",
+          "username": "str"
+        },
+        "patients": {
+          "item": {
+            "BMI": "NoneType",
+            "DOB": "str",
+            "acuity_level": "NoneType",
+            "acuity_score": "NoneType",
+            "awaiting_vitals": "int",
+            "bpd": "NoneType",
+            "bps": "NoneType",
+            "fname": "str",
+            "height": "NoneType",
+            "id": "str",
+            "is_assigned": "NoneType",
+            "last_vital_date": "NoneType",
+            "lname": "str",
+            "oxygen_saturation": "NoneType",
+            "pid": "str",
+            "pulse": "NoneType",
+            "respiration": "NoneType",
+            "room": "NoneType",
+            "sex": "str",
+            "temperature": "NoneType",
+            "weight": "NoneType"
+          },
+          "kind": "list",
+          "length": 37
+        },
+        "sharedNotes": {
+          "item": null,
+          "kind": "list",
+          "length": 0
+        },
+        "unreadCount": "int"
+      }
+    },
+    "/patients/{pid}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/patients/36",
+      "status": 200,
+      "structure": {
+        "DOB": "str",
+        "chart_complete": "bool",
+        "chart_readiness": {
+          "complete": "bool",
+          "missing": {
+            "item": "str",
+            "kind": "list",
+            "length": 2
+          },
+          "nextAction": "str",
+          "score": "int",
+          "sections": {
+            "item": {
+              "complete": "bool",
+              "earned": "int",
+              "key": "str",
+              "label": "str",
+              "missing": "list",
+              "weight": "int"
+            },
+            "kind": "list",
+            "length": 4
+          }
+        },
+        "chart_shared": "int",
+        "city": "str",
+        "created_by": "str",
+        "dob": "str",
+        "email": "str",
+        "emergency": {
+          "active": "NoneType",
+          "current": "NoneType",
+          "history": {
+            "item": null,
+            "kind": "list",
+            "length": 0
+          },
+          "reassessments": {
+            "item": null,
+            "kind": "list",
+            "length": 0
+          },
+          "total": "int"
+        },
+        "fname": "str",
+        "id": "str",
+        "insurance_type": "str",
+        "lname": "str",
+        "maternity_eligibility": {
+          "ageYears": "int",
+          "applicable": "bool",
+          "minAge": "int",
+          "reason": "str",
+          "sex": "str"
+        },
+        "missing_fields": {
+          "item": "str",
+          "kind": "list",
+          "length": 2
+        },
+        "mname": "str",
+        "patient_responsibility_percent": "int",
+        "phone": "str",
+        "phone_contact": "str",
+        "pid": "str",
+        "postal_code": "str",
+        "provider": "int",
+        "providerID": "int",
+        "providerName": "str",
+        "public_id": "str",
+        "ref_providerID": "NoneType",
+        "regdate": "str",
+        "sex": "str",
+        "state": "str",
+        "status": "str",
+        "street": "str",
+        "suffix": "NoneType",
+        "zip": "str"
+      }
+    },
+    "/patients/{pid}/allergies": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/allergies",
+      "status": 200,
+      "structure": {
+        "item": {
+          "allergen": "str",
+          "date": "str",
+          "id": "str",
+          "reaction": "str",
+          "type": "str"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/patients/{pid}/allergies/enriched": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/allergies/enriched",
+      "status": 200,
+      "structure": {
+        "item": {
+          "allergen": "str",
+          "id": "str",
+          "reaction": "str",
+          "source": "str"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/patients/{pid}/appointments": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/appointments",
+      "status": 200,
+      "structure": {
+        "item": {
+          "pc_aid": "str",
+          "pc_apptstatus": "str",
+          "pc_billing_location": "int",
+          "pc_catid": "int",
+          "pc_duration": "str",
+          "pc_eid": "int",
+          "pc_endDate": "NoneType",
+          "pc_endTime": "NoneType",
+          "pc_eventDate": "str",
+          "pc_facility": "int",
+          "pc_hometext": "str",
+          "pc_pid": "str",
+          "pc_startTime": "str",
+          "pc_time": "str",
+          "pc_title": "str",
+          "pc_uuid": "NoneType"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/patients/{pid}/attending-history": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/attending-history",
+      "status": 200,
+      "structure": {
+        "item": {
+          "id": "str",
+          "last_seen": "str",
+          "name": "str",
+          "role": "str",
+          "visits": "str"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/patients/{pid}/billing": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/patients/36/billing",
+      "status": 200,
+      "structure": {
+        "claimCount": "int",
+        "claims": {
+          "item": null,
+          "kind": "list",
+          "length": 0
+        },
+        "transactionCount": "int",
+        "transactions": {
+          "item": {
+            "amountFormatted": "str",
+            "amountLRD": "int",
+            "amountUSD": "int",
+            "date": "str",
+            "id": "str",
+            "paymentId": "str",
+            "paymentMethod": "str",
+            "pid": "str",
+            "title": "str",
+            "user": "str"
+          },
+          "kind": "list",
+          "length": 8
+        }
+      }
+    },
+    "/patients/{pid}/care-plan": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/care-plan",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/ccda": {
+      "count": null,
+      "error": null,
+      "kind": "str",
+      "path": "/patients/36/ccda",
+      "status": 200,
+      "structure": "str"
+    },
+    "/patients/{pid}/conditions": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/conditions",
+      "status": 200,
+      "structure": {
+        "item": {
+          "begdate": "str",
+          "date": "str",
+          "diagnosis": "str",
+          "enddate": "NoneType",
+          "id": "str",
+          "note": "str",
+          "type": "str"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/patients/{pid}/encounter-breakdown": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/patients/36/encounter-breakdown",
+      "status": 200,
+      "structure": {
+        "encounters": {
+          "item": {
+            "adjustments": "int",
+            "balance": "int",
+            "categories": {
+              "item": "str",
+              "kind": "list",
+              "length": 1
+            },
+            "charges": "int",
+            "date": "str",
+            "dateEnd": "str",
+            "disposition": "str",
+            "encounterId": "str",
+            "groups": {
+              "item": "dict",
+              "kind": "list",
+              "length": 1
+            },
+            "holds": {
+              "item": null,
+              "kind": "list",
+              "length": 0
+            },
+            "labLink": "NoneType",
+            "labOrders": {
+              "item": null,
+              "kind": "list",
+              "length": 0
+            },
+            "labTests": {
+              "item": null,
+              "kind": "list",
+              "length": 0
+            },
+            "label": "str",
+            "lines": {
+              "item": "dict",
+              "kind": "list",
+              "length": 1
+            },
+            "paid": "int",
+            "pendingHolds": "int",
+            "reason": "str",
+            "type": "str"
+          },
+          "kind": "list",
+          "length": 3
+        },
+        "holdsPending": {
+          "item": null,
+          "kind": "list",
+          "length": 0
+        },
+        "labOrders": {
+          "item": {
+            "dateOrdered": "str",
+            "orderId": "str",
+            "status": "str",
+            "testName": "str"
+          },
+          "kind": "list",
+          "length": 4
+        },
+        "pendingHolds": "int",
+        "pid": "int",
+        "totals": {
+          "balance": "int",
+          "charges": "float",
+          "paid": "float"
+        }
+      }
+    },
+    "/patients/{pid}/encounters": {
+      "count": 2,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/encounters",
+      "status": 200,
+      "structure": {
+        "item": {
+          "billing_facility": "int",
+          "billing_note": "NoneType",
+          "class_code": "str",
+          "date": "str",
+          "external_id": "NoneType",
+          "facility": "NoneType",
+          "facility_id": "int",
+          "id": "str",
+          "invoice_refno": "str",
+          "last_level_billed": "int",
+          "last_level_closed": "int",
+          "last_stmt_date": "NoneType",
+          "onset_date": "NoneType",
+          "pc_catid": "int",
+          "pid": "str",
+          "pos_code": "NoneType",
+          "provider_id": "int",
+          "reason": "str",
+          "referral_source": "str",
+          "sensitivity": "NoneType",
+          "stmt_count": "int",
+          "supervisor_id": "int",
+          "uuid": "NoneType"
+        },
+        "kind": "list",
+        "length": 2
+      }
+    },
+    "/patients/{pid}/encounters/{eid}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/patients/36/encounters/66",
+      "status": 200,
+      "structure": {
+        "billing_facility": "int",
+        "billing_note": "NoneType",
+        "class_code": "str",
+        "date": "str",
+        "external_id": "NoneType",
+        "facility": "NoneType",
+        "facility_id": "int",
+        "id": "str",
+        "invoice_refno": "str",
+        "last_level_billed": "int",
+        "last_level_closed": "int",
+        "last_stmt_date": "NoneType",
+        "onset_date": "NoneType",
+        "pc_catid": "int",
+        "pid": "str",
+        "pos_code": "NoneType",
+        "provider_id": "int",
+        "reason": "str",
+        "referral_source": "str",
+        "sensitivity": "NoneType",
+        "stmt_count": "int",
+        "supervisor_id": "int",
+        "uuid": "NoneType"
+      }
+    },
+    "/patients/{pid}/encounters/{eid}/notes": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/encounters/66/notes",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/encounters/{eid}/soap": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/encounters/66/soap",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/encounters/{eid}/vitals": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/encounters/66/vitals",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/immunizations": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/immunizations",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/insurance": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/insurance",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/lab-reports": {
+      "count": 2,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/lab-reports",
+      "status": 200,
+      "structure": {
+        "item": {
+          "DOB": "str",
+          "created_at": "str",
+          "fname": "str",
+          "id": "int",
+          "item_count": "str",
+          "lab_no": "str",
+          "lab_order_id": "NoneType",
+          "lname": "str",
+          "patient_id": "int",
+          "pid": "int",
+          "public_id": "str",
+          "sex": "str",
+          "status": "str",
+          "technician_id": "int",
+          "technician_name": "str",
+          "updated_at": "str",
+          "verified_at": "str"
+        },
+        "kind": "list",
+        "length": 2
+      }
+    },
+    "/patients/{pid}/lab/ordered-tests": {
+      "count": 4,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/lab/ordered-tests",
+      "status": 200,
+      "structure": {
+        "item": "str",
+        "kind": "list",
+        "length": 4
+      }
+    },
+    "/patients/{pid}/medications": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/medications",
+      "status": 200,
+      "structure": {
+        "item": {
+          "active": "int",
+          "dosage": "str",
+          "dose_interval": "NoneType",
+          "drug": "str",
+          "end_date": "NoneType",
+          "id": "int",
+          "note": "str",
+          "patient_id": "str",
+          "quantity": "str",
+          "refills": "int",
+          "route": "str",
+          "start_date": "NoneType",
+          "uuid": "NoneType"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/patients/{pid}/notes": {
+      "count": 2,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/notes",
+      "status": 200,
+      "structure": {
+        "item": {
+          "acuity_level": "str",
+          "acuity_score": "int",
+          "assigned_nurse_id": "int",
+          "assigned_to": "str",
+          "author_name": "str",
+          "body": "str",
+          "charge_nurse_id": "int",
+          "date": "str",
+          "groupname": "str",
+          "id": "str",
+          "message_status": "str",
+          "pid": "str",
+          "room": "str",
+          "title": "str",
+          "user": "str"
+        },
+        "kind": "list",
+        "length": 2
+      }
+    },
+    "/patients/{pid}/observations": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/observations",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/procedures": {
+      "count": 4,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/procedures",
+      "status": 200,
+      "structure": {
+        "item": {
+          "billingCleared": "bool",
+          "billingCode": "NoneType",
+          "billingDesc": "NoneType",
+          "billingFee": "NoneType",
+          "billingHeld": "bool",
+          "billingHold": "str",
+          "billingHoldCode": "NoneType",
+          "billingHoldFee": "int",
+          "chartId": "str",
+          "clinicalHx": "str",
+          "dateOrdered": "str",
+          "encounterId": "str",
+          "estimatedTime": "str",
+          "hasResults": "bool",
+          "id": "str",
+          "instructions": "str",
+          "nextStatus": "str",
+          "orderPriority": "str",
+          "orderStatus": "str",
+          "patientId": "str",
+          "patientName": "str",
+          "patientPid": "str",
+          "providerId": "str",
+          "specimenId": "str",
+          "statusColor": "str",
+          "statusLabel": "str",
+          "steps": {
+            "item": {
+              "active": "bool",
+              "color": "str",
+              "completed": "bool",
+              "eta": "str",
+              "label": "str",
+              "status": "str"
+            },
+            "kind": "list",
+            "length": 7
+          }
+        },
+        "kind": "list",
+        "length": 4
+      }
+    },
+    "/patients/{pid}/room": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/patients/36/room",
+      "status": 200,
+      "structure": {
+        "acuity_level": "str",
+        "acuity_score": "int",
+        "assigned_nurse_id": "int",
+        "charge_nurse_id": "int",
+        "pid": "int",
+        "room": "str"
+      }
+    },
+    "/patients/{pid}/ros": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/ros",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/patients/{pid}/vitals": {
+      "count": 2,
+      "error": null,
+      "kind": "list",
+      "path": "/patients/36/vitals",
+      "status": 200,
+      "structure": {
+        "item": {
+          "BMI": "str",
+          "BMI_status": "NoneType",
+          "bpd": "str",
+          "bps": "str",
+          "date": "str",
+          "height": "str",
+          "id": "str",
+          "note": "NoneType",
+          "oxygen_saturation": "str",
+          "pulse": "str",
+          "respiration": "str",
+          "temperature": "str",
+          "weight": "str"
+        },
+        "kind": "list",
+        "length": 2
+      }
+    },
+    "/patients?limit=1": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/patients?limit=1",
+      "status": 200,
+      "structure": {
+        "item": {
+          "DOB": "str",
+          "age": "str",
+          "chart_shared": "int",
+          "city": "str",
+          "created_by": "str",
+          "email": "str",
+          "fname": "str",
+          "id": "str",
+          "lname": "str",
+          "mname": "str",
+          "phone_contact": "str",
+          "pid": "str",
+          "postal_code": "str",
+          "providerID": "NoneType",
+          "providerName": "NoneType",
+          "public_id": "NoneType",
+          "ref_providerID": "NoneType",
+          "regdate": "str",
+          "sex": "str",
+          "state": "str",
+          "status": "str",
+          "street": "str",
+          "suffix": "NoneType"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/prescriptions": {
+      "count": 17,
+      "error": null,
+      "kind": "list",
+      "path": "/prescriptions",
+      "status": 200,
+      "structure": {
+        "item": {
+          "active": "int",
+          "billed": "bool",
+          "billed_amount_usd": "int",
+          "billing_cleared": "bool",
+          "billing_held": "bool",
+          "billing_hold": "str",
+          "dosage": "str",
+          "drug": "str",
+          "end_date": "NoneType",
+          "hold_code": "str",
+          "hold_fee_usd": "int",
+          "id": "int",
+          "note": "str",
+          "paid": "bool",
+          "patient_balance_usd": "int",
+          "patient_charges_usd": "int",
+          "patient_id": "str",
+          "patient_name": "str",
+          "patient_paid_usd": "int",
+          "pid": "str",
+          "quantity": "str",
+          "refills": "int",
+          "start_date": "NoneType"
+        },
+        "kind": "list",
+        "length": 17
+      }
+    },
+    "/provider/profile/{provider_id}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/provider/profile/5",
+      "status": 200,
+      "structure": {
+        "active": "int",
+        "calendar_color": "str",
+        "email": "NoneType",
+        "fname": "str",
+        "id": "str",
+        "lname": "str",
+        "npi": "NoneType",
+        "phone": "NoneType",
+        "phonecell": "NoneType",
+        "physician_type": "NoneType",
+        "specialty": "NoneType",
+        "taxonomy": "str",
+        "title": "NoneType",
+        "todayAvailability": {
+          "item": null,
+          "kind": "list",
+          "length": 0
+        },
+        "upin": "NoneType",
+        "username": "str"
+      }
+    },
+    "/providers": {
+      "count": 10,
+      "error": null,
+      "kind": "list",
+      "path": "/providers",
+      "status": 200,
+      "structure": {
+        "item": {
+          "active": "int",
+          "calendar_color": "str",
+          "fname": "str",
+          "id": "str",
+          "lname": "str",
+          "npi": "NoneType",
+          "physician_type": "NoneType",
+          "specialty": "NoneType",
+          "title": "NoneType",
+          "username": "str"
+        },
+        "kind": "list",
+        "length": 10
+      }
+    },
+    "/providers/available-today": {
+      "count": 0,
+      "error": null,
+      "kind": "list",
+      "path": "/providers/available-today",
+      "status": 200,
+      "structure": {
+        "item": null,
+        "kind": "list",
+        "length": 0
+      }
+    },
+    "/referrals": {
+      "count": 1,
+      "error": null,
+      "kind": "list",
+      "path": "/referrals",
+      "status": 200,
+      "structure": {
+        "item": {
+          "body": "str",
+          "date": "str",
+          "id": "str",
+          "patientDOB": "str",
+          "patientId": "int",
+          "patientName": "str",
+          "patientSex": "str",
+          "pid": "str",
+          "reason": "str",
+          "referringProvider": "str",
+          "specialistId": "int",
+          "specialistName": "str",
+          "specialty": "str",
+          "status": "str",
+          "urgency": "str"
+        },
+        "kind": "list",
+        "length": 1
+      }
+    },
+    "/referrals/smart-suggest/{pid}": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/referrals/smart-suggest/36",
+      "status": 200,
+      "structure": {
+        "clinicalNotes": {
+          "item": {
+            "body": "str",
+            "date": "str",
+            "id": "str",
+            "kind": "str",
+            "title": "str"
+          },
+          "kind": "list",
+          "length": 10
+        },
+        "conditions": {
+          "item": {
+            "date": "str",
+            "diagnosis": "str",
+            "id": "str",
+            "note": "str"
+          },
+          "kind": "list",
+          "length": 1
+        },
+        "patient": {
+          "DOB": "str",
+          "name": "str",
+          "pid": "str",
+          "sex": "str"
+        },
+        "suggestedReason": "str",
+        "suggestions": {
+          "item": {
+            "matchedKeywords": {
+              "item": "str",
+              "kind": "list",
+              "length": 1
+            },
+            "providers": {
+              "item": null,
+              "kind": "list",
+              "length": 0
+            },
+            "score": "int",
+            "specialty": "str"
+          },
+          "kind": "list",
+          "length": 5
+        }
+      }
+    },
+    "/reports/appointments": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/reports/appointments",
+      "status": 200,
+      "structure": {
+        "byStatus": {
+          "item": {
+            "count": "str",
+            "status": "str"
+          },
+          "kind": "list",
+          "length": 6
+        },
+        "total": "str",
+        "uniquePatients": "str"
+      }
+    },
+    "/reports/encounters": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/reports/encounters",
+      "status": 200,
+      "structure": {
+        "byClass": {
+          "item": {
+            "class_code": "str",
+            "count": "str"
+          },
+          "kind": "list",
+          "length": 1
+        },
+        "total": "str",
+        "uniquePatients": "str"
+      }
+    },
+    "/reports/financial": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/reports/financial",
+      "status": 200,
+      "structure": {
+        "claimCount": "str",
+        "encounterCount": "str",
+        "transactionCount": "str"
+      }
+    },
+    "/reports/patients": {
+      "count": null,
+      "error": null,
+      "kind": "dict",
+      "path": "/reports/patients",
+      "status": 200,
+      "structure": {
+        "active": "int",
+        "ageBands": {
+          "item": {
+            "count": "int",
+            "label": "str"
+          },
+          "kind": "list",
+          "length": 5
+        },
+        "bySex": {
+          "item": {
+            "count": "int",
+            "label": "str"
+          },
+          "kind": "list",
+          "length": 3
+        },
+        "byStatus": {
+          "item": {
+            "count": "int",
+            "label": "str"
+          },
+          "kind": "list",
+          "length": 1
+        },
+        "last30": "int",
+        "monthly": {
+          "item": {
+            "count": "int",
+            "month": "str"
+          },
+          "kind": "list",
+          "length": 2
+        },
+        "recent": {
+          "item": {
+            "DOB": "str",
+            "name": "str",
+            "patientId": "int",
+            "pid": "int",
+            "regdate": "str",
+            "sex": "str",
+            "status": "str",
+            "visits": "int"
+          },
+          "kind": "list",
+          "length": 15
+        },
+        "thisYear": "int",
+        "total": "int"
+      }
+    }
+  },
+  "capabilities": {
+    "allergies": true,
+    "conditions": true,
+    "encounters": true,
+    "immunizations": false,
+    "lab-reports": true,
+    "medications": true,
+    "notes": true,
+    "vitals": true
+  },
+  "database": {
+    "engine": "mysql",
+    "patient_data_columns": [
+      "id",
+      "uuid",
+      "title",
+      "language",
+      "financial",
+      "fname",
+      "lname",
+      "mname",
+      "DOB",
+      "street",
+      "postal_code",
+      "city",
+      "state",
+      "country_code",
+      "drivers_license",
+      "ss",
+      "occupation",
+      "phone_home",
+      "phone_biz",
+      "phone_contact",
+      "phone_cell",
+      "pharmacy_id",
+      "status",
+      "approved_at",
+      "contact_relationship",
+      "date",
+      "sex",
+      "referrer",
+      "referrerID",
+      "providerID",
+      "ref_providerID",
+      "email",
+      "email_direct",
+      "ethnoracial",
+      "race",
+      "ethnicity",
+      "religion",
+      "interpreter",
+      "interpreter_needed",
+      "migrantseasonal",
+      "family_size",
+      "monthly_income",
+      "billing_note",
+      "homeless",
+      "financial_review",
+      "pubpid",
+      "pid",
+      "public_id",
+      "genericname1",
+      "genericval1",
+      "genericname2",
+      "genericval2",
+      "hipaa_mail",
+      "hipaa_voice",
+      "hipaa_notice",
+      "hipaa_message",
+      "hipaa_allowsms",
+      "hipaa_allowemail",
+      "squad",
+      "fitness",
+      "referral_source",
+      "usertext1",
+      "usertext2",
+      "usertext3",
+      "usertext4",
+      "usertext5",
+      "usertext6",
+      "usertext7",
+      "usertext8",
+      "userlist1",
+      "userlist2",
+      "userlist3",
+      "userlist4",
+      "userlist5",
+      "userlist6",
+      "userlist7",
+      "pricelevel",
+      "regdate",
+      "contrastart",
+      "completed_ad",
+      "ad_reviewed",
+      "advance_directive_user_authenticator",
+      "vfc",
+      "mothersname",
+      "guardiansname",
+      "allow_imm_reg_use",
+      "allow_imm_info_share",
+      "allow_health_info_ex",
+      "allow_patient_portal",
+      "deceased_date",
+      "deceased_reason",
+      "soap_import_status",
+      "cmsportal_login",
+      "care_team_provider",
+      "care_team_facility",
+      "care_team_status",
+      "county",
+      "industry",
+      "imm_reg_status",
+      "imm_reg_stat_effdate",
+      "publicity_code",
+      "publ_code_eff_date",
+      "protect_indicator",
+      "prot_indi_effdate",
+      "guardianrelationship",
+      "guardiansex",
+      "guardianaddress",
+      "guardiancity",
+      "guardianstate",
+      "guardianpostalcode",
+      "guardiancountry",
+      "guardianphone",
+      "guardianworkphone",
+      "guardianemail",
+      "sexual_orientation",
+      "gender_identity",
+      "birth_fname",
+      "birth_lname",
+      "birth_mname",
+      "dupscore",
+      "name_history",
+      "suffix",
+      "street_line_2",
+      "patient_groups",
+      "prevent_portal_apps",
+      "provider_since_date",
+      "created_by",
+      "updated_by",
+      "preferred_name",
+      "nationality_country",
+      "last_updated",
+      "tribal_affiliations",
+      "sex_identified",
+      "pronoun",
+      "chart_shared",
+      "insurance_type",
+      "patient_responsibility_percent"
+    ],
+    "tables": {
+      "addresses": 0,
+      "amc_misc_data": 0,
+      "amendments": 0,
+      "amendments_history": 0,
+      "api_log": 0,
+      "api_refresh_token": 0,
+      "api_token": 0,
+      "ar_activity": 73,
+      "ar_session": 0,
+      "audit_details": 0,
+      "audit_master": 0,
+      "automatic_notification": 0,
+      "avatars": 3,
+      "background_services": 0,
+      "bak_midwife_assessments_20260925": 16,
+      "bak_midwife_assessments_20260925b": 6,
+      "bak_pc_categories_20260925": 2,
+      "bak_pc_events_cat5_20260925": 23,
+      "batchcom": 0,
+      "benefit_eligibility": 0,
+      "billing": 252,
+      "billing_holds": 85,
+      "billing_integrity_runs": 6,
+      "billing_settings": 7,
+      "booking_requests": 1,
+      "calendar_external": 0,
+      "care_team_member": 0,
+      "care_teams": 0,
+      "categories": 0,
+      "categories_seq": 0,
+      "categories_to_documents": 0,
+      "ccda": 0,
+      "ccda_components": 0,
+      "ccda_field_mapping": 0,
+      "ccda_sections": 0,
+      "ccda_table_mapping": 0,
+      "chart_tracker": 0,
+      "claims": 0,
+      "clinical_notes_documents": 0,
+      "clinical_notes_procedure_results": 0,
+      "clinical_plans": 0,
+      "clinical_plans_rules": 0,
+      "clinical_rules": 0,
+      "clinical_rules_log": 0,
+      "code_types": 0,
+      "codes": 2,
+      "codes_history": 0,
+      "contact": 0,
+      "contact_address": 0,
+      "contact_relation": 0,
+      "contact_telecom": 0,
+      "customlists": 0,
+      "dated_reminders": 0,
+      "dated_reminders_link": 0,
+      "direct_message_log": 0,
+      "document_template_profiles": 0,
+      "document_templates": 0,
+      "documents": 0,
+      "documents_legal_categories": 0,
+      "documents_legal_detail": 0,
+      "documents_legal_master": 0,
+      "documents_secure": 0,
+      "drug_info_notifications": 0,
+      "drug_inventory": 0,
+      "drug_sales": 0,
+      "drug_templates": 0,
+      "drugs": 0,
+      "dsi_source_attributes": 0,
+      "edi_sequences": 0,
+      "eligibility_verification": 0,
+      "email_queue": 0,
+      "emergency_reassessments": 2,
+      "emergency_visits": 2,
+      "employer_data": 0,
+      "enc_category_map": 0,
+      "erx_narcotics": 0,
+      "erx_rx_log": 0,
+      "erx_ttl_touch": 0,
+      "esign_signatures": 0,
+      "export_job": 0,
+      "extended_log": 0,
+      "external_encounters": 0,
+      "external_procedures": 0,
+      "facility": 0,
+      "facility_user_ids": 0,
+      "fee_schedule": 0,
+      "fee_sheet_options": 0,
+      "form_care_plan": 0,
+      "form_clinical_instructions": 0,
+      "form_clinical_notes": 0,
+      "form_dictation": 0,
+      "form_encounter": 61,
+      "form_eye_acuity": 0,
+      "form_eye_antseg": 0,
+      "form_eye_base": 0,
+      "form_eye_biometrics": 0,
+      "form_eye_external": 0,
+      "form_eye_hpi": 0,
+      "form_eye_locking": 0,
+      "form_eye_mag_dispense": 0,
+      "form_eye_mag_impplan": 0,
+      "form_eye_mag_orders": 0,
+      "form_eye_mag_prefs": 0,
+      "form_eye_mag_wearing": 0,
+      "form_eye_neuro": 0,
+      "form_eye_postseg": 0,
+      "form_eye_refraction": 0,
+      "form_eye_ros": 0,
+      "form_eye_vitals": 0,
+      "form_functional_cognitive_status": 0,
+      "form_group_attendance": 0,
+      "form_groups_encounter": 0,
+      "form_history_sdoh": 0,
+      "form_history_sdoh_health_concerns": 0,
+      "form_misc_billing_options": 0,
+      "form_observation": 0,
+      "form_questionnaire_assessments": 0,
+      "form_reviewofs": 0,
+      "form_ros": 0,
+      "form_soap": 0,
+      "form_taskman": 0,
+      "form_vital_details": 0,
+      "form_vitals": 104,
+      "form_vitals_calculation": 0,
+      "form_vitals_calculation_components": 0,
+      "form_vitals_calculation_form_vitals": 0,
+      "forms": 0,
+      "gacl_acl": 0,
+      "gacl_acl_sections": 0,
+      "gacl_acl_seq": 0,
+      "gacl_aco": 0,
+      "gacl_aco_map": 0,
+      "gacl_aco_sections": 0,
+      "gacl_aco_sections_seq": 0,
+      "gacl_aco_seq": 0,
+      "gacl_aro": 0,
+      "gacl_aro_groups": 0,
+      "gacl_aro_groups_id_seq": 0,
+      "gacl_aro_groups_map": 0,
+      "gacl_aro_map": 0,
+      "gacl_aro_sections": 0,
+      "gacl_aro_sections_seq": 0,
+      "gacl_aro_seq": 0,
+      "gacl_axo": 0,
+      "gacl_axo_groups": 0,
+      "gacl_axo_groups_map": 0,
+      "gacl_axo_map": 0,
+      "gacl_axo_sections": 0,
+      "gacl_groups_aro_map": 0,
+      "gacl_groups_axo_map": 0,
+      "gacl_phpgacl": 0,
+      "globals": 0,
+      "gprelations": 0,
+      "groups": 0,
+      "history_data": 0,
+      "icd10_dx_order_code": 0,
+      "icd10_gem_dx_10_9": 0,
+      "icd10_gem_dx_9_10": 0,
+      "icd10_gem_pcs_10_9": 0,
+      "icd10_gem_pcs_9_10": 0,
+      "icd10_pcs_order_code": 0,
+      "icd10_reimbr_dx_9_10": 0,
+      "icd10_reimbr_pcs_9_10": 0,
+      "icd9_dx_code": 0,
+      "icd9_dx_long_code": 0,
+      "icd9_sg_code": 0,
+      "icd9_sg_long_code": 0,
+      "imaging": 0,
+      "immunization_observation": 0,
+      "immunizations": 0,
+      "insurance_companies": 0,
+      "insurance_data": 0,
+      "insurance_numbers": 0,
+      "insurance_type_codes": 0,
+      "inventory_items": 312,
+      "inventory_purchase_order_items": 6,
+      "inventory_purchase_orders": 3,
+      "inventory_request_items": 4,
+      "inventory_requests": 3,
+      "inventory_transactions": 25,
+      "inventory_vendors": 4,
+      "ip_tracking": 0,
+      "issue_encounter": 0,
+      "issue_types": 0,
+      "jwt_grant_history": 0,
+      "keys": 0,
+      "lab_delete_authorizations": 0,
+      "lab_result_audit": 17,
+      "lab_result_items": 365,
+      "lab_result_reports": 4,
+      "lab_test_catalog": 155,
+      "lang_constants": 0,
+      "lang_custom": 0,
+      "lang_definitions": 0,
+      "lang_languages": 0,
+      "layout_group_properties": 0,
+      "layout_options": 0,
+      "lbf_data": 0,
+      "lbt_data": 0,
+      "licenses": 0,
+      "list_options": 222,
+      "lists": 6,
+      "lists_medication": 0,
+      "lists_touch": 0,
+      "log": 0,
+      "log_comment_encrypt": 0,
+      "login_mfa_registrations": 0,
+      "mailbox_archive_items": 0,
+      "mailbox_archives": 0,
+      "mailbox_settings": 5,
+      "medex_icons": 0,
+      "medex_outgoing": 0,
+      "medex_prefs": 0,
+      "medex_recalls": 0,
+      "midwife_assessments": 7,
+      "migrations": 0,
+      "misc_address_book": 0,
+      "module_acl_group_settings": 0,
+      "module_acl_sections": 0,
+      "module_acl_user_settings": 0,
+      "module_configuration": 0,
+      "modules": 0,
+      "modules_hooks_settings": 0,
+      "modules_settings": 0,
+      "notes": 0,
+      "notification_log": 0,
+      "notification_settings": 0,
+      "oauth_clients": 0,
+      "oauth_trusted_user": 0,
+      "onetime_auth": 0,
+      "onotes": 0,
+      "onsite_documents": 0,
+      "onsite_mail": 0,
+      "onsite_messages": 0,
+      "onsite_online": 0,
+      "onsite_portal_activity": 0,
+      "onsite_signatures": 0,
+      "openemr_module_vars": 0,
+      "openemr_modules": 0,
+      "openemr_postcalendar_categories": 2,
+      "openemr_postcalendar_events": 44,
+      "patient_access_onsite": 0,
+      "patient_birthday_alert": 0,
+      "patient_care_assignment": 13,
+      "patient_care_experience_preferences": 0,
+      "patient_chat_share": 0,
+      "patient_data": 36,
+      "patient_history": 0,
+      "patient_observations": 12,
+      "patient_portal_credentials": 1,
+      "patient_portal_menu": 0,
+      "patient_reminders": 0,
+      "patient_settings": 0,
+      "patient_tracker": 19,
+      "patient_tracker_element": 0,
+      "patient_treatment_intervention_preferences": 0,
+      "payment_gateway_details": 0,
+      "payment_processing_audit": 0,
+      "payments": 0,
+      "person": 0,
+      "person_patient_link": 0,
+      "pharmacies": 0,
+      "pharmacy_alerts": 19,
+      "phone_numbers": 0,
+      "pnotes": 114,
+      "preference_value_sets": 0,
+      "prescriptions": 17,
+      "price_catalog": 308,
+      "prices": 0,
+      "pro_assessments": 0,
+      "procedure_answers": 0,
+      "procedure_order": 69,
+      "procedure_order_code": 0,
+      "procedure_order_relationships": 0,
+      "procedure_providers": 0,
+      "procedure_questions": 0,
+      "procedure_report": 62,
+      "procedure_result": 56,
+      "procedure_specimen": 0,
+      "procedure_type": 0,
+      "product_registration": 0,
+      "product_warehouse": 0,
+      "questionnaire_repository": 0,
+      "questionnaire_response": 0,
+      "recent_patients": 0,
+      "registry": 0,
+      "report_itemized": 0,
+      "report_results": 0,
+      "role_menu_permissions": 48,
+      "rule_action": 0,
+      "rule_action_item": 0,
+      "rule_filter": 0,
+      "rule_patient_data": 0,
+      "rule_reminder": 0,
+      "rule_target": 0,
+      "sequences": 0,
+      "session_tracker": 0,
+      "shared_attributes": 0,
+      "standardized_tables_track": 0,
+      "supported_external_dataloads": 0,
+      "syndromic_surveillance": 0,
+      "template_users": 0,
+      "therapy_groups": 0,
+      "therapy_groups_counselors": 0,
+      "therapy_groups_participant_attendance": 0,
+      "therapy_groups_participants": 0,
+      "track_events": 0,
+      "transactions": 73,
+      "user_settings": 0,
+      "users": 12,
+      "users_facility": 0,
+      "users_secure": 10,
+      "uuid_mapping": 0,
+      "uuid_registry": 0,
+      "valueset": 0,
+      "valueset_oid": 0,
+      "verify_email": 0,
+      "version": 0,
+      "voids": 0,
+      "x12_partners": 0,
+      "x12_remote_tracker": 0
+    }
+  },
+  "env": {
+    "OPENRX_TEST_ADMIN_USER_ID": "5",
+    "OPENRX_TEST_APPOINTMENT_ID": "56",
+    "OPENRX_TEST_DOCUMENT_ID": "10",
+    "OPENRX_TEST_ENCOUNTER_ID": "66",
+    "OPENRX_TEST_LAB_REPORT_ID": "5",
+    "OPENRX_TEST_PATIENT_ID": "36",
+    "OPENRX_TEST_PATIENT_RECORD_ID": "48",
+    "OPENRX_TEST_PROVIDER_ID": "5"
+  },
+  "fixtures": {
+    "admin_user_id": 5,
+    "appointment_id": 56,
+    "document_id": 10,
+    "encounter_id": 66,
+    "lab_report_id": 5,
+    "patient_id": 36,
+    "patient_record_id": 48,
+    "provider_id": 5
+  },
+  "generated_at": "2026-10-01T01:56:07+00:00",
+  "notes": [
+    "app database fingerprint: patient_data=36, form_encounter=61, procedure_order=69, users=12"
+  ],
+  "source": "authenticated GET"
+}

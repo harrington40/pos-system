@@ -1,0 +1,102 @@
+// Production read-only discovery + baseline pipeline for the OpenRx API tests.
+//
+//   production API ──authenticated GET──▶ discovery ──sanitized fixtures──▶ tests
+//
+// Point a Jenkins job at this file ("Pipeline script from SCM", script path
+// backend/tests/api-tests/Jenkinsfile). It only ever reads.
+//
+// Job configuration:
+//   * environment variable OPENRX_BASELINE_API_URL — the API to verify, e.g.
+//     https://openrx.example.com/api
+//   * a Secret text credential whose id is `openrx-baseline-token` — a service
+//     token with read access. Without it the authenticated tests skip and the
+//     job would look green while testing nothing, so the script fails instead.
+//
+// Nothing here writes to the API: conftest.py skips `production_write` and
+// `destructive` tests unless OPENRX_RUN_WRITES=true, which this pipeline never
+// sets.
+pipeline {
+    agent any
+
+    /*
+     * Run automatically, approximately once an hour.
+     *
+     * `H` asks Jenkins to hash the minute, so builds are spread across the hour
+     * (and across agents) instead of every job firing at :00. Use `H * * * *`
+     * (this job) or a specific offset such as `H/15 * * * *` for a denser
+     * schedule. The production API is only ever read, so an hourly run is safe;
+     * see the notes in README.md about the number of requests it makes.
+     */
+    options {
+        // Keep a bounded history now that builds land every hour.
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        // Never let one slow discovery run overlap the next hourly build.
+        disableConcurrentBuilds()
+        // Fail fast rather than hang if the API is unreachable.
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    environment {
+        OPENRX_BASELINE_API_URL = "${env.OPENRX_BASELINE_API_URL ?: 'https://openrx.transtechologies.com/api'}"
+        OPENRX_VENV = "${env.OPENRX_VENV ?: (env.WORKSPACE + '/.api-tests-venv')}"
+        OPENRX_JUNIT_XML = "${env.WORKSPACE}/backend/tests/api-tests/pytest-results.xml"
+        OPENRX_HTML_REPORT = "${env.WORKSPACE}/backend/tests/api-tests/html-report/pytest-report.html"
+    }
+
+    triggers {
+        cron('H * * * *')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Production discovery + baseline') {
+            steps {
+                withCredentials([string(credentialsId: 'openrx-baseline-token', variable: 'OPENRX_API_TOKEN')]) {
+                    sh '''
+                        set -e
+                        command -v python3 >/dev/null 2>&1 || { echo "python3 is required"; exit 1; }
+                        cd backend/tests/api-tests
+                        chmod +x ci/run-production-baseline.sh
+                        ./ci/run-production-baseline.sh
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // JUnit powers the "Test Result" summary and trend in Jenkins.
+            junit allowEmptyResults: true, testResults: 'backend/tests/api-tests/pytest-results.xml'
+
+            // Renders the full pytest output as a page inside the build. Wrapped
+            // because the HTML Publisher plugin may not be installed; the report
+            // is archived as a build artifact either way.
+            script {
+                try {
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'backend/tests/api-tests/html-report',
+                        reportFiles: 'pytest-report.html',
+                        reportName: 'API Test Report',
+                        reportTitles: 'OpenRx API baseline',
+                    ])
+                } catch (err) {
+                    echo "HTML Publisher unavailable (install the 'HTML Publisher' plugin): ${err}"
+                }
+            }
+
+            archiveArtifacts(
+                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html',
+                allowEmptyArchive: true
+            )
+        }
+    }
+}
