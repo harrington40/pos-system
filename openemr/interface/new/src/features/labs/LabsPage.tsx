@@ -136,6 +136,47 @@ const flagBadge = (f: string) =>
   : f === 'NEGATIVE' ? 'bg-success'
   : 'bg-secondary';
 
+/** Result-type-aware value control, shared by the single and bulk entry forms. */
+function valueControl(
+  t: any,
+  value: string,
+  onChange: (v: string) => void,
+  width = '130px',
+) {
+  if (t?.result_type === 'POSITIVE_NEGATIVE') {
+    return (
+      <select className="form-select form-select-sm" style={{ maxWidth: width }} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">—</option>
+        <option>Negative</option><option>Positive</option><option>Non-Reactive</option><option>Reactive</option>
+      </select>
+    );
+  }
+  if (t?.result_type === 'BLOOD_GROUP') {
+    return (
+      <select className="form-select form-select-sm" style={{ maxWidth: width }} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">—</option>
+        {BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}
+      </select>
+    );
+  }
+  if (t?.result_type === 'SELECT' && t?.options) {
+    return (
+      <select className="form-select form-select-sm" style={{ maxWidth: width }} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">—</option>
+        {String(t.options).split(',').map((o) => <option key={o}>{o.trim()}</option>)}
+      </select>
+    );
+  }
+  return (
+    <input className="form-control form-control-sm" style={{ maxWidth: width }}
+      type={t?.result_type === 'NUMERIC' ? 'number' : 'text'} step="any"
+      value={value} onChange={(e) => onChange(e.target.value)} />
+  );
+}
+
+/** Stable key for a catalog row (code when present, else id). */
+const testKey = (t: any) => String(t?.code || t?.id);
+
 export default function LabsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -143,6 +184,9 @@ export default function LabsPage() {
   const [selectedOrder, setSelectedOrder] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [resultForm, setResultForm] = useState({ result_code: '', result_text: '', result: '', units: '', range: '' });
+  // Bulk entry: type every value for the selected panel, then Add all in one click.
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkValues, setBulkValues] = useState<Record<string, string>>({});
   const [duplicateNotice, setDuplicateNotice] = useState('');
   const [validateNotice, setValidateNotice] = useState('');
 
@@ -193,6 +237,32 @@ export default function LabsPage() {
       setResultForm(prev => ({ ...prev, result: '' }));
       setDuplicateNotice(data?.duplicate ? 'Duplicate result skipped — this test already has a recorded result for this order.' : '');
     },
+  });
+
+  // Add every filled value for a panel in one click (still one POST per test,
+  // but the technician types them all and submits once).
+  const addBulk = useMutation({
+    mutationFn: async (tests: any[]) => {
+      const rows = tests.filter(t => (bulkValues[testKey(t)] || '').trim() !== '');
+      for (const t of rows) {
+        await nestClient.post(`/procedures/${selectedOrder}/results`, {
+          result_code: String(t.code || ''),
+          result_text: t.name || '',
+          result: bulkValues[testKey(t)],
+          units: t.unit || '',
+          range: refText(t),
+        });
+      }
+      return rows.length;
+    },
+    onSuccess: (n: number) => {
+      queryClient.invalidateQueries({ queryKey: ['lab-results', selectedOrder] });
+      queryClient.invalidateQueries({ queryKey: ['lab-orders'] });
+      setBulkValues({});
+      setDuplicateNotice(`${n} result${n === 1 ? '' : 's'} added.`);
+    },
+    onError: (e: any) =>
+      setDuplicateNotice(e?.response?.data?.message || 'Could not add the results.'),
   });
 
   // Update order status (lab tech only)
@@ -600,6 +670,11 @@ export default function LabsPage() {
 
                 {isLabTech && (() => {
                   const picked = (catalog as any[]).find((t: any) => String(t.code || t.id) === String(resultForm.result_code));
+                  const panelCat = picked?.category || picked?.sheet;
+                  const panelTests: any[] = panelCat
+                    ? ((groupedCatalog.find(([c]) => c === panelCat)?.[1] as any[]) || [])
+                    : [];
+                  const bulkCount = panelTests.filter((t: any) => (bulkValues[testKey(t)] || '').trim() !== '').length;
                   return (
                   <div className="border-top pt-3">
                     <small className="fw-bold text-muted text-uppercase">Enter Result</small>
@@ -676,6 +751,35 @@ export default function LabsPage() {
                         </button>
                       </div>
                     </div>
+                    {panelTests.length > 1 && (
+                      <div className="mt-2">
+                        <button type="button" className="btn btn-sm btn-outline-primary rounded-pill"
+                          onClick={() => setBulkOpen(v => !v)}>
+                          <i className="bi bi-lightning-charge-fill me-1"></i>
+                          {bulkOpen ? 'Hide bulk entry' : `Enter all ${panelTests.length} ${panelCat} results at once`}
+                        </button>
+                        {bulkOpen && (
+                          <div className="border rounded-3 p-2 mt-2 bg-white">
+                            <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                              {panelTests.map((t: any) => (
+                                <div className="d-flex align-items-center gap-2 mb-1" key={testKey(t)}>
+                                  <span className="small flex-grow-1">
+                                    {t.name} {t.unit ? <span className="text-muted">({t.unit})</span> : null}
+                                  </span>
+                                  {valueControl(t, bulkValues[testKey(t)] || '', (v) =>
+                                    setBulkValues(prev => ({ ...prev, [testKey(t)]: v })))}
+                                </div>
+                              ))}
+                            </div>
+                            <button className="btn btn-success btn-sm w-100 mt-2"
+                              onClick={() => addBulk.mutate(panelTests)}
+                              disabled={addBulk.isPending || bulkCount === 0}>
+                              {addBulk.isPending ? 'Saving…' : `Add all results${bulkCount ? ` (${bulkCount})` : ''}`}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {duplicateNotice && (
                       <div className="alert alert-warning py-1 px-2 mt-2 small rounded-3">
                         <i className="bi bi-exclamation-triangle me-1"></i>{duplicateNotice}
