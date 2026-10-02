@@ -213,7 +213,7 @@ function AISettings({ s, set }) {
       <SettingGroup title="Reasoning Model (DeepAI)">
         <SettingRow label="API Key" sub="Used for intent & sentiment analysis">
           <div className="flex items-center gap-2">
-            <SecretInput value={s.deepaiKey} onChange={v => set("deepaiKey", v)} placeholder="bd53ba27-…" />
+            <SecretInput value={s.deepaiKey} onChange={v => set("deepaiKey", v)} placeholder="your DeepAI API key" />
             <StatusBadge ok={s.deepaiKey.length > 10} label={s.deepaiKey.length > 10 ? "Connected" : "Not set"} />
           </div>
         </SettingRow>
@@ -232,7 +232,7 @@ function AISettings({ s, set }) {
       <SettingGroup title="Implementation Model (DeepSeek)">
         <SettingRow label="API Key" sub="Used for response generation">
           <div className="flex items-center gap-2">
-            <SecretInput value={s.deepseekKey} onChange={v => set("deepseekKey", v)} placeholder="sk-93442a…" />
+            <SecretInput value={s.deepseekKey} onChange={v => set("deepseekKey", v)} placeholder="your DeepSeek API key" />
             <StatusBadge ok={s.deepseekKey.length > 10} label={s.deepseekKey.length > 10 ? "Connected" : "Not set"} />
           </div>
         </SettingRow>
@@ -580,8 +580,10 @@ const DEFAULT_STATE = {
   bizName: "AI Receptionist Co.", timezone: "EST", language: "en-US",
   hoursFrom: "09:00", hoursTo: "18:00", refreshInterval: "10", startPage: "/dashboard", compact: false,
   // AI
-  deepaiKey: "REDACTED",
-  deepseekKey: "REDACTED",
+  // Secrets must NOT live in source. Set these in the deployment environment
+  // (e.g. a local .env loaded at runtime) — never commit real keys.
+  deepaiKey: "",
+  deepseekKey: "",
   deepaiModel: "text-generator", deepseekModel: "deepseek-reasoner",
   minConf: "70", autoResolve: false, logReasoning: true, autoLang: true, sentiment: true,
   // Telephony
