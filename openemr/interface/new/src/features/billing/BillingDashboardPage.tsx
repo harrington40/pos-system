@@ -656,7 +656,13 @@ export default function BillingDashboardPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {breakdown.encounters.map((e: any) => (
+                          {breakdown.encounters.map((e: any) => {
+                            // Per-category breakdown: lab only under Laboratory, etc.
+                            // Falls back to a single group when the API omits `groups`.
+                            const groups: any[] = e.groups?.length
+                              ? e.groups
+                              : [{ category: '', subtotal: e.charges, lines: e.lines || [] }];
+                            return (
                             <Fragment key={String(e.encounterId)}>
                               <tr>
                                 <td>
@@ -700,37 +706,46 @@ export default function BillingDashboardPage() {
                                     : <span className="badge bg-success bg-opacity-25 text-success rounded-pill">cleared</span>}
                                 </td>
                               </tr>
-                              {e.lines.map((l: any, li: number) => (
-                                <tr key={`${e.encounterId}-${li}`} className="text-muted" style={{ fontSize: '0.72rem' }}>
-                                  <td className="ps-4">
-                                    <i className="bi bi-dot"></i>
-                                    <span className="text-dark">{l.description || l.code}</span>
-                                    {showCptCodes ? (
-                                      <span
-                                        className="badge bg-primary bg-opacity-10 text-primary border border-primary ms-2 align-middle"
-                                        style={{ fontSize: '0.62rem' }}
-                                      >
-                                        {l.code}
-                                      </span>
-                                    ) : (
-                                      <span className="ms-1" style={{ fontSize: '0.65rem' }}>· {l.code}</span>
-                                    )}
-                                    {l.category && (
-                                      <span className="ms-1" style={{ fontSize: '0.65rem' }}>· {l.category}</span>
-                                    )}
-                                    {l.labOrder && (
-                                      <span className="ms-1" style={{ fontSize: '0.65rem' }}>
-                                        <i className="bi bi-flask me-1"></i>
-                                        ordered as “{l.labOrder.testName}” · {l.labOrder.status}
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="text-end">{formatUSD(l.amount)}</td>
-                                  <td colSpan={3} className="text-end">qty {l.qty}</td>
-                                </tr>
+                              {groups.map((g: any) => (
+                                <Fragment key={`${e.encounterId}-${g.category || 'all'}`}>
+                                  {g.category && (
+                                    <tr className="table-secondary" style={{ fontSize: '0.68rem' }}>
+                                      <td className="ps-3 fw-semibold text-uppercase">{g.category}</td>
+                                      <td className="text-end fw-semibold">{formatUSD(g.subtotal || 0)}</td>
+                                      <td colSpan={3}></td>
+                                    </tr>
+                                  )}
+                                  {(g.lines || []).map((l: any, li: number) => (
+                                    <tr key={`${e.encounterId}-${g.category || 'all'}-${li}`} className="text-muted" style={{ fontSize: '0.72rem' }}>
+                                      <td className="ps-4">
+                                        <i className="bi bi-dot"></i>
+                                        <span className="text-dark">{l.description || l.code}</span>
+                                        {showCptCodes ? (
+                                          <span
+                                            className="badge bg-primary bg-opacity-10 text-primary border border-primary ms-2 align-middle"
+                                            style={{ fontSize: '0.62rem' }}
+                                          >
+                                            {l.code}
+                                          </span>
+                                        ) : (
+                                          <span className="ms-1" style={{ fontSize: '0.65rem' }}>· {l.code}</span>
+                                        )}
+                                        {l.labOrder && (
+                                          <span className="ms-1" style={{ fontSize: '0.65rem' }}>
+                                            <i className="bi bi-flask me-1"></i>
+                                            ordered as “{l.labOrder.testName}” · {l.labOrder.status}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="text-end">{formatUSD(l.amount)}</td>
+                                      <td colSpan={3} className="text-end">qty {l.qty}</td>
+                                    </tr>
+                                  ))}
+                                </Fragment>
                               ))}
                             </Fragment>
-                          ))}
+                            );
+                          })}
                         </tbody>
                         <tfoot>
                           <tr className="fw-bold table-light">
