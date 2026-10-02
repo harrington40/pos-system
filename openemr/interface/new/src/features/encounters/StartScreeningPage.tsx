@@ -112,6 +112,45 @@ const SMART_TEMPLATES: Record<string, {
 const DURATIONS = ['<24h', '1-2 days', '3-7 days', '>7 days'];
 const SEVERITIES = ['Mild', 'Moderate', 'Severe'];
 
+/** Built-in common diagnoses for the smart diagnosis entry (chart conditions are merged in). */
+const COMMON_DIAGNOSES = [
+  'Acute upper respiratory tract infection',
+  'Urinary tract infection',
+  'Malaria',
+  'Gastroenteritis',
+  'Hypertension',
+  'Type 2 diabetes mellitus',
+  'Asthma',
+  'Pneumonia',
+  'Peptic ulcer disease',
+  'Migraine',
+  'Anemia',
+  'Typhoid fever',
+  'Conjunctivitis',
+  'Otitis media',
+  'Cellulitis',
+  'Low back pain',
+  'Dyspepsia',
+  'Allergic rhinitis',
+  'Vaginitis',
+  'Dermatitis',
+];
+
+/** One-tap clinical phrases that append to the diagnosis. */
+const DX_PHRASES = [
+  'c/o',
+  'r/o',
+  's/p',
+  'afebrile',
+  'NAD',
+  'stable',
+  'no acute distress',
+  'improving',
+  'worsening',
+  'chronic',
+  'acute',
+];
+
 // MJ-MC / MA JUAH MEMORIAL CLINIC LABORATORY REQUEST FORM — exact content and order.
 // Mirrors backend/src/labreports/lab-catalog.data.ts 1:1 (sections, wording, and sequence
 // are identical to the paper form; do not reorder, rename, merge, or alphabetise).
@@ -314,6 +353,16 @@ export default function StartScreeningPage() {
     enabled: !!clinicalPid,
   });
 
+  // Patient's existing conditions — feeds the smart diagnosis autocomplete.
+  const { data: chartConditions = [] } = useQuery({
+    queryKey: ['patient', pid, 'conditions'],
+    queryFn: async () => {
+      try { const r = await nestClient.get(`/patients/${clinicalPid}/conditions`); return r.data || []; }
+      catch { return []; }
+    },
+    enabled: !!clinicalPid,
+  });
+
   // Template
   const [template, setTemplate] = useState('');
   const [templateSearch, setTemplateSearch] = useState('');
@@ -388,6 +437,9 @@ export default function StartScreeningPage() {
   const [noteTab, setNoteTab] = useState<'review' | 'history' | 'vitals'>('review');
   // Duplicate-note guard: holds a pending note + the matching existing one.
   const [dupPrompt, setDupPrompt] = useState<{ text: string; existing: string; run: () => void } | null>(null);
+  // Smart diagnosis entry: autocomplete dropdown + keyboard highlight.
+  const [dxOpen, setDxOpen] = useState(false);
+  const [dxActive, setDxActive] = useState(-1);
 
   // Vital history panel
   const [vitalHistoryOpen, setVitalHistoryOpen] = useState(false);
@@ -772,6 +824,65 @@ export default function StartScreeningPage() {
     run();
   };
 
+  // ── Smart diagnosis entry ────────────────────────────────────
+  // The diagnosis text is the SOAP "assessment"; suggestions come from the
+  // patient's charted conditions merged with the built-in common list.
+  const dxText = soap.assessment;
+  const dxToken = useMemo(() => {
+    const m = dxText.match(/[^,;\n]*$/);
+    return (m ? m[0] : '').trim();
+  }, [dxText]);
+
+  const chartDx: string[] = useMemo(
+    () => Array.from(new Set((chartConditions || [])
+      .map((c: any) => (c.diagnosis || c.title || c.name || '').trim())
+      .filter(Boolean))),
+    [chartConditions],
+  );
+
+  const dxPool = useMemo(
+    () => Array.from(new Set([...chartDx, ...COMMON_DIAGNOSES])),
+    [chartDx],
+  );
+
+  const dxMatches = useMemo(() => {
+    if (dxToken.length < 2) return [];
+    const q = dxToken.toLowerCase();
+    return dxPool.filter(d => d.toLowerCase().includes(q)).slice(0, 8);
+  }, [dxToken, dxPool]);
+
+  const dxWords = dxText.trim() ? dxText.trim().split(/\s+/).length : 0;
+
+  /** Replace the token currently being typed with a chosen diagnosis. */
+  const acceptDx = (value: string) => {
+    const m = dxText.match(/[^,;\n]*$/);
+    const idx = m ? dxText.length - m[0].length : dxText.length;
+    const prefix = dxText.slice(0, idx);
+    const next = `${prefix}${value}`.replace(/[,\s;]+$/, '') + ', ';
+    setSoap(prev => ({ ...prev, assessment: next }));
+    setDxOpen(false);
+    setDxActive(-1);
+  };
+
+  /** Append a clinical phrase to the diagnosis. */
+  const insertDxPhrase = (phrase: string) => {
+    setSoap(prev => {
+      const base = prev.assessment.replace(/\s+$/, '');
+      return { ...prev, assessment: base ? `${base} ${phrase} ` : `${phrase} ` };
+    });
+  };
+
+  const onDxKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') { setDxOpen(false); return; }
+    if (!dxMatches.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setDxOpen(true); setDxActive(a => Math.min(a + 1, dxMatches.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setDxActive(a => Math.max(a - 1, 0)); }
+    else if ((e.key === 'Enter' || e.key === 'Tab') && dxOpen && dxActive >= 0) {
+      e.preventDefault();
+      acceptDx(dxMatches[dxActive]);
+    }
+  };
+
   const applySoapTemplate = () => {
     if (!matchingTemplate) return;
     setSoap(s => ({
@@ -1139,14 +1250,65 @@ export default function StartScreeningPage() {
             </button>
           </div>
 
-          {/* Diagnosis — free text, written into the note (replaces the symptom chips) */}
-          <textarea
-            className="form-control form-control-sm mb-2"
-            rows={3}
-            placeholder="Diagnosis / impression — written into the note…"
-            value={soap.assessment}
-            onChange={e => setSoap({ ...soap, assessment: e.target.value })}
-          />
+          {/* Diagnosis — smart free-text entry: autocomplete + phrase chips, written into the note */}
+          <div className="rounded-3 p-2 mb-2" style={{ background: 'linear-gradient(135deg, #eef6ff 0%, #f4fbf7 100%)', border: '1px solid #dbe7f3' }}>
+            <div className="d-flex justify-content-between align-items-center mb-1">
+              <span className="small fw-semibold" style={{ color: '#0d6efd', fontSize: '0.72rem' }}>
+                <i className="bi bi-stars me-1"></i>Diagnosis / impression
+              </span>
+              <span className="badge bg-white text-muted border rounded-pill" style={{ fontSize: '0.6rem', fontWeight: 500 }}>
+                {dxWords} word{dxWords === 1 ? '' : 's'} · {dxText.length} char{dxText.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="position-relative">
+              <textarea
+                className="form-control"
+                rows={3}
+                style={{ borderRadius: '12px', borderColor: '#cfe0f2', fontSize: '0.85rem', resize: 'vertical' }}
+                placeholder="Type a diagnosis…  suggestions appear as you type (↑ ↓ then Enter to insert)"
+                value={dxText}
+                onChange={e => { setSoap({ ...soap, assessment: e.target.value }); setDxOpen(true); setDxActive(-1); }}
+                onKeyDown={onDxKeyDown}
+                onFocus={() => setDxOpen(true)}
+                onBlur={() => setTimeout(() => setDxOpen(false), 150)}
+              />
+              {dxOpen && dxMatches.length > 0 && (
+                <div className="list-group position-absolute w-100 shadow-sm"
+                  style={{ zIndex: 20, maxHeight: '220px', overflowY: 'auto', borderRadius: '12px' }}>
+                  {dxMatches.map((m, i) => (
+                    <button type="button" key={m}
+                      className={`list-group-item list-group-item-action py-1 px-2 small ${i === dxActive ? 'active' : ''}`}
+                      onMouseDown={e => { e.preventDefault(); acceptDx(m); }}>
+                      <i className="bi bi-plus-circle me-1"></i>{m}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick clinical phrases */}
+            <div className="d-flex flex-wrap gap-1 mt-2">
+              {DX_PHRASES.map(p => (
+                <button type="button" key={p}
+                  className="btn btn-sm btn-outline-secondary rounded-pill"
+                  style={{ fontSize: '0.62rem', padding: '1px 9px' }}
+                  onClick={() => insertDxPhrase(p)}>{p}</button>
+              ))}
+            </div>
+
+            {/* Charted conditions — one-tap insert */}
+            {chartDx.length > 0 && (
+              <div className="d-flex flex-wrap gap-1 mt-1 align-items-center">
+                <span className="text-muted" style={{ fontSize: '0.6rem' }}>From chart:</span>
+                {chartDx.slice(0, 6).map(d => (
+                  <button type="button" key={d}
+                    className="btn btn-sm btn-outline-primary rounded-pill"
+                    style={{ fontSize: '0.62rem', padding: '1px 9px' }}
+                    onClick={() => acceptDx(d)}>{d}</button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Duration + Severity row */}
           <div className="d-flex gap-3 flex-wrap align-items-center">
@@ -1496,7 +1658,14 @@ export default function StartScreeningPage() {
               <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Exam findings, vitals… (auto-filled from recorded vitals)" value={soap.objective} onChange={e => setSoap({ ...soap, objective: e.target.value })} />
 
               <label className="form-label small fw-semibold"><span className="badge bg-warning text-dark me-1">A</span>Assessment — diagnosis</label>
-              <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Diagnosis / differential…" value={soap.assessment} onChange={e => setSoap({ ...soap, assessment: e.target.value })} />
+              <textarea className="form-control form-control-sm mb-1" rows={2} placeholder="Diagnosis / differential…" value={soap.assessment} onChange={e => setSoap({ ...soap, assessment: e.target.value })} />
+              <div className="d-flex flex-wrap gap-1 mb-2">
+                {DX_PHRASES.map(p => (
+                  <button key={p} type="button" className="btn btn-outline-secondary btn-sm rounded-pill"
+                    style={{ fontSize: '0.65rem', padding: '1px 8px' }}
+                    onClick={() => insertDxPhrase(p)}>{p}</button>
+                ))}
+              </div>
 
               <label className="form-label small fw-semibold"><span className="badge bg-danger me-1">P</span>Plan — orders & next steps</label>
               <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Labs, medications, imaging, follow-up… (auto-filled from selected orders)" value={soap.plan} onChange={e => setSoap({ ...soap, plan: e.target.value })} />
