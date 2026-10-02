@@ -386,6 +386,8 @@ export default function StartScreeningPage() {
   const [chartNoteSaved, setChartNoteSaved] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteTab, setNoteTab] = useState<'review' | 'history' | 'vitals'>('review');
+  // Duplicate-note guard: holds a pending note + the matching existing one.
+  const [dupPrompt, setDupPrompt] = useState<{ text: string; existing: string; run: () => void } | null>(null);
 
   // Vital history panel
   const [vitalHistoryOpen, setVitalHistoryOpen] = useState(false);
@@ -737,10 +739,37 @@ export default function StartScreeningPage() {
 
   const handleSaveClinicalNote = () => {
     const note = composeSoapNote();
-    setClinicalNote(note);
-    saveClinicalNote.mutate(note);
-    setShowClinicalModal(false);
-    setSoap({ subjective: '', objective: '', assessment: '', plan: '' });
+    const proceed = () => {
+      setClinicalNote(note);
+      saveClinicalNote.mutate(note);
+      setShowClinicalModal(false);
+      setSoap({ subjective: '', objective: '', assessment: '', plan: '' });
+    };
+    guardedNoteAdd(note, proceed);
+  };
+
+  /** Normalise note text so two entries that differ only in spacing/case match. */
+  const normNote = (s: string) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+  /** The existing chart note identical to `text`, if any. */
+  const findDuplicateNote = (text: string) =>
+    existingNotes.find(
+      (n: any) => normNote(n.body || n.note || n.title || '') === normNote(text),
+    );
+
+  /**
+   * Refuse a duplicate silently? No — the clinician is prompted first. If the
+   * note already exists on the chart, hold it and ask; otherwise add it now.
+   */
+  const guardedNoteAdd = (text: string, run: () => void) => {
+    const trimmed = String(text || '').trim();
+    if (!trimmed) return;
+    const dup = findDuplicateNote(trimmed);
+    if (dup) {
+      setDupPrompt({ text: trimmed, existing: dup.body || dup.note || dup.title || '', run });
+      return;
+    }
+    run();
   };
 
   const applySoapTemplate = () => {
@@ -1270,6 +1299,34 @@ export default function StartScreeningPage() {
         </div>
       )}
 
+      {/* ═══ DUPLICATE NOTE PROMPT ═══ */}
+      {dupPrompt && (
+        <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1070, background: 'rgba(0,0,0,0.45)' }} onClick={(e) => { if (e.target === e.currentTarget) setDupPrompt(null); }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content" style={{ borderRadius: '16px' }}>
+              <div className="modal-header py-2">
+                <h6 className="modal-title"><i className="bi bi-exclamation-triangle me-2 text-warning"></i>Duplicate note</h6>
+                <button className="btn-close" onClick={() => setDupPrompt(null)}></button>
+              </div>
+              <div className="modal-body">
+                <p className="small mb-2">A note with the same text already exists on this chart — it will not be added again:</p>
+                <div className="border rounded-3 p-2 small text-muted" style={{ maxHeight: '160px', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
+                  {dupPrompt.existing}
+                </div>
+                <p className="small mt-3 mb-0">Do you want to add this entry anyway?</p>
+              </div>
+              <div className="modal-footer py-2">
+                <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setDupPrompt(null)}>Cancel</button>
+                <button className="btn btn-warning btn-sm rounded-pill"
+                  onClick={() => { const run = dupPrompt.run; setDupPrompt(null); run(); }}>
+                  Add anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══ ADD NOTE MODAL ═══ */}
       {showNoteModal && (
         <div className="modal-backdrop fade show" style={{ zIndex: 1055 }} onClick={() => setShowNoteModal(false)} />
@@ -1394,7 +1451,7 @@ export default function StartScreeningPage() {
             </div>
             <div className="modal-footer border-0">
               <button className="btn btn-outline-secondary" onClick={() => setShowNoteModal(false)}>Cancel</button>
-              <button className="btn btn-danger px-4" onClick={() => { addChartNote.mutate(); setShowNoteModal(false); }} disabled={!chartNote.trim() || addChartNote.isPending}>
+              <button className="btn btn-danger px-4" onClick={() => guardedNoteAdd(chartNote, () => { addChartNote.mutate(); setShowNoteModal(false); })} disabled={!chartNote.trim() || addChartNote.isPending}>
                 {addChartNote.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-check-lg me-1"></i>}
                 Add to Chart
               </button>
