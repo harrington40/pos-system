@@ -22,6 +22,22 @@ pytest -m surface
 pytest -m "not surface"
 ```
 
+## Full end-to-end API sweep (`e2e/`)
+
+`e2e/` adds a broad, configurable sweep on top of the contract tests: one test
+case per route, split into public-read, public-write (gated), authenticated-read,
+latency, and guarded-write checks, plus an end-to-end login flow.
+
+```bash
+pytest e2e/ -q                                   # whole API (reads by default)
+OPENRX_E2E_DOMAINS=imaging pytest e2e/ -q        # one feature area
+pytest e2e/ -k "catalog or public" -q            # offline + public cases
+```
+
+Everything is environment-driven — see [`e2e/README.md`](e2e/README.md) for the
+full option matrix and the two configurable allowlists (`OPENRX_E2E_KNOWN_5XX`,
+`OPENRX_E2E_NON_JSON`).
+
 CI runs this folder as the `api-tests` job in
 `.github/workflows/backend-ci.yml`.
 
@@ -35,6 +51,7 @@ CI runs this folder as the `api-tests` job in
 | `discovery/` | Read-only production discovery: finds real ids, writes sanitized fixtures |
 | `fixtures/` | Generated, sanitized `production_discovery.json` + `.env` |
 | `<domain>/test_*.py` | Per-domain tests (patients, billing, fda, …) |
+| `e2e/` | **Full end-to-end API sweep** — one case per route, domain-filterable, env-configurable |
 
 `api_routes.py` is generated from `backend/src/**/*.controller.ts`, so a new
 controller route cannot escape the contract tests. After changing a controller:

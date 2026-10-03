@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -14,7 +14,10 @@ export class LicenseController {
      * No secrets exposed in client code.
      */
     @Post('verify-passphrase')
-    verifyPassphrase(@Body('passphrase') passphrase: string) {
+    verifyPassphrase(@Body('passphrase') passphrase?: string) {
+        if (typeof passphrase !== 'string' || passphrase.length === 0) {
+            throw new BadRequestException('passphrase is required');
+        }
         const valid = this.licenseService.verifyGeneratorPassphrase(passphrase);
         return { valid };
     }
@@ -28,6 +31,9 @@ export class LicenseController {
         @Body('key') key: string,
         @Body('customerName') customerName?: string,
     ) {
+        if (typeof key !== 'string' || key.length === 0) {
+            throw new BadRequestException('key is required');
+        }
         const license = await this.licenseService.activateKey(
             key,
             customerName,
