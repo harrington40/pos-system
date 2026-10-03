@@ -340,6 +340,14 @@ export class BillingController {
         return this.billing.deletePriceCatalogItem(+id);
     }
 
+    /** Re-price every posted charge that drifted from its catalogue price. */
+    @Post('billing/price-catalog/resync')
+    @Roles('admin', 'billing', 'physician', 'front_desk')
+    resyncCharges(@Req() req: BillingRequest) {
+        this.assertCanEditCharges(req.user);
+        return this.billing.resyncChargesToCatalog();
+    }
+
     /**
      * Only the administrator (supervisor) or a user explicitly granted the
      * special "edit charges" privilege may create/update/deactivate charges.

@@ -2150,6 +2150,27 @@ export class BillingService implements OnModuleInit {
         return Number(res?.affectedRows ?? 0);
     }
 
+    /**
+     * One-shot catch-up: re-price EVERY posted charge that no longer matches its
+     * catalogue price. Used for charges created before dynamic re-pricing existed
+     * (and to clear any drift the integrity scan reports).
+     */
+    async resyncChargesToCatalog(): Promise<{ repriced: number }> {
+        const res = await this.dataSource.query<AffectedRowsResult>(
+            `UPDATE billing b
+                JOIN price_catalog pc ON pc.code = b.code AND pc.active = 1
+                   SET b.fee = pc.fee
+                 WHERE b.activity = 1
+                   AND (b.code_type IS NULL OR b.code_type <> 'REFUND')
+                   AND b.fee <> pc.fee`,
+        );
+        const repriced = Number(res?.affectedRows ?? 0);
+        this.logger.log(
+            `Catalogue re-sync: re-priced ${repriced} posted charge(s) to catalogue prices`,
+        );
+        return { repriced };
+    }
+
     async deletePriceCatalogItem(
         id: number,
     ): Promise<{ message: string; id: number }> {

@@ -58,7 +58,7 @@ export default function ChargeCatalogPanel() {
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
       setForm({ code: '', code_type: 'CPT4', description: '', category: 'general', cost: '', fee: '' });
-      const n = Number(res?.repricedCharges || 0);
+      const n = Number(res?.data?.repricedCharges ?? res?.repricedCharges ?? 0);
       setNotice(n > 0 ? `Saved — ${n} existing charge${n === 1 ? '' : 's'} re-priced to the new price.` : 'Charge saved.');
     },
   });
@@ -67,9 +67,24 @@ export default function ChargeCatalogPanel() {
     mutationFn: ({ id, d }: { id: number; d: any }) => nestClient.put(`/billing/price-catalog/${id}`, d),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
-      const n = Number(res?.repricedCharges || 0);
+      const n = Number(res?.data?.repricedCharges ?? res?.repricedCharges ?? 0);
       setNotice(n > 0 ? `Price updated — ${n} existing charge${n === 1 ? '' : 's'} updated to the new price.` : 'Price updated.');
     },
+  });
+
+  // One-click catch-up: bring every already-posted charge in line with the
+  // catalogue (for charges created before dynamic re-pricing existed).
+  const resyncMutation = useMutation({
+    mutationFn: () => nestClient.post('/billing/price-catalog/resync', {}),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts-receivable'] });
+      const n = Number(res?.data?.repriced ?? res?.repriced ?? 0);
+      setNotice(n > 0
+        ? `Re-synced — ${n} charge${n === 1 ? '' : 's'} updated to catalogue prices.`
+        : 'All posted charges already match the catalogue.');
+    },
+    onError: (e: any) => setNotice(e?.response?.data?.message || 'Re-sync failed.'),
   });
 
   const deleteMutation = useMutation({
@@ -206,6 +221,20 @@ export default function ChargeCatalogPanel() {
           <h6 className="mb-0 fw-bold"><i className="bi bi-tags me-2 text-primary"></i>Charge Catalog & Pricing</h6>
           <div className="d-flex align-items-center gap-3">
             <CurrencySwitcher />
+            {canEditCharges && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary rounded-pill"
+                disabled={resyncMutation.isPending}
+                onClick={() => resyncMutation.mutate()}
+                title="Re-price every already-posted charge to match the catalogue"
+              >
+                {resyncMutation.isPending
+                  ? <span className="spinner-border spinner-border-sm me-1"></span>
+                  : <i className="bi bi-arrow-repeat me-1"></i>}
+                Re-sync all charges
+              </button>
+            )}
             <span className="badge bg-primary rounded-pill">{catalog.length} charges</span>
           </div>
         </div>
