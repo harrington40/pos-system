@@ -59,6 +59,15 @@ $ npm run test:cov
 
 ## Deployment
 
+See [`../DEPLOYMENT.md`](../DEPLOYMENT.md) for the full build + deploy + rollback guide
+(target server, PM2 app, tarball flow, and verification commands). Short version:
+
+```bash
+cd ..                                    # openemr/
+bash deploy/deploy-local.sh --backend    # build backend, upload, swap, pm2 restart
+```
+
+
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 
 If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:

@@ -101,6 +101,36 @@ export class ImagingService {
         return this.b2.getDownloadUrl(bucket, image.b2Path, 3600);
     }
 
+    /**
+     * Fetch a stored study's bytes so the viewer can render it same-origin.
+     *
+     * The browser's DICOM loader (Cornerstone) reads files over XHR. Backblaze
+     * only answers cross-origin reads when the bucket has a CORS rule, so the
+     * viewer loads studies through this proxy instead of the signed B2 URL.
+     */
+    async getFile(id: number): Promise<{
+        buffer: Buffer;
+        contentType: string;
+        originalName: string;
+        mimeType: string;
+    }> {
+        const image = await this.imagingRepo.findOne({ where: { id } });
+        if (!image) throw new BadRequestException('Imaging record not found');
+
+        const bucket = this.getBucket(image.type);
+        const { buffer, contentType } = await this.b2.downloadFile(
+            bucket,
+            image.b2Path,
+        );
+
+        return {
+            buffer,
+            contentType: image.mimeType || contentType,
+            originalName: image.originalName,
+            mimeType: image.mimeType,
+        };
+    }
+
     async delete(id: number): Promise<void> {
         const image = await this.imagingRepo.findOne({ where: { id } });
         if (!image) throw new BadRequestException('Imaging record not found');

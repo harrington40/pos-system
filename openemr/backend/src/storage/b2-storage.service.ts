@@ -187,6 +187,39 @@ export class B2StorageService {
         return `${auth.downloadUrl}/file/${bucket.bucketName}/${filePath}?Authorization=${data.authorizationToken}`;
     }
 
+    /**
+     * Download a file's raw bytes straight from B2.
+     *
+     * Used by the imaging viewer proxy: the browser cannot fetch a DICOM study
+     * cross-origin from Backblaze (no CORS rule on the bucket), so the SPA asks
+     * the backend for the bytes over the same-origin `/api` prefix instead.
+     *
+     * @returns the file bytes plus the content type B2 stored for it.
+     */
+    async downloadFile(
+        bucket: BucketConfig,
+        filePath: string,
+    ): Promise<{ buffer: Buffer; contentType: string }> {
+        const auth = await this.getAuth();
+
+        const { data, headers } = await firstValueFrom(
+            this.http.get<ArrayBuffer>(
+                `${auth.downloadUrl}/file/${bucket.bucketName}/${filePath}`,
+                {
+                    headers: { Authorization: auth.authorizationToken },
+                    responseType: 'arraybuffer',
+                },
+            ),
+        );
+
+        return {
+            buffer: Buffer.from(data),
+            contentType:
+                (headers['content-type'] as string) ||
+                'application/octet-stream',
+        };
+    }
+
     // ── Delete ──────────────────────────────────────────────────
 
     /**

@@ -6,6 +6,7 @@ import {
     Param,
     Query,
     Body,
+    Res,
     UseGuards,
     UseInterceptors,
     UploadedFile,
@@ -13,6 +14,7 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -92,6 +94,29 @@ export class ImagingController {
     async download(@Param('id') id: string) {
         const url = await this.imagingService.getDownloadUrl(parseInt(id, 10));
         return { downloadUrl: url };
+    }
+
+    /**
+     * Stream a stored study's bytes same-origin so the DICOM viewer can render
+     * it. Cornerstone reads studies over XHR and Backblaze's signed download URL
+     * is cross-origin, so this proxy avoids a bucket CORS dependency.
+     */
+    @Get(':id/file')
+    @Roles('admin', 'physician', 'nurse', 'lab_tech', 'radiologist')
+    async file(@Param('id') id: string, @Res() res: Response) {
+        const { buffer, contentType, originalName } =
+            await this.imagingService.getFile(parseInt(id, 10));
+
+        res.setHeader(
+            'Content-Type',
+            contentType || 'application/octet-stream',
+        );
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${encodeURIComponent(originalName)}"`,
+        );
+        res.end(buffer);
     }
 
     @Delete(':id')

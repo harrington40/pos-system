@@ -15,6 +15,8 @@ interface ImagingUploadProps {
   pid: number;
   eid?: number;
   onSuccess?: (result: UploadResult) => void;
+  /** Fired as soon as a file is chosen (before upload) so the parent can preview it. */
+  onFileSelected?: (file: File) => void;
   className?: string;
 }
 
@@ -37,7 +39,7 @@ const LABELS: Record<'xray' | 'lab', { title: string; icon: string; accept: stri
   },
 };
 
-export default function ImagingUpload({ type, pid, eid, onSuccess, className }: ImagingUploadProps) {
+export default function ImagingUpload({ type, pid, eid, onSuccess, onFileSelected, className }: ImagingUploadProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -83,6 +85,7 @@ export default function ImagingUpload({ type, pid, eid, onSuccess, className }: 
     if (f) {
       setFile(f);
       setUploaded(null);
+      onFileSelected?.(f);
     }
   };
 
