@@ -41,6 +41,7 @@ export default function ChargeCatalogPanel() {
   const [sortKey, setSortKey] = useState<SortKey>('code');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [notice, setNotice] = useState('');
 
   const { data: catalog = [] } = useQuery({
     queryKey: ['price-catalog'],
@@ -54,15 +55,21 @@ export default function ChargeCatalogPanel() {
 
   const createMutation = useMutation({
     mutationFn: (d: any) => nestClient.post('/billing/price-catalog', d),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
       setForm({ code: '', code_type: 'CPT4', description: '', category: 'general', cost: '', fee: '' });
+      const n = Number(res?.repricedCharges || 0);
+      setNotice(n > 0 ? `Saved — ${n} existing charge${n === 1 ? '' : 's'} re-priced to the new price.` : 'Charge saved.');
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, d }: { id: number; d: any }) => nestClient.put(`/billing/price-catalog/${id}`, d),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['price-catalog'] }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
+      const n = Number(res?.repricedCharges || 0);
+      setNotice(n > 0 ? `Price updated — ${n} existing charge${n === 1 ? '' : 's'} updated to the new price.` : 'Price updated.');
+    },
   });
 
   const deleteMutation = useMutation({
@@ -203,6 +210,12 @@ export default function ChargeCatalogPanel() {
           </div>
         </div>
         <div className="card-body">
+          {notice && (
+            <div className="alert alert-success py-2 px-3 small d-flex justify-content-between align-items-center rounded-3 mb-3">
+              <span><i className="bi bi-arrow-repeat me-1"></i>{notice}</span>
+              <button type="button" className="btn-close btn-sm" onClick={() => setNotice('')}></button>
+            </div>
+          )}
           {/* Add / smart-price form (permission-gated) */}
           {!canEditCharges && (
             <div className="alert alert-warning py-2 px-3 small d-flex align-items-center rounded-3 mb-3">

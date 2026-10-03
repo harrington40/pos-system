@@ -2046,6 +2046,7 @@ export class BillingService implements OnModuleInit {
         id: number | undefined;
         code: string | undefined;
         fee: number;
+        repricedCharges: number;
     }> {
         const fee = Number(dto.fee ?? this.suggestFee(dto.category, dto.cost));
         const result = await this.dataSource.query<AffectedRowsResult>(
@@ -2063,13 +2064,25 @@ export class BillingService implements OnModuleInit {
                 dto.unit || null,
             ],
         );
-        return { id: result.insertId, code: dto.code, fee };
+        // Saving a code that already exists re-prices its posted charges too.
+        const repricedCharges =
+            dto.code != null
+                ? await this.repriceCharges(dto.code, dto.code, fee)
+                : 0;
+        return { id: result.insertId, code: dto.code, fee, repricedCharges };
     }
 
     async updatePriceCatalogItem(
         id: number,
         dto: PriceCatalogDto,
-    ): Promise<{ message: string; id?: number }> {
+    ): Promise<{ message: string; id?: number; repricedCharges?: number }> {
+        // The pre-edit code/fee, so any posted charge for the code can be moved
+        // onto the new price (and the new code, if it was renamed).
+        const before = await this.dataSource.query<
+            { code: string; fee: number }[]
+        >(`SELECT code, fee FROM price_catalog WHERE id = ?`, [id]);
+        const current = before[0];
+
         const sets: string[] = [];
         const vals: unknown[] = [];
         const fields: [string, string][] = [
@@ -2094,7 +2107,47 @@ export class BillingService implements OnModuleInit {
             `UPDATE price_catalog SET ${sets.join(', ')} WHERE id = ?`,
             vals,
         );
-        return { message: 'updated', id };
+
+        // Dynamic re-pricing: instantly update charges already calculated on an
+        // encounter (or anywhere else in billing) for this code.
+        const repricedCharges = current
+            ? await this.repriceCharges(
+                  current.code,
+                  dto.code !== undefined ? String(dto.code) : current.code,
+                  dto.fee !== undefined ? Number(dto.fee) : Number(current.fee),
+              )
+            : 0;
+        return { message: 'updated', id, repricedCharges };
+    }
+
+    /**
+     * Push a catalogue price change onto charges that are already posted.
+     *
+     * Every active, non-refund charge for the code is re-priced to the new fee
+     * (and moved onto the new code when the code itself was renamed) so the
+     * encounter breakdown, patient balances and every other billing view update
+     * instantly instead of drifting from the catalogue.
+     */
+    private async repriceCharges(
+        oldCode: string,
+        newCode: string,
+        newFee: number,
+    ): Promise<number> {
+        if (!oldCode || !Number.isFinite(newFee)) return 0;
+        const rename = String(newCode) !== String(oldCode);
+        const sql = `UPDATE billing
+            SET fee = ?${rename ? ', code = ?' : ''}
+          WHERE code = ? AND activity = 1
+            AND (code_type IS NULL OR code_type <> 'REFUND')
+            AND fee <> ?`;
+        const params: unknown[] = rename
+            ? [newFee, newCode, oldCode, newFee]
+            : [newFee, oldCode, newFee];
+        const res = await this.dataSource.query<AffectedRowsResult>(
+            sql,
+            params,
+        );
+        return Number(res?.affectedRows ?? 0);
     }
 
     async deletePriceCatalogItem(
