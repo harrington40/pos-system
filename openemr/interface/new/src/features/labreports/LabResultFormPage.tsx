@@ -6,8 +6,7 @@ import nestClient from '../../api/nest-client';
 import { formatPatientName } from '../../utils/patientName';
 import { formatDateTime } from '../../utils/date';
 import { buildLabSections } from './labSections';
-
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+import { BLOOD_GROUPS, flagForTest, flagBadge, refText } from './labResult';
 
 /** The sheets a catalog row belongs to (a test can be printed on two sheets). */
 const sheetsOf = (t: any): string[] =>
@@ -17,27 +16,6 @@ const sheetsOf = (t: any): string[] =>
     .filter(Boolean);
 
 
-
-function computeFlag(test: any, value: string): string {
-  if (!value) return '';
-  if (test.result_type === 'NUMERIC' && (test.ref_min != null || test.ref_max != null)) {
-    const num = Number(value);
-    if (isNaN(num)) return 'TEXT';
-    if (test.ref_min != null && num < Number(test.ref_min)) return 'LOW';
-    if (test.ref_max != null && num > Number(test.ref_max)) return 'HIGH';
-    return 'NORMAL';
-  }
-  if (test.result_type === 'POSITIVE_NEGATIVE') {
-    const v = value.toLowerCase();
-    if (['negative', 'non-reactive', 'non reactive'].includes(v)) return 'NEGATIVE';
-    if (['positive', 'reactive'].includes(v)) return 'POSITIVE';
-  }
-  return '';
-}
-
-const flagBadge = (f: string) =>
-  f === 'LOW' ? 'bg-warning text-dark' : f === 'HIGH' ? 'bg-danger' : f === 'NORMAL' ? 'bg-success' :
-  f === 'POSITIVE' ? 'bg-danger' : f === 'NEGATIVE' ? 'bg-success' : 'bg-secondary';
 
 /** Deterministic barcode-like SVG (same approach as the pharmacy label). */
 function Barcode({ seed, width = 140 }: { seed: string; width?: number }) {
@@ -342,8 +320,6 @@ export default function LabResultFormPage() {
     return <input className="form-control form-control-sm" type={t.result_type === 'NUMERIC' ? 'number' : 'text'} step="any" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })} />;
   };
 
-  const refText = (t: any) => t.ref_text || (t.ref_min != null && t.ref_max != null ? `${t.ref_min} - ${t.ref_max}` : t.ref_min != null ? `≥ ${t.ref_min}` : t.ref_max != null ? `≤ ${t.ref_max}` : '—');
-
   return (
     <div className="glass-page position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh', padding: '16px' }}>
       {toast && (
@@ -542,7 +518,7 @@ export default function LabResultFormPage() {
                                 );
                               })() : refText(t)}
                             </td>
-                            <td>{values[t.id] ? <span className={`badge ${flagBadge(computeFlag(t, values[t.id]))}`}>{computeFlag(t, values[t.id])}</span> : '—'}</td>
+                            <td>{values[t.id] ? <span className={`badge ${flagBadge(flagForTest(t, values[t.id]))}`}>{flagForTest(t, values[t.id])}</span> : '—'}</td>
                             <td><input className="form-control form-control-sm" value={comments[t.id] || ''} onChange={e => setComments({ ...comments, [t.id]: e.target.value })} /></td>
                           </tr>
                             ))}

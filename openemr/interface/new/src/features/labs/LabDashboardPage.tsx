@@ -8,6 +8,8 @@ import { groupOrdersByPatient } from '../../utils/groupOrdersByPatient';
 import { formatPatientName } from '../../utils/patientName';
 import { chartPatientId } from '../../utils/patientChart';
 import Barcode from '../../components/shared/Barcode';
+import { buildLabSections } from '../labreports/labSections';
+import { BLOOD_GROUPS, computeFlag, flagBadge, refText, flagFromStored } from '../labreports/labResult';
 
 const TEST_PANELS: { name: string; icon: string; tests: string[] }[] = [
   { name: 'Complete Blood Count (CBC)', icon: 'bi-droplet', tests: ['WBC', 'RBC', 'Hemoglobin', 'Hematocrit', 'MCV', 'MCH', 'MCHC', 'Platelets', 'Neutrophils', 'Lymphocytes', 'Monocytes', 'Eosinophils', 'Basophils'] },
@@ -60,30 +62,6 @@ const testsForOrder = (o: any): string[] => {
   }
   return TEST_PANELS.find((p) => p.name === o.instructions)?.tests || [];
 };
-
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-
-/** Same flag logic as the Patient Lab Result Form. */
-function computeFlag(resultType: string, value: string, refMin: any, refMax: any): string {
-  if (!value) return '';
-  if (resultType === 'NUMERIC' && (refMin != null || refMax != null)) {
-    const n = Number(value);
-    if (isNaN(n)) return 'TEXT';
-    if (refMin != null && n < Number(refMin)) return 'LOW';
-    if (refMax != null && n > Number(refMax)) return 'HIGH';
-    return 'NORMAL';
-  }
-  if (resultType === 'POSITIVE_NEGATIVE') {
-    const v = value.toLowerCase();
-    if (['negative', 'non-reactive', 'non reactive'].includes(v)) return 'NEGATIVE';
-    if (['positive', 'reactive'].includes(v)) return 'POSITIVE';
-  }
-  return '';
-}
-
-const flagBadge = (f: string) =>
-  f === 'LOW' ? 'bg-warning text-dark' : f === 'HIGH' ? 'bg-danger' : f === 'NORMAL' ? 'bg-success'
-    : f === 'POSITIVE' ? 'bg-danger' : f === 'NEGATIVE' ? 'bg-success' : 'bg-secondary';
 
 const EMPTY_RESULT: any = {
   result_code: '', result_text: '', result: '', units: '', range: '',
@@ -263,6 +241,10 @@ export default function LabDashboardPage() {
     return m;
   }, [catalog]);
 
+  // Section tree (shared with the Patient Lab Result Form) so the test picker is
+  // grouped identically on both lab screens.
+  const sectionOptions = useMemo(() => buildLabSections(catalog as any[]), [catalog]);
+
   const tabs = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: 'bi-speedometer2' },
     { id: 'orders' as const, label: 'Order Lab Tests', icon: 'bi-flask' },
@@ -362,6 +344,7 @@ export default function LabDashboardPage() {
           pending={validateGroup.isPending}
           onClose={() => setPreviewPid(null)}
           onValidate={() => validateGroup.mutate(previewPid)}
+          catalog={catalog}
         />
       )}
 
@@ -451,14 +434,19 @@ export default function LabDashboardPage() {
                 <select className="form-select form-select-sm" value={resultForm.result_code}
                   onChange={(e) => {
                     const t = (catalog as any[]).find((c) => c.code === e.target.value);
-                    const range = t?.ref_text || (t?.ref_min != null && t?.ref_max != null ? `${t.ref_min} - ${t.ref_max}` : t?.ref_min != null ? `≥ ${t.ref_min}` : t?.ref_max != null ? `≤ ${t.ref_max}` : '');
-                    setResultForm({ result_code: t?.code || '', result_text: t?.name || '', result: '', units: t?.unit || '', range, flag: '', comments: '', result_type: t?.result_type || 'TEXT', ref_min: t?.ref_min ?? null, ref_max: t?.ref_max ?? null });
+                    setResultForm({ result_code: t?.code || '', result_text: t?.name || '', result: '', units: t?.unit || '', range: t ? refText(t) : '', flag: '', comments: '', result_type: t?.result_type || 'TEXT', ref_min: t?.ref_min ?? null, ref_max: t?.ref_max ?? null });
                   }}>
                   <option value="">— Select Test —</option>
-                  {Object.entries(groupedCatalog).map(([cat, tests]: any) => (
-                    <optgroup key={cat} label={cat}>
-                      {tests.map((t: any) => <option key={t.code} value={t.code}>{t.name}{t.unit ? ` (${t.unit})` : ''}</option>)}
-                    </optgroup>
+                  {sectionOptions.map((sec) => (
+                    <Fragment key={sec.title}>
+                      {sec.groups.map((g, gi) => (
+                        <optgroup key={`${sec.title}-${gi}`} label={g.subsection ? `${sec.title} · ${g.subsection}` : sec.title}>
+                          {g.items.map(({ t, label }) => (
+                            <option key={t.code} value={t.code}>{label}{t.unit ? ` (${t.unit})` : ''}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </Fragment>
                   ))}
                 </select>
               </div>
@@ -491,7 +479,7 @@ export default function LabDashboardPage() {
                 <div className="form-control form-control-sm bg-light small">{resultForm.units || '—'}</div>
               </div>
               <div className="col-md-4">
-                <label className="form-label small mb-0">Reference Range</label>
+                <label className="form-label small mb-0">Normal Value</label>
                 <div className="form-control form-control-sm bg-light small">{resultForm.range || '—'}</div>
               </div>
               <div className="col-md-4">
@@ -715,7 +703,7 @@ export default function LabDashboardPage() {
  * technician can preview the whole group and validate it in one shot.
  * ────────────────────────────────────────────────────────────────────────── */
 function GroupValidateModal({
-  pid, preview, loading, pending, onClose, onValidate,
+  pid, preview, loading, pending, onClose, onValidate, catalog,
 }: {
   pid: string;
   preview: any;
@@ -723,7 +711,17 @@ function GroupValidateModal({
   pending: boolean;
   onClose: () => void;
   onValidate: () => void;
+  catalog: any[];
 }) {
+  // Flag and print each stored result exactly like the Patient Lab Result Form.
+  const byCode = useMemo(() => new Map((catalog || []).map((t: any) => [t.code, t])), [catalog]);
+  const byName = useMemo(
+    () => new Map((catalog || []).map((t: any) => [String(t.name || '').toLowerCase(), t])),
+    [catalog],
+  );
+  const testForResult = (r: any): any =>
+    byCode.get(r.result_code) || byName.get(String(r.result_text || '').toLowerCase());
+
   return (
     <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '20px', border: '2px solid #0d6efd' }}>
       <div className="card-header text-white py-3 d-flex justify-content-between align-items-center"
@@ -789,24 +787,27 @@ function GroupValidateModal({
                 </div>
                 <table className="table table-sm small mb-0">
                   <thead className="table-light">
-                    <tr><th>Test</th><th>Result</th><th>Units</th><th>Range</th><th>Flag</th></tr>
+                    <tr><th>Test Request</th><th>Result</th><th>Unit</th><th>Normal Value</th><th>Flag</th><th>Comments</th></tr>
                   </thead>
                   <tbody>
-                    {(o.results || []).map((r: any, i: number) => (
-                      <tr key={r.id ?? i}>
-                        <td className="fw-semibold">{r.result_text || r.result_code || '—'}</td>
-                        <td>{r.result ?? '—'}</td>
-                        <td>{r.units || '—'}</td>
-                        <td className="text-muted">{r.range || '—'}</td>
-                        <td>
-                          {r.abnormal === 'Y'
-                            ? <span className="badge bg-danger">Abnormal</span>
-                            : <span className="badge bg-success">Normal</span>}
-                        </td>
-                      </tr>
-                    ))}
+                    {(o.results || []).map((r: any, i: number) => {
+                      const t = testForResult(r);
+                      const flag = t
+                        ? computeFlag(t.result_type, String(r.result ?? ''), t.ref_min, t.ref_max)
+                        : flagFromStored(r);
+                      return (
+                        <tr key={r.id ?? i}>
+                          <td className="fw-semibold">{r.result_text || r.result_code || t?.name || '—'}</td>
+                          <td>{r.result ?? '—'}</td>
+                          <td>{r.units || t?.unit || '—'}</td>
+                          <td className="text-muted">{t ? refText(t) : (r.range || '—')}</td>
+                          <td>{flag ? <span className={`badge ${flagBadge(flag)}`}>{flag}</span> : '—'}</td>
+                          <td className="text-muted">{r.comments || r.comment || '—'}</td>
+                        </tr>
+                      );
+                    })}
                     {!(o.results || []).length && (
-                      <tr><td colSpan={5} className="text-muted text-center">No results</td></tr>
+                      <tr><td colSpan={6} className="text-muted text-center">No results</td></tr>
                     )}
                   </tbody>
                 </table>
