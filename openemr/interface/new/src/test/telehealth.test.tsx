@@ -18,8 +18,9 @@ vi.mock('socket.io-client', () => ({
 
 const post = nestClient.post as unknown as ReturnType<typeof vi.fn>;
 
-// jsdom does not implement scrollTo; BookAppointmentPage calls it after submit.
+// jsdom does not implement scrollTo/scrollIntoView; the page calls both.
 window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+Element.prototype.scrollIntoView = vi.fn();
 
 /** Fill the required fields and submit the booking form. */
 function submitBooking() {
@@ -50,8 +51,22 @@ describe('BookAppointmentPage — consultation type', () => {
   it('offers an in-person / video choice and defaults to in person', () => {
     renderPage();
     expect(screen.getByText('Consultation type')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /In person/ })).toHaveClass('btn-primary');
-    expect(screen.getByRole('button', { name: /Video call/ })).toHaveClass('btn-outline-secondary');
+    const inPerson = screen.getByRole('button', { name: /In person/ });
+    const video = screen.getByRole('button', { name: /Video call/ });
+    expect(inPerson).toHaveAttribute('aria-pressed', 'true');
+    expect(video).toHaveAttribute('aria-pressed', 'false');
+    // The video option is deliberately promoted: interactive card + "Popular" flag.
+    expect(video).toHaveClass('vc-option');
+    expect(screen.getByText('Popular')).toBeInTheDocument();
+  });
+
+  it('promotes video from the hero callout and preselects it', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /Start a video visit/i }));
+    const video = screen.getByRole('button', { name: /Video call/ });
+    expect(video).toHaveAttribute('aria-pressed', 'true');
+    expect(video).toHaveClass('vc-option-video-active');
+    expect(screen.getByText('Selected')).toBeInTheDocument();
   });
 
   it('submits an in-person booking by default', async () => {

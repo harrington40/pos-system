@@ -37,8 +37,9 @@ export default function BookAppointmentPage() {
       const r = await nestClient.post('/booking/request', { ...form, source: 'whatsapp' });
       setConfirmed(r.data);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Could not submit your booking. Please try again.');
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e?.response?.data?.message || 'Could not submit your booking. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -68,11 +69,46 @@ export default function BookAppointmentPage() {
                 Choose an in-person visit or a secure video consultation with your physician.
               </p>
 
+              {/* Video consultation spotlight — the headline feature for this page */}
+              <div
+                className="p-3 p-md-4 rounded-4 mb-4 position-relative overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(13,110,253,0.45), rgba(0,201,167,0.45))',
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <span className="d-inline-flex align-items-center gap-2 fw-bold text-white">
+                    <span className="vc-live-dot"></span> NEW · Video consultations
+                  </span>
+                  <i className="bi bi-camera-video-fill fs-4 text-white text-opacity-75"></i>
+                </div>
+                <p className="small text-white text-opacity-75 mb-3">
+                  See your doctor without leaving home — no travel, no waiting room.
+                </p>
+                <div className="d-flex flex-wrap gap-2 mb-3">
+                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-house-door me-1"></i>From home</span>
+                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-shield-lock me-1"></i>Private & secure</span>
+                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-phone me-1"></i>Phone or laptop</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-light btn-sm rounded-pill fw-semibold px-3"
+                  onClick={() => {
+                    update('consultation_type', 'video');
+                    document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                >
+                  <i className="bi bi-camera-video-fill me-1 text-primary"></i> Start a video visit
+                </button>
+              </div>
+
               <div className="d-flex flex-column gap-3 mb-4">
                 {[
                   { icon: 'bi-pencil-square', title: '1 · Request a slot', desc: 'Tell us your name, phone, and preferred date.' },
                   { icon: 'bi-check2-circle', title: '2 · We confirm', desc: 'Our registrar verifies and schedules you with a provider.' },
-                  { icon: 'bi-heart-pulse', title: '3 · Come in for care', desc: 'Vitals are taken on arrival, then you see your doctor.' },
+                  { icon: 'bi-heart-pulse', title: '3 · Choose how you are seen', desc: 'Walk in to the clinic, or join by secure video from anywhere.' },
                 ].map(s => (
                   <div key={s.title} className="d-flex gap-3 align-items-start">
                     <div className="rounded-circle bg-white bg-opacity-10 border border-white border-opacity-25 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '46px', height: '46px' }}>
@@ -114,19 +150,35 @@ export default function BookAppointmentPage() {
                     <p className="text-muted small mb-1">Booking reference <span className="badge bg-primary rounded-pill">#{confirmed.id}</span></p>
                     <p className="text-muted small mb-4">We will contact you on WhatsApp or phone to confirm your appointment.</p>
                     {confirmed.consultation_type === 'video' && confirmed.video_room && (
-                      <div className="alert alert-info text-start small mb-4">
-                        <div className="fw-semibold mb-1"><i className="bi bi-camera-video me-1"></i>Video consultation requested</div>
-                        <p className="mb-2">Save this private link — you and your physician join here at your appointment time.</p>
+                      <div
+                        className="text-start small mb-4 p-3 rounded-4 text-white"
+                        style={{
+                          background: 'linear-gradient(135deg, #0d6efd 0%, #00c9a7 100%)',
+                          boxShadow: '0 14px 34px rgba(0,201,167,0.35)',
+                        }}
+                      >
+                        <div className="d-flex align-items-center gap-2 fw-bold mb-1">
+                          <span className="vc-live-dot"></span> Video consultation requested
+                        </div>
+                        <p className="mb-2 text-white text-opacity-75">
+                          Save this private link — you and your physician join here at your appointment time.
+                        </p>
                         <div className="input-group input-group-sm mb-2">
                           <input className="form-control" readOnly value={`${window.location.origin}/video/${confirmed.video_room}`} />
-                          <button className="btn btn-outline-primary" type="button"
+                          <button className="btn btn-light" type="button"
                             onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/video/${confirmed.video_room}`)}>
                             <i className="bi bi-clipboard"></i>
                           </button>
                         </div>
-                        <a className="btn btn-primary btn-sm rounded-pill" href={`/video/${confirmed.video_room}`}>
-                          <i className="bi bi-camera-video-fill me-1"></i>Join video room now
-                        </a>
+                        <div className="d-flex flex-wrap gap-2">
+                          <a className="btn btn-light btn-sm rounded-pill fw-semibold" href={`/video/${confirmed.video_room}`}>
+                            <i className="bi bi-camera-video-fill me-1 text-primary"></i>Join video room now
+                          </a>
+                          <a className="btn btn-outline-light btn-sm rounded-pill" target="_blank" rel="noreferrer"
+                            href={`https://wa.me/?text=${encodeURIComponent(`My video consultation link: ${window.location.origin}/video/${confirmed.video_room}`)}`}>
+                            <i className="bi bi-whatsapp me-1"></i>Send to my phone
+                          </a>
+                        </div>
                       </div>
                     )}
                     <button className="btn btn-outline-primary rounded-pill px-4" onClick={() => setConfirmed(null)}>
@@ -140,27 +192,68 @@ export default function BookAppointmentPage() {
 
                     {error && <div className="alert alert-danger py-2 small"><i className="bi bi-exclamation-triangle me-1"></i>{error}</div>}
 
-                    <form onSubmit={handleSubmit}>
+                    <form id="booking-form" onSubmit={handleSubmit}>
                       <div className="row g-3">
                         <div className="col-12">
-                          <label className="form-label small fw-semibold">Consultation type</label>
+                          <div className="d-flex align-items-center justify-content-between">
+                            <label className="form-label small fw-semibold mb-1">Consultation type</label>
+                            <span className="small text-primary-emphasis fw-semibold mb-1"><i className="bi bi-stars me-1"></i>Video now available</span>
+                          </div>
                           <div className="row g-2">
-                            {CONSULT_OPTIONS.map(o => (
-                              <div className="col-6" key={o.value}>
-                                <button
-                                  type="button"
-                                  className={`w-100 btn ${form.consultation_type === o.value ? 'btn-primary' : 'btn-outline-secondary'} text-start rounded-3 py-2`}
-                                  onClick={() => update('consultation_type', o.value)}
-                                >
-                                  <i className={`bi ${o.icon} me-2`}></i>
-                                  <span className="fw-semibold">{o.label}</span>
-                                  <div className={`small ${form.consultation_type === o.value ? 'text-white-50' : 'text-muted'}`}>{o.desc}</div>
-                                </button>
-                              </div>
-                            ))}
+                            {CONSULT_OPTIONS.map(o => {
+                              const active = form.consultation_type === o.value;
+                              const isVideo = o.value === 'video';
+                              return (
+                                <div className="col-6" key={o.value}>
+                                  <button
+                                    type="button"
+                                    aria-pressed={active}
+                                    className={`vc-option w-100 h-100 btn text-start rounded-4 p-3 position-relative border ${
+                                      active
+                                        ? isVideo
+                                          ? 'vc-option-video-active'
+                                          : 'border-primary bg-primary text-white'
+                                        : `bg-white ${isVideo ? 'border-primary border-2' : 'border-secondary-subtle'}`
+                                    }`}
+                                    onClick={() => update('consultation_type', o.value)}
+                                  >
+                                    {isVideo && (
+                                      <span className="vc-gradient badge rounded-pill position-absolute top-0 end-0 m-2 text-white fw-semibold">
+                                        <i className="bi bi-stars me-1"></i>{active ? 'Selected' : 'Popular'}
+                                      </span>
+                                    )}
+                                    <div
+                                      className={`rounded-circle d-inline-flex align-items-center justify-content-center mb-2 ${
+                                        active
+                                          ? 'bg-white bg-opacity-25 text-white'
+                                          : isVideo
+                                          ? 'bg-primary bg-opacity-10 text-primary'
+                                          : 'bg-light text-secondary'
+                                      }`}
+                                      style={{ width: 44, height: 44 }}
+                                    >
+                                      <i className={`bi ${o.icon} fs-5`}></i>
+                                    </div>
+                                    <div className="fw-semibold d-flex align-items-center gap-1">
+                                      {o.label}
+                                      {active && <i className="bi bi-check-circle-fill small"></i>}
+                                    </div>
+                                    <div className={`small ${active ? 'text-white-50' : 'text-muted'}`}>{o.desc}</div>
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
                           {form.consultation_type === 'video' && (
-                            <div className="form-text small"><i className="bi bi-info-circle me-1"></i>We will send you a private video link to join at your appointment time.</div>
+                            <div
+                              className="mt-2 px-3 py-2 rounded-3 d-flex align-items-center gap-2"
+                              style={{ background: 'rgba(13,110,253,0.08)', border: '1px solid rgba(13,110,253,0.25)' }}
+                            >
+                              <span className="vc-live-dot"></span>
+                              <span className="small text-primary-emphasis">
+                                Video visit selected — we will send a private video link to join at your appointment time.
+                              </span>
+                            </div>
                           )}
                         </div>
                         <div className="col-md-6">
@@ -222,9 +315,18 @@ export default function BookAppointmentPage() {
                           <textarea className="form-control" rows={2} placeholder="Anything else we should know…" value={form.reason === 'Other' ? '' : form.reason} onChange={e => update('reason', e.target.value)} />
                         </div>
                       </div>
-                      <button className="btn btn-primary btn-lg rounded-pill w-100 mt-4 py-3 fw-semibold" disabled={submitting}>
-                        {submitting ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-send me-2"></i>}
-                        Request Appointment
+                      <button
+                        className={`btn btn-lg rounded-pill w-100 mt-4 py-3 fw-semibold ${
+                          form.consultation_type === 'video' ? 'vc-gradient text-white border-0 shadow' : 'btn-primary'
+                        }`}
+                        disabled={submitting}
+                      >
+                        {submitting ? (
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                        ) : (
+                          <i className={`bi ${form.consultation_type === 'video' ? 'bi-camera-video-fill' : 'bi-send'} me-2`}></i>
+                        )}
+                        {form.consultation_type === 'video' ? 'Request Video Consultation' : 'Request Appointment'}
                       </button>
                       <p className="text-muted text-center small mt-3 mb-0">
                         <i className="bi bi-shield-lock me-1"></i>Your details are used only to schedule your visit.

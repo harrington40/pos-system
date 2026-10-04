@@ -9,11 +9,28 @@ const BOOKING_URL =
     ? `${window.location.origin}${BOOKING_PATH}`
     : `https://openrx.transtechologies.com${BOOKING_PATH}`;
 
+/** A row from `GET /bookings/requests`. */
+interface BookingRow {
+  id: number;
+  fname: string;
+  lname: string;
+  phone_contact: string;
+  preferred_date: string;
+  preferred_time?: string | null;
+  reason?: string | null;
+  source?: string | null;
+  status: string;
+  consultation_type?: string | null;
+  video_room?: string | null;
+  patient_id?: number | null;
+  pid?: number | null;
+}
+
 export default function BookingsPage() {
   const queryClient = useQueryClient();
   const [toast, setToast] = useState('');
 
-  const { data: bookings = [], isLoading } = useQuery({
+  const { data: bookings = [], isLoading } = useQuery<BookingRow[]>({
     queryKey: ['bookings-requests'],
     queryFn: async () => {
       const r = await nestClient.get('/bookings/requests');
@@ -24,7 +41,7 @@ export default function BookingsPage() {
 
   const approveMutation = useMutation({
     mutationFn: (id: number) => nestClient.patch(`/bookings/requests/${id}/approve`, {}),
-    onSuccess: (d: any) => {
+    onSuccess: (d: { data?: { publicId?: string } }) => {
       queryClient.invalidateQueries({ queryKey: ['bookings-requests'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['registrar', 'appointments'] });
@@ -40,9 +57,9 @@ export default function BookingsPage() {
     },
   });
 
-  const pending = (bookings || []).filter((b: any) => b.status === 'pending');
-  const approved = (bookings || []).filter((b: any) => b.status === 'approved');
-  const declined = (bookings || []).filter((b: any) => b.status === 'declined');
+  const pending = (bookings || []).filter((b) => b.status === 'pending');
+  const approved = (bookings || []).filter((b) => b.status === 'approved');
+  const declined = (bookings || []).filter((b) => b.status === 'declined');
 
   const copyLink = () => {
     navigator.clipboard?.writeText(BOOKING_URL).then(() => setToast('Booking link copied'));
@@ -51,7 +68,7 @@ export default function BookingsPage() {
   const statusBadge = (s: string) =>
     s === 'pending' ? 'bg-warning text-dark' : s === 'approved' ? 'bg-success' : 'bg-danger';
 
-  const renderRow = (b: any) => (
+  const renderRow = (b: BookingRow) => (
     <tr key={b.id}>
       <td><strong>#{b.id}</strong></td>
       <td>{b.fname} {b.lname}</td>
@@ -60,7 +77,7 @@ export default function BookingsPage() {
       <td>{b.reason || '—'}</td>
       <td>
         {b.consultation_type === 'video' ? (
-          <span className="badge rounded-pill bg-info text-dark"><i className="bi bi-camera-video me-1"></i>Video</span>
+          <span className="vc-gradient badge rounded-pill text-white fw-semibold"><span className="vc-live-dot me-1"></span>Video</span>
         ) : (
           <span className="badge rounded-pill bg-light text-dark border">In person</span>
         )}
@@ -69,9 +86,9 @@ export default function BookingsPage() {
       <td><span className={`badge rounded-pill ${statusBadge(b.status)}`}>{b.status}</span></td>
       <td className="text-nowrap">
         {b.consultation_type === 'video' && b.video_room && (
-          <a className="btn btn-primary btn-sm rounded-pill me-1" target="_blank" rel="noreferrer"
+          <a className="vc-gradient btn btn-sm rounded-pill text-white fw-semibold me-1 border-0" target="_blank" rel="noreferrer"
             href={`/video/${b.video_room}?role=physician`}>
-            <i className="bi bi-camera-video-fill me-1"></i>Join
+            <i className="bi bi-camera-video-fill me-1"></i>Join video
           </a>
         )}
         {b.status === 'pending' ? (
