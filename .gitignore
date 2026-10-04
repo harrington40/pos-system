@@ -9,3 +9,9 @@ node_modules
 **/.env.production
 **/.env.test
 
+# Python virtualenvs and caches (test suites create these locally).
+.venv/
+__pycache__/
+*.pyc
+
+

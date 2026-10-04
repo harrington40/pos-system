@@ -6,3 +6,7 @@ __pycache__/
 # Playwright
 test-results/
 playwright-report/
+
+# pytest reports (Jenkins publishes/archives these; never committed)
+pytest-results.xml
+pytest-report.html

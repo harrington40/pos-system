@@ -1,20 +1,30 @@
-// Production read-only discovery + baseline pipeline for the OpenRx API tests.
+// OpenRx CI pipeline — production read-only API verification (+ optional UI sweep).
 //
 //   production API ──authenticated GET──▶ discovery ──sanitized fixtures──▶ tests
+//                                        (read-only; nothing is ever written)
+//
+// Stages:
+//   1. Production discovery + baseline   (ci/run-production-baseline.sh)
+//   2. Full API sweep (e2e)              (backend/tests/api-tests/e2e/)
+//   3. UI sweep (Playwright)             (tests/ui-tests/) — opt-in via RUN_UI_TESTS
 //
 // Point a Jenkins job at this file ("Pipeline script from SCM", script path
-// backend/tests/api-tests/Jenkinsfile). It only ever reads.
+// backend/tests/api-tests/Jenkinsfile).
 //
 // Job configuration:
 //   * environment variable OPENRX_BASELINE_API_URL — the API to verify, e.g.
-//     https://openrx.example.com/api
+//     https://openrx.transtechologies.com/api
 //   * a Secret text credential whose id is `openrx-baseline-token` — a service
 //     token with read access. Without it the authenticated tests skip and the
-//     job would look green while testing nothing, so the script fails instead.
+//     job would look green while testing nothing, so the baseline script fails.
+//   * UI sweep: tick RUN_UI_TESTS and set UI_BASE_URL (a browser-capable agent is
+//     required; the stage installs Chromium via Playwright on the fly).
+//
+// Retention: build ARTIFACTS ARE DELETED AFTER ONE DAY (artifactDaysToKeepStr);
+// build records are kept 30 days / 50 builds. See options.buildDiscarder below.
 //
 // Nothing here writes to the API: conftest.py skips `production_write` and
-// `destructive` tests unless OPENRX_RUN_WRITES=true, which this pipeline never
-// sets.
+// `destructive` tests unless OPENRX_RUN_WRITES=true, which this pipeline never sets.
 pipeline {
     agent any
 
@@ -28,16 +38,31 @@ pipeline {
      * see the notes in README.md about the number of requests it makes.
      */
     options {
-        // Keep a bounded history now that builds land every hour.
-        buildDiscarder(logRotator(numToKeepStr: '50'))
+        // Keep a bounded build history, but DELETE THE BUILD ARTIFACTS AFTER ONE
+        // DAY — they are throwaway XML/HTML test reports and pile up fast at an
+        // hourly cadence. Raise artifactDaysToKeepStr for a longer window.
+        buildDiscarder(logRotator(
+            numToKeepStr: '50',
+            daysToKeepStr: '30',
+            artifactDaysToKeepStr: '1',
+            artifactNumToKeepStr: '5',
+        ))
         // Never let one slow discovery run overlap the next hourly build.
         disableConcurrentBuilds()
         // Fail fast rather than hang if the API is unreachable.
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
+    }
+
+    parameters {
+        booleanParam(name: 'RUN_UI_TESTS', defaultValue: false,
+            description: 'Run the Playwright UI sweep (needs UI_BASE_URL and a browser-capable agent).')
+        string(name: 'UI_BASE_URL', defaultValue: '',
+            description: 'SPA origin for UI tests, e.g. https://openrx.transtechologies.com')
     }
 
     environment {
         OPENRX_BASELINE_API_URL = "${env.OPENRX_BASELINE_API_URL ?: 'https://openrx.transtechologies.com/api'}"
+        OPENRX_API_URL = "${env.OPENRX_BASELINE_API_URL ?: 'https://openrx.transtechologies.com/api'}"
         OPENRX_VENV = "${env.OPENRX_VENV ?: (env.WORKSPACE + '/.api-tests-venv')}"
         OPENRX_JUNIT_XML = "${env.WORKSPACE}/backend/tests/api-tests/pytest-results.xml"
         OPENRX_HTML_REPORT = "${env.WORKSPACE}/backend/tests/api-tests/html-report/pytest-report.html"
@@ -67,12 +92,53 @@ pipeline {
                 }
             }
         }
+
+        // Broad, read-only sweep of the whole API (backend/tests/api-tests/e2e/).
+        // Only GETs and anonymous probes; write routes are never called here.
+        stage('Full API sweep (e2e)') {
+            steps {
+                withCredentials([string(credentialsId: 'openrx-baseline-token', variable: 'OPENRX_API_TOKEN')]) {
+                    sh '''
+                        set -e
+                        cd backend/tests/api-tests
+                        if [ ! -x "$OPENRX_VENV/bin/python" ]; then
+                            python3 -m venv "$OPENRX_VENV"
+                            "$OPENRX_VENV/bin/python" -m pip install --quiet --upgrade pip
+                            "$OPENRX_VENV/bin/python" -m pip install --quiet -r requirements.txt
+                        fi
+                        "$OPENRX_VENV/bin/python" -m pytest e2e/ -q \
+                            --junitxml=e2e/pytest-results.xml
+                    '''
+                }
+            }
+        }
+
+        // Optional browser sweep (tests/ui-tests/, Playwright). Off by default:
+        // enable with the RUN_UI_TESTS parameter and set UI_BASE_URL.
+        stage('UI sweep (Playwright)') {
+            when { expression { return params.RUN_UI_TESTS && (params.UI_BASE_URL?.trim() ?: false) } }
+            steps {
+                withCredentials([string(credentialsId: 'openrx-baseline-token', variable: 'OPENRX_API_TOKEN')]) {
+                    sh '''
+                        set -e
+                        cd tests/ui-tests
+                        python3 -m venv .venv
+                        .venv/bin/python -m pip install --quiet --upgrade pip
+                        .venv/bin/python -m pip install --quiet -r requirements.txt
+                        .venv/bin/python -m playwright install chromium
+                        UI_BASE_URL="$UI_BASE_URL" UI_API_URL="$OPENRX_API_URL" UI_TOKEN="$OPENRX_API_TOKEN" \
+                            .venv/bin/python -m pytest -q --junitxml=pytest-results.xml
+                    '''
+                }
+            }
+        }
     }
 
     post {
         always {
-            // JUnit powers the "Test Result" summary and trend in Jenkins.
-            junit allowEmptyResults: true, testResults: 'backend/tests/api-tests/pytest-results.xml'
+            // JUnit powers the "Test Result" summary and trend in Jenkins across
+            // all three suites (baseline, full API sweep, UI sweep).
+            junit allowEmptyResults: true, testResults: '**/pytest-results*.xml'
 
             // Renders the full pytest output as a page inside the build. Wrapped
             // because the HTML Publisher plugin may not be installed; the report
@@ -94,7 +160,7 @@ pipeline {
             }
 
             archiveArtifacts(
-                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html',
+                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html',
                 allowEmptyArchive: true
             )
         }
