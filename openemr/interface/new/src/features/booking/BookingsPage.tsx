@@ -58,9 +58,22 @@ export default function BookingsPage() {
       <td>{b.phone_contact}</td>
       <td>{String(b.preferred_date || '').slice(0, 10)} {b.preferred_time || ''}</td>
       <td>{b.reason || '—'}</td>
+      <td>
+        {b.consultation_type === 'video' ? (
+          <span className="badge rounded-pill bg-info text-dark"><i className="bi bi-camera-video me-1"></i>Video</span>
+        ) : (
+          <span className="badge rounded-pill bg-light text-dark border">In person</span>
+        )}
+      </td>
       <td><span className="badge rounded-pill text-capitalize">{b.source || 'social'}</span></td>
       <td><span className={`badge rounded-pill ${statusBadge(b.status)}`}>{b.status}</span></td>
       <td className="text-nowrap">
+        {b.consultation_type === 'video' && b.video_room && (
+          <a className="btn btn-primary btn-sm rounded-pill me-1" target="_blank" rel="noreferrer"
+            href={`/video/${b.video_room}?role=physician`}>
+            <i className="bi bi-camera-video-fill me-1"></i>Join
+          </a>
+        )}
         {b.status === 'pending' ? (
           <>
             <button className="btn btn-success btn-sm rounded-pill me-1" onClick={() => approveMutation.mutate(b.id)} disabled={approveMutation.isPending}>
@@ -125,7 +138,7 @@ export default function BookingsPage() {
               </div>
               <div className="d-flex flex-wrap gap-2">
                 <a className="btn btn-success btn-sm rounded-pill" target="_blank" rel="noreferrer"
-                  href={`https://wa.me/?text=${encodeURIComponent(`Book your appointment with us: ${BOOKING_URL}`)}`}>
+                  href={`https://wa.me/?text=${encodeURIComponent(`Book your appointment with us — in person or by video: ${BOOKING_URL}`)}`}>
                   <i className="bi bi-whatsapp me-1"></i>WhatsApp
                 </a>
                 <a className="btn btn-primary btn-sm rounded-pill" target="_blank" rel="noreferrer"
@@ -151,12 +164,12 @@ export default function BookingsPage() {
               <table className="table table-hover small mb-0">
                 <thead className="table-light sticky-top">
                   <tr>
-                    <th>Ref</th><th>Patient</th><th>Phone</th><th>Preferred</th><th>Reason</th><th>Source</th><th>Status</th><th>Action</th>
+                    <th>Ref</th><th>Patient</th><th>Phone</th><th>Preferred</th><th>Reason</th><th>Type</th><th>Source</th><th>Status</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bookings.length === 0 ? (
-                    <tr><td colSpan={8} className="text-center text-muted py-4">No booking requests yet.</td></tr>
+                    <tr><td colSpan={9} className="text-center text-muted py-4">No booking requests yet.</td></tr>
                   ) : (
                     [...pending, ...approved, ...declined].map(renderRow)
                   )}

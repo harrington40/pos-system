@@ -80,6 +80,8 @@ ROUTES: tuple[UiRoute, ...] = (
     UiRoute("/inventory", "Inventory", "inventory"),
     UiRoute("/bookings", "Bookings", "booking"),
     UiRoute("/book-appointment", "Book Appointment", "booking", staff_auth=False),
+    # telehealth — public WebRTC room; a denied camera is surfaced in-page
+    UiRoute("/video/vc-smoke", "Video Consultation", "telehealth", staff_auth=False),
     UiRoute("/license", "License", "license", staff_auth=False),
     # fda / documents / data
     UiRoute("/fda", "FDA Lookup", "fda"),

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import * as crypto from 'crypto';
 import { PatientsService } from '../patients/patients.service';
 
 export interface CreateBookingDto {
@@ -18,6 +19,8 @@ export interface CreateBookingDto {
     preferred_time?: string;
     reason?: string;
     source?: string;
+    /** 'in_person' (default) or 'video' for a WebRTC video consultation. */
+    consultation_type?: string;
 }
 
 /** `booking_requests` row (with the joined provider name). */
@@ -32,6 +35,8 @@ export interface BookingRequestRow {
     reason: string | null;
     source: string | null;
     status: string;
+    consultation_type: string;
+    video_room: string | null;
     provider_id: number | null;
     patient_id: number | null;
     pid: number | null;
@@ -74,6 +79,8 @@ export class BookingsService implements OnModuleInit {
         reason VARCHAR(255) NULL,
         source VARCHAR(20) NOT NULL DEFAULT 'social',
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        consultation_type VARCHAR(20) NOT NULL DEFAULT 'in_person',
+        video_room VARCHAR(40) NULL,
         patient_id INT NULL,
         pid INT NULL,
         appointment_id INT NULL,
@@ -85,12 +92,26 @@ export class BookingsService implements OnModuleInit {
         INDEX idx_booking_date (preferred_date)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+        // Self-healing columns for databases created before telehealth existed.
+        for (const ddl of [
+            `ALTER TABLE booking_requests ADD COLUMN consultation_type VARCHAR(20) NOT NULL DEFAULT 'in_person'`,
+            `ALTER TABLE booking_requests ADD COLUMN video_room VARCHAR(40) NULL`,
+        ]) {
+            try {
+                await this.dataSource.query(ddl);
+            } catch {
+                /* column already present */
+            }
+        }
         this.logger.log('booking_requests schema ready');
     }
 
-    async createRequest(
-        dto: CreateBookingDto,
-    ): Promise<{ id: number; status: string }> {
+    async createRequest(dto: CreateBookingDto): Promise<{
+        id: number;
+        status: string;
+        consultation_type: string;
+        video_room: string | null;
+    }> {
         const fname = String(dto.fname || '').trim();
         const lname = String(dto.lname || '').trim();
         const phone = String(dto.phone_contact || '').trim();
@@ -101,10 +122,21 @@ export class BookingsService implements OnModuleInit {
         if (!phone) throw new BadRequestException('Phone number is required');
         if (!date) throw new BadRequestException('Preferred date is required');
 
+        const consultationType =
+            String(dto.consultation_type || '').toLowerCase() === 'video'
+                ? 'video'
+                : 'in_person';
+        // Video consultations get a short, shareable room code. The patient and
+        // the physician both open /video/<code>, which pairs them over WebRTC.
+        const videoRoom =
+            consultationType === 'video'
+                ? `vc-${crypto.randomBytes(4).toString('hex')}`
+                : null;
+
         const result = await this.dataSource.query<AffectedRowsResult>(
             `INSERT INTO booking_requests
-        (fname, lname, phone_contact, email, preferred_date, preferred_time, reason, source, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        (fname, lname, phone_contact, email, preferred_date, preferred_time, reason, source, status, consultation_type, video_room)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
             [
                 fname,
                 lname,
@@ -114,10 +146,17 @@ export class BookingsService implements OnModuleInit {
                 dto.preferred_time || '09:00',
                 dto.reason || 'General appointment',
                 dto.source || 'social',
+                consultationType,
+                videoRoom,
             ],
         );
 
-        return { id: result.insertId, status: 'pending' };
+        return {
+            id: result.insertId,
+            status: 'pending',
+            consultation_type: consultationType,
+            video_room: videoRoom,
+        };
     }
 
     async listRequests(): Promise<BookingRequestRow[]> {
@@ -237,6 +276,8 @@ export class BookingsService implements OnModuleInit {
                 ? `${provider.fname} ${provider.lname}`.trim()
                 : null,
             appointmentId,
+            consultationType: req.consultation_type || 'in_person',
+            videoRoom: req.video_room,
         };
     }
 

@@ -67,6 +67,7 @@ import VendorPortalPage from './features/inventory/VendorPortalPage';
 import BookAppointmentPage from './features/booking/BookAppointmentPage';
 import BookingsPage from './features/booking/BookingsPage';
 import LabResultFormPage from './features/labreports/LabResultFormPage';
+import VideoConsultPage from './features/telehealth/VideoConsultPage';
 
 function RoleRedirect() {
   const { user } = useAuth();
@@ -101,6 +102,8 @@ export default function App() {
         <Route path="/callback" element={<CallbackPage />} />
         <Route path="/license" element={<LicensePage />} />
         <Route path="/book-appointment" element={<BookAppointmentPage />} />
+        {/* Public telehealth room — patients join from their booking link. */}
+        <Route path="/video/:room" element={<VideoConsultPage />} />
 
         {/* Protected routes */}
         <Route

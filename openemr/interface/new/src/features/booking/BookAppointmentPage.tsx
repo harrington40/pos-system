@@ -3,6 +3,11 @@ import nestClient from '../../api/nest-client';
 
 const REASONS = ['General appointment', 'Consultation', 'Lab work', 'Vaccination', 'Follow-up', 'Maternity', 'Other'];
 
+const CONSULT_OPTIONS = [
+  { value: 'in_person', label: 'In person', desc: 'Visit the clinic for your care', icon: 'bi-building' },
+  { value: 'video', label: 'Video call', desc: 'Meet your doctor online', icon: 'bi-camera-video' },
+];
+
 export default function BookAppointmentPage() {
   const [form, setForm] = useState({
     fname: '',
@@ -12,10 +17,15 @@ export default function BookAppointmentPage() {
     preferred_date: '',
     preferred_time: '09:00',
     reason: 'General appointment',
+    consultation_type: 'in_person',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [confirmed, setConfirmed] = useState<{ id: number } | null>(null);
+  const [confirmed, setConfirmed] = useState<{
+    id: number;
+    consultation_type?: string;
+    video_room?: string | null;
+  } | null>(null);
 
   const update = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -55,7 +65,7 @@ export default function BookAppointmentPage() {
               </h1>
               <p className="text-white text-opacity-75 mb-4" style={{ fontSize: '1.05rem' }}>
                 Request an appointment from anywhere — WhatsApp, Facebook, X, or the link we share.
-                Our registrar confirms your slot and you simply walk in on your day.
+                Choose an in-person visit or a secure video consultation with your physician.
               </p>
 
               <div className="d-flex flex-column gap-3 mb-4">
@@ -103,6 +113,22 @@ export default function BookAppointmentPage() {
                     <h4 className="fw-bold">Request received</h4>
                     <p className="text-muted small mb-1">Booking reference <span className="badge bg-primary rounded-pill">#{confirmed.id}</span></p>
                     <p className="text-muted small mb-4">We will contact you on WhatsApp or phone to confirm your appointment.</p>
+                    {confirmed.consultation_type === 'video' && confirmed.video_room && (
+                      <div className="alert alert-info text-start small mb-4">
+                        <div className="fw-semibold mb-1"><i className="bi bi-camera-video me-1"></i>Video consultation requested</div>
+                        <p className="mb-2">Save this private link — you and your physician join here at your appointment time.</p>
+                        <div className="input-group input-group-sm mb-2">
+                          <input className="form-control" readOnly value={`${window.location.origin}/video/${confirmed.video_room}`} />
+                          <button className="btn btn-outline-primary" type="button"
+                            onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/video/${confirmed.video_room}`)}>
+                            <i className="bi bi-clipboard"></i>
+                          </button>
+                        </div>
+                        <a className="btn btn-primary btn-sm rounded-pill" href={`/video/${confirmed.video_room}`}>
+                          <i className="bi bi-camera-video-fill me-1"></i>Join video room now
+                        </a>
+                      </div>
+                    )}
                     <button className="btn btn-outline-primary rounded-pill px-4" onClick={() => setConfirmed(null)}>
                       <i className="bi bi-plus-lg me-1"></i>Make another booking
                     </button>
@@ -116,6 +142,27 @@ export default function BookAppointmentPage() {
 
                     <form onSubmit={handleSubmit}>
                       <div className="row g-3">
+                        <div className="col-12">
+                          <label className="form-label small fw-semibold">Consultation type</label>
+                          <div className="row g-2">
+                            {CONSULT_OPTIONS.map(o => (
+                              <div className="col-6" key={o.value}>
+                                <button
+                                  type="button"
+                                  className={`w-100 btn ${form.consultation_type === o.value ? 'btn-primary' : 'btn-outline-secondary'} text-start rounded-3 py-2`}
+                                  onClick={() => update('consultation_type', o.value)}
+                                >
+                                  <i className={`bi ${o.icon} me-2`}></i>
+                                  <span className="fw-semibold">{o.label}</span>
+                                  <div className={`small ${form.consultation_type === o.value ? 'text-white-50' : 'text-muted'}`}>{o.desc}</div>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          {form.consultation_type === 'video' && (
+                            <div className="form-text small"><i className="bi bi-info-circle me-1"></i>We will send you a private video link to join at your appointment time.</div>
+                          )}
+                        </div>
                         <div className="col-md-6">
                           <label className="form-label small fw-semibold">First name *</label>
                           <div className="input-group">

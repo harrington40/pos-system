@@ -37,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MailboxModule } from './mailbox/mailbox.module';
 import { EmergencyModule } from './emergency/emergency.module';
 import { MedicationAdministrationModule } from './medication-administration/medication-administration.module';
+import { TelehealthModule } from './telehealth/telehealth.module';
 
 @Module({
     controllers: [AppConfigController],
@@ -107,6 +108,7 @@ import { MedicationAdministrationModule } from './medication-administration/medi
         ReferralsModule,
         InventoryModule,
         MidwifeModule,
+        TelehealthModule,
     ],
 })
 export class AppModule {}
