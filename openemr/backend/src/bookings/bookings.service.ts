@@ -9,6 +9,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import * as crypto from 'crypto';
 import { PatientsService } from '../patients/patients.service';
+import { SettingsService } from '../settings/settings.service';
 
 export interface CreateBookingDto {
     fname: string;
@@ -60,6 +61,7 @@ export class BookingsService implements OnModuleInit {
     constructor(
         @InjectDataSource() private readonly dataSource: DataSource,
         private readonly patients: PatientsService,
+        private readonly settings: SettingsService,
     ) {}
 
     async onModuleInit(): Promise<void> {
@@ -126,6 +128,16 @@ export class BookingsService implements OnModuleInit {
             String(dto.consultation_type || '').toLowerCase() === 'video'
                 ? 'video'
                 : 'in_person';
+        // Server-side enforcement: the admin switch must hold even for direct
+        // API callers that skip the booking UI.
+        if (
+            consultationType === 'video' &&
+            !(await this.settings.isEnabled('video_consultation_enabled'))
+        ) {
+            throw new BadRequestException(
+                'Video consultations are currently unavailable. Please book an in-person visit.',
+            );
+        }
         // Video consultations get a short, shareable room code. The patient and
         // the physician both open /video/<code>, which pairs them over WebRTC.
         const videoRoom =

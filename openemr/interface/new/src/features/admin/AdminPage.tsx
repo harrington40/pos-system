@@ -465,7 +465,7 @@ function loadSettings(): SystemSettings {
 function SettingsTab() {
   const [settings, setSettings] = useState<SystemSettings>(loadSettings);
   const [saved, setSaved] = useState(false);
-  const [activeSection, setActiveSection] = useState<'general' | 'language' | 'legacy'>('general');
+  const [activeSection, setActiveSection] = useState<'general' | 'consultations' | 'language' | 'legacy'>('general');
 
   const update = (patch: Partial<SystemSettings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));
@@ -498,6 +498,7 @@ function SettingsTab() {
         <ul className="nav nav-pills">
           {[
             { id: 'general' as const, label: 'General', icon: 'bi-gear' },
+            { id: 'consultations' as const, label: 'Consultations', icon: 'bi-camera-video' },
             { id: 'language' as const, label: 'Language & Region', icon: 'bi-translate' },
             { id: 'legacy' as const, label: 'Legacy Tools', icon: 'bi-link-45deg' },
           ].map((s) => (
@@ -789,6 +790,9 @@ function SettingsTab() {
         </div>
       )}
 
+      {/* ===== Consultations Section (server-backed feature flags) ===== */}
+      {activeSection === 'consultations' && <ConsultationsSettings />}
+
       {/* ===== Legacy Tools Section ===== */}
       {activeSection === 'legacy' && (
         <div>
@@ -813,6 +817,139 @@ function SettingsTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A server-backed setting as returned by `GET /admin/settings`. */
+interface ServerSettingItem {
+  key: string;
+  label: string;
+  description: string;
+  group: string;
+  type: 'boolean' | 'string';
+  value: boolean | string;
+  public?: boolean;
+}
+
+/**
+ * Server-backed feature flags for patient-facing consultations. Unlike the rest
+ * of this tab (which is per-browser localStorage), these are stored on the
+ * backend and enforced by the API, so they apply to every patient and device.
+ */
+function ConsultationsSettings() {
+  const queryClient = useQueryClient();
+  const [saved, setSaved] = useState(false);
+
+  const { data: items = [], isLoading } = useQuery<ServerSettingItem[]>({
+    queryKey: ['server-settings'],
+    queryFn: async () => (await nestClient.get('/admin/settings')).data,
+  });
+
+  const save = useMutation({
+    mutationFn: (patch: Record<string, unknown>) => nestClient.put('/admin/settings', patch),
+    onSuccess: (r: { data: ServerSettingItem[] }) => {
+      queryClient.setQueryData(['server-settings'], r.data);
+      // The public flag drives the booking page — refresh it immediately.
+      queryClient.invalidateQueries({ queryKey: ['public-settings'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    },
+  });
+
+  const consultations = items.filter((i) => i.group === 'consultations');
+
+  return (
+    <div className="row g-4">
+      <div className="col-lg-8">
+        <div className="card shadow-sm">
+          <div className="card-header d-flex align-items-center justify-content-between">
+            <h5 className="mb-0"><i className="bi bi-camera-video me-2"></i>Video Consultations</h5>
+            <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary">Patient-facing</span>
+          </div>
+          <div className="card-body">
+            <p className="text-muted small mb-3">
+              Choose which consultation types patients can request from the public booking page.
+              Switching one off hides it from patients and rejects it at the API.
+            </p>
+
+            {saved && (
+              <div className="alert alert-success py-2 small d-flex align-items-center">
+                <i className="bi bi-check-circle-fill me-2"></i>Setting saved.
+              </div>
+            )}
+            {save.isError && (
+              <div className="alert alert-danger py-2 small d-flex align-items-center">
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>Could not save the setting. Please try again.
+              </div>
+            )}
+
+            {isLoading ? (
+              <div className="text-center py-4"><div className="spinner-border text-primary"></div></div>
+            ) : consultations.length === 0 ? (
+              <div className="text-muted small py-3">No consultation settings available.</div>
+            ) : (
+              consultations.map((s) => (
+                <div
+                  key={s.key}
+                  className="d-flex align-items-start justify-content-between gap-3 p-3 rounded-3 border mb-3"
+                  style={{ background: s.value === true ? 'rgba(0,201,167,0.07)' : 'rgba(108,117,125,0.07)' }}
+                >
+                  <div className="d-flex gap-3">
+                    <div
+                      className={`rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 ${
+                        s.value === true ? 'vc-gradient text-white' : 'bg-secondary bg-opacity-25 text-secondary'
+                      }`}
+                      style={{ width: 46, height: 46 }}
+                    >
+                      <i className="bi bi-camera-video-fill fs-5"></i>
+                    </div>
+                    <div>
+                      <div className="fw-semibold d-flex align-items-center gap-2 flex-wrap">
+                        {s.label}
+                        <span className={`badge rounded-pill ${s.value === true ? 'bg-success' : 'bg-secondary'}`}>
+                          {s.value === true ? 'On' : 'Off'}
+                        </span>
+                      </div>
+                      <div className="small text-muted mt-1">{s.description}</div>
+                    </div>
+                  </div>
+                  <div className="form-check form-switch fs-5 flex-shrink-0" style={{ paddingLeft: '3rem' }}>
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      style={{ cursor: 'pointer' }}
+                      checked={s.value === true}
+                      disabled={save.isPending}
+                      onChange={(e) => save.mutate({ [s.key]: e.target.checked })}
+                      aria-label={`${s.label} enabled`}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="col-lg-4">
+        <div className="card shadow-sm">
+          <div className="card-header"><h5 className="mb-0"><i className="bi bi-info-circle me-2"></i>How it works</h5></div>
+          <div className="card-body small text-muted">
+            <p>
+              While <strong>Video consultations</strong> is on, patients can pick a video visit on
+              <code className="ms-1">/book-appointment</code> and receive a private room link to meet
+              their physician.
+            </p>
+            <p className="mb-0">
+              Turned off, the video option and its booking callout disappear, and any video booking
+              sent straight to the API is refused — existing video appointments can still be joined
+              from the Bookings page.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

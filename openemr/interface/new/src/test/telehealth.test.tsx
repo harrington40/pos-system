@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import nestClient from '../api/nest-client';
 import BookAppointmentPage from '../features/booking/BookAppointmentPage';
 import VideoConsultPage from '../features/telehealth/VideoConsultPage';
 
-// The booking page posts straight to the NestJS backend; stub the axios wrapper
+// The booking page talks straight to the NestJS backend; stub the axios wrapper
 // so no request leaves the test.
 vi.mock('../api/nest-client', () => ({
-  default: { post: vi.fn(), get: vi.fn(), patch: vi.fn() },
+  default: { post: vi.fn(), get: vi.fn(), patch: vi.fn(), put: vi.fn() },
 }));
 
 // Signalling must never actually dial out from a unit test.
@@ -17,6 +18,7 @@ vi.mock('socket.io-client', () => ({
 }));
 
 const post = nestClient.post as unknown as ReturnType<typeof vi.fn>;
+const get = nestClient.get as unknown as ReturnType<typeof vi.fn>;
 
 // jsdom does not implement scrollTo/scrollIntoView; the page calls both.
 window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
@@ -41,16 +43,22 @@ describe('BookAppointmentPage — consultation type', () => {
     });
   });
 
-  const renderPage = () =>
-    render(
-      <MemoryRouter>
-        <BookAppointmentPage />
-      </MemoryRouter>,
+  const renderPage = (settings: Record<string, boolean | string> = { video_consultation_enabled: true }) => {
+    get.mockResolvedValue({ data: settings });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <BookAppointmentPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
+  };
 
-  it('offers an in-person / video choice and defaults to in person', () => {
+  it('offers an in-person / video choice and defaults to in person', async () => {
     renderPage();
-    expect(screen.getByText('Consultation type')).toBeInTheDocument();
+    // The option only appears once the public feature flag has been read.
+    expect(await screen.findByText('Consultation type')).toBeInTheDocument();
     const inPerson = screen.getByRole('button', { name: /In person/ });
     const video = screen.getByRole('button', { name: /Video call/ });
     expect(inPerson).toHaveAttribute('aria-pressed', 'true');
@@ -60,9 +68,9 @@ describe('BookAppointmentPage — consultation type', () => {
     expect(screen.getByText('Popular')).toBeInTheDocument();
   });
 
-  it('promotes video from the hero callout and preselects it', () => {
+  it('promotes video from the hero callout and preselects it', async () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /Start a video visit/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Start a video visit/i }));
     const video = screen.getByRole('button', { name: /Video call/ });
     expect(video).toHaveAttribute('aria-pressed', 'true');
     expect(video).toHaveClass('vc-option-video-active');
@@ -71,6 +79,7 @@ describe('BookAppointmentPage — consultation type', () => {
 
   it('submits an in-person booking by default', async () => {
     renderPage();
+    await screen.findByText('Consultation type');
     submitBooking();
 
     await waitFor(() => expect(post).toHaveBeenCalled());
@@ -81,7 +90,7 @@ describe('BookAppointmentPage — consultation type', () => {
 
   it('submits a video booking and hands back the room invite link', async () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /Video call/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Video call/ }));
     // Choosing video surfaces the "we will send you a link" hint before submit.
     expect(screen.getByText(/private video link/i)).toBeInTheDocument();
 
@@ -96,6 +105,22 @@ describe('BookAppointmentPage — consultation type', () => {
       'href',
       '/video/vc-abc12345',
     );
+  });
+
+  it('hides every video affordance when an admin turns video consultations off', async () => {
+    renderPage({ video_consultation_enabled: false });
+
+    expect(await screen.findByText('Book an Appointment')).toBeInTheDocument();
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/settings/public'));
+
+    expect(screen.queryByText('Consultation type')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Video call/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Start a video visit/i })).not.toBeInTheDocument();
+
+    // And a submission falls back to an in-person request.
+    submitBooking();
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    expect(post.mock.calls[0][1]).toMatchObject({ consultation_type: 'in_person' });
   });
 });
 

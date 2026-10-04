@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
 const REASONS = ['General appointment', 'Consultation', 'Lab work', 'Vaccination', 'Follow-up', 'Maternity', 'Other'];
@@ -27,6 +28,16 @@ export default function BookAppointmentPage() {
     video_room?: string | null;
   } | null>(null);
 
+  // Admin-controlled feature flag (Administration → Settings → Consultations).
+  const { data: publicSettings } = useQuery({
+    queryKey: ['public-settings'],
+    queryFn: async () => (await nestClient.get('/settings/public')).data,
+    staleTime: 60_000,
+  });
+  // Fail closed: only advertise video once the flag is confirmed on.
+  const videoEnabled = publicSettings?.video_consultation_enabled === true;
+  const submitType = videoEnabled ? form.consultation_type : 'in_person';
+
   const update = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,7 +45,11 @@ export default function BookAppointmentPage() {
     setError('');
     setSubmitting(true);
     try {
-      const r = await nestClient.post('/booking/request', { ...form, source: 'whatsapp' });
+      const r = await nestClient.post('/booking/request', {
+        ...form,
+        consultation_type: submitType,
+        source: 'whatsapp',
+      });
       setConfirmed(r.data);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -69,15 +84,16 @@ export default function BookAppointmentPage() {
                 Choose an in-person visit or a secure video consultation with your physician.
               </p>
 
-              {/* Video consultation spotlight — the headline feature for this page */}
-              <div
-                className="p-3 p-md-4 rounded-4 mb-4 position-relative overflow-hidden"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(13,110,253,0.45), rgba(0,201,167,0.45))',
-                  border: '1px solid rgba(255,255,255,0.35)',
-                  backdropFilter: 'blur(8px)',
-                }}
-              >
+              {/* Video consultation spotlight — hidden when an admin turns it off */}
+              {videoEnabled && (
+                <div
+                  className="p-3 p-md-4 rounded-4 mb-4 position-relative overflow-hidden"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(13,110,253,0.45), rgba(0,201,167,0.45))',
+                    border: '1px solid rgba(255,255,255,0.35)',
+                    backdropFilter: 'blur(8px)',
+                  }}
+                >
                 <div className="d-flex align-items-center justify-content-between mb-2">
                   <span className="d-inline-flex align-items-center gap-2 fw-bold text-white">
                     <span className="vc-live-dot"></span> NEW · Video consultations
@@ -102,7 +118,8 @@ export default function BookAppointmentPage() {
                 >
                   <i className="bi bi-camera-video-fill me-1 text-primary"></i> Start a video visit
                 </button>
-              </div>
+                </div>
+              )}
 
               <div className="d-flex flex-column gap-3 mb-4">
                 {[
@@ -194,6 +211,7 @@ export default function BookAppointmentPage() {
 
                     <form id="booking-form" onSubmit={handleSubmit}>
                       <div className="row g-3">
+                        {videoEnabled && (
                         <div className="col-12">
                           <div className="d-flex align-items-center justify-content-between">
                             <label className="form-label small fw-semibold mb-1">Consultation type</label>
@@ -256,6 +274,7 @@ export default function BookAppointmentPage() {
                             </div>
                           )}
                         </div>
+                        )}
                         <div className="col-md-6">
                           <label className="form-label small fw-semibold">First name *</label>
                           <div className="input-group">
@@ -317,16 +336,16 @@ export default function BookAppointmentPage() {
                       </div>
                       <button
                         className={`btn btn-lg rounded-pill w-100 mt-4 py-3 fw-semibold ${
-                          form.consultation_type === 'video' ? 'vc-gradient text-white border-0 shadow' : 'btn-primary'
+                          submitType === 'video' ? 'vc-gradient text-white border-0 shadow' : 'btn-primary'
                         }`}
                         disabled={submitting}
                       >
                         {submitting ? (
                           <span className="spinner-border spinner-border-sm me-2"></span>
                         ) : (
-                          <i className={`bi ${form.consultation_type === 'video' ? 'bi-camera-video-fill' : 'bi-send'} me-2`}></i>
+                          <i className={`bi ${submitType === 'video' ? 'bi-camera-video-fill' : 'bi-send'} me-2`}></i>
                         )}
-                        {form.consultation_type === 'video' ? 'Request Video Consultation' : 'Request Appointment'}
+                        {submitType === 'video' ? 'Request Video Consultation' : 'Request Appointment'}
                       </button>
                       <p className="text-muted text-center small mt-3 mb-0">
                         <i className="bi bi-shield-lock me-1"></i>Your details are used only to schedule your visit.
