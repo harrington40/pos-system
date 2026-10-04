@@ -123,6 +123,27 @@ curl -s -o /dev/null -w '%{http_code}\n' https://openrx.transtechologies.com/api
 ssh dev@94.250.201.58 'pm2 list; ls -la /home/dev/openrx/backend/dist/main.js /home/dev/openrx/public/dist/index.html'
 ```
 
+## Testing
+
+Two black-box suites live alongside the app:
+
+- **API tests** (`backend/tests/api-tests/`, pytest) — whole-API contract
+  (`test_api_surface.py`), a configurable full sweep (`e2e/`), and per-domain
+  modules. See `backend/tests/api-tests/README.md`.
+- **UI tests** (`tests/ui-tests/`, Playwright for Python) — one UI case per SPA
+  route (route-render smoke sweep) plus per-feature modules (auth, DICOM viewer,
+  …), all environment-configurable. See `tests/ui-tests/README.md`.
+
+```bash
+# API (against a running backend)
+cd backend/tests/api-tests && OPENRX_API_URL=http://localhost:3002/api \
+    OPENRX_API_TOKEN=<token> .venv/bin/python -m pytest -q
+
+# UI (against a running SPA)
+cd tests/ui-tests && .venv/bin/python -m playwright install chromium   # once
+    UI_BASE_URL=http://localhost:5173 UI_TOKEN=<token> .venv/bin/python -m pytest -q
+```
+
 ## History / maintenance notes
 
 - The deploy tooling originally lived at `openemr/deploy/` and was removed in a
