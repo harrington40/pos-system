@@ -157,24 +157,27 @@ pipeline {
             steps {
                 sh '''
                     set -e
-                    mkdir -p tests/reliability-artifacts
-                    rm -f tests/reliability-artifacts/jest-results.json \
-                          tests/reliability-artifacts/jest-coverage-summary.json \
-                          tests/reliability-artifacts/vitest-results.json
+                    BASE="."
+                    [ -d openemr/tests ] && BASE="openemr"
+                    ART="$BASE/tests/reliability-artifacts"
+                    ART_ABS="$(pwd)/$ART"
+                    mkdir -p "$ART"
+                    rm -f "$ART"/jest-results.json "$ART"/jest-coverage-summary.json "$ART"/vitest-results.json
                     if ! command -v npm >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
                         echo "[js] node/npm not available; JS suites will show as 'not run'"
                         exit 0
                     fi
-                    echo "[js] backend Jest (+ coverage)"
-                    ( cd backend && npm ci --no-audit --no-fund >/dev/null 2>&1 || true
+                    echo "[js] backend Jest (+ coverage) [base=$BASE]"
+                    ( cd "$BASE/backend" && npm ci --no-audit --no-fund >/dev/null 2>&1 || true
                       npx jest --ci --coverage --coverageReporters=json-summary \
-                        --json --outputFile=../tests/reliability-artifacts/jest-results.json || true )
-                    cp -f backend/coverage/coverage-summary.json \
-                          tests/reliability-artifacts/jest-coverage-summary.json 2>/dev/null || true
+                        --json --outputFile="$ART_ABS/jest-results.json" || true )
+                    cp -f "$BASE/backend/coverage/coverage-summary.json" \
+                          "$ART/jest-coverage-summary.json" 2>/dev/null || true
                     echo "[js] frontend Vitest"
-                    ( cd interface/new && npm ci --no-audit --no-fund >/dev/null 2>&1 || true
+                    ( cd "$BASE/interface/new" && npm ci --no-audit --no-fund >/dev/null 2>&1 || true
                       npx vitest run --reporter=json \
-                        --outputFile=../../tests/reliability-artifacts/vitest-results.json || true )
+                        --outputFile="$ART_ABS/vitest-results.json" || true )
+                    echo "[js] artifacts:"; ls -la "$ART" || true
                     echo "[js] done"
                 '''
             }
@@ -189,10 +192,24 @@ pipeline {
             steps {
                 sh '''
                     set -e
-                    OUT="${OPENRX_RELIABILITY_REPORT:-$WORKSPACE/tests/reliability-report.html}"
-                    python3 tests/build_reliability_report.py --collect \
-                        --out "$OUT" --json "${OUT%.html}.json"
-                    echo "[reliability] wrote $OUT and ${OUT%.html}.json"
+                    if command -v python3 >/dev/null 2>&1; then PY=python3; else PY=python; fi
+                    # The openemr repo may be the workspace root, or nested under
+                    # openemr/ (as in the pos-system repo). Find the script either way.
+                    BASE="."
+                    [ -f openemr/tests/build_reliability_report.py ] && BASE="openemr"
+                    SCRIPT="$BASE/tests/build_reliability_report.py"
+                    if [ ! -f "$SCRIPT" ]; then
+                        echo "[reliability] ERROR: $SCRIPT not found (cwd $(pwd))."
+                        echo "[reliability] The openemr tree is not where the pipeline expects it."
+                        ls -la
+                        exit 1
+                    fi
+                    echo "[reliability] generating from $SCRIPT (base=$BASE)"
+                    "$PY" "$SCRIPT" --collect \
+                        --out "$BASE/tests/reliability-report.html" \
+                        --json "$BASE/tests/reliability-report.json"
+                    echo "[reliability] outputs:"
+                    ls -la "$BASE/tests"/reliability-report.* || true
                 '''
             }
         }
@@ -222,23 +239,33 @@ pipeline {
                 } catch (err) {
                     echo "HTML Publisher unavailable (install the 'HTML Publisher' plugin): ${err}"
                 }
-                try {
-                    publishHTML(target: [
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'tests',
-                        reportFiles: 'reliability-report.html',
-                        reportName: 'Test Reliability Report',
-                        reportTitles: 'OpenRx test reliability',
-                    ])
-                } catch (err) {
-                    echo "HTML Publisher unavailable (install the 'HTML Publisher' plugin): ${err}"
+                // The reliability page may be at tests/ or openemr/tests/.
+                def relDir = fileExists('openemr/tests/reliability-report.html') ? 'openemr/tests'
+                           : (fileExists('tests/reliability-report.html') ? 'tests' : null)
+                if (relDir != null) {
+                    echo "reliability report found in ${relDir}/ — publishing as 'Test Reliability Report'"
+                    try {
+                        publishHTML(target: [
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: relDir,
+                            reportFiles: 'reliability-report.html',
+                            reportName: 'Test Reliability Report',
+                            reportTitles: 'OpenRx test reliability',
+                        ])
+                    } catch (err) {
+                        echo "HTML Publisher unavailable (install the 'HTML Publisher' plugin): ${err}"
+                    }
+                } else {
+                    echo "reliability-report.html NOT found in the workspace — nothing to publish."
+                    echo "See the 'Test reliability report' stage log above; it prints the path it wrote."
+                    echo "If it never ran, the earlier stages may have failed, or the SCM layout differs."
                 }
             }
 
             archiveArtifacts(
-                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html,tests/reliability-report.html,tests/reliability-report.json,tests/reliability-history.jsonl',
+                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html,**/reliability-report.html,**/reliability-report.json,**/reliability-history.jsonl',
                 allowEmptyArchive: true
             )
 
@@ -247,7 +274,9 @@ pipeline {
             // show it as a build badge too. Reads the JSON the report stage
             // produced — no extra plugins required for the description.
             script {
-                def report = 'tests/reliability-report.json'
+                def report = fileExists('openemr/tests/reliability-report.json')
+                    ? 'openemr/tests/reliability-report.json'
+                    : 'tests/reliability-report.json'
                 if (fileExists(report)) {
                     def txt = readFile(report)
                     def score = (txt =~ /"reliability"\s*:\s*([0-9.]+)/)
