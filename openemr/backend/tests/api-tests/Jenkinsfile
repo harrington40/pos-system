@@ -210,6 +210,15 @@ pipeline {
                         --json "$BASE/tests/reliability-report.json"
                     echo "[reliability] outputs:"
                     ls -la "$BASE/tests"/reliability-report.* || true
+
+                    # Canonical publish location at the WORKSPACE ROOT, so
+                    # Jenkins' publishHTML finds the page no matter where the
+                    # openemr tree sits in the checkout.
+                    mkdir -p reliability-report
+                    cp -f "$BASE/tests/reliability-report.html" reliability-report/reliability-report.html
+                    cp -f "$BASE/tests/reliability-report.json" reliability-report/reliability-report.json
+                    echo "[reliability] publish dir ($(pwd)/reliability-report):"
+                    ls -la reliability-report
                 '''
             }
         }
@@ -239,9 +248,11 @@ pipeline {
                 } catch (err) {
                     echo "HTML Publisher unavailable (install the 'HTML Publisher' plugin): ${err}"
                 }
-                // The reliability page may be at tests/ or openemr/tests/.
-                def relDir = fileExists('openemr/tests/reliability-report.html') ? 'openemr/tests'
-                           : (fileExists('tests/reliability-report.html') ? 'tests' : null)
+                // Prefer the canonical dir the stage creates at the workspace
+                // root; fall back to wherever the file may be.
+                def relDir = fileExists('reliability-report/reliability-report.html') ? 'reliability-report'
+                           : (fileExists('openemr/tests/reliability-report.html') ? 'openemr/tests'
+                           : (fileExists('tests/reliability-report.html') ? 'tests' : null))
                 if (relDir != null) {
                     echo "reliability report found in ${relDir}/ — publishing as 'Test Reliability Report'"
                     try {
@@ -274,9 +285,11 @@ pipeline {
             // show it as a build badge too. Reads the JSON the report stage
             // produced — no extra plugins required for the description.
             script {
-                def report = fileExists('openemr/tests/reliability-report.json')
-                    ? 'openemr/tests/reliability-report.json'
-                    : 'tests/reliability-report.json'
+                def report = fileExists('reliability-report/reliability-report.json')
+                    ? 'reliability-report/reliability-report.json'
+                    : (fileExists('openemr/tests/reliability-report.json')
+                        ? 'openemr/tests/reliability-report.json'
+                        : 'tests/reliability-report.json')
                 if (fileExists(report)) {
                     def txt = readFile(report)
                     def score = (txt =~ /"reliability"\s*:\s*([0-9.]+)/)
