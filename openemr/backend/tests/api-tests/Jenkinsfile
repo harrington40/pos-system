@@ -78,9 +78,9 @@ pipeline {
         // OPENRX_API_URL) fails closed instead of quietly reading real data.
         OPENRX_ALLOW_PRODUCTION = 'true'
         OPENRX_VENV = "${env.OPENRX_VENV ?: (env.WORKSPACE + '/.api-tests-venv')}"
-        OPENRX_JUNIT_XML = "${env.WORKSPACE}/backend/tests/api-tests/pytest-results.xml"
-        OPENRX_HTML_REPORT = "${env.WORKSPACE}/backend/tests/api-tests/html-report/pytest-report.html"
-        OPENRX_RELIABILITY_REPORT = "${env.WORKSPACE}/tests/reliability-report.html"
+        // Where the openemr tree sits in the checkout is resolved right after
+        // `checkout scm` (OPENRX_BASE); the stages are relative to it. The
+        // baseline script derives its own JUnit/HTML paths from its location.
     }
 
     triggers {
@@ -91,6 +91,13 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                script {
+                    // The openemr tree may be the workspace root, or nested under
+                    // openemr/ (the pos-system monorepo layout). Resolve it once;
+                    // every later stage is relative to OPENRX_BASE.
+                    env.OPENRX_BASE = fileExists('openemr/backend/tests/api-tests/Jenkinsfile') ? 'openemr' : '.'
+                }
+                sh 'echo "OPENRX_BASE=${OPENRX_BASE}  (workspace=$WORKSPACE)"'
             }
         }
 
@@ -100,7 +107,7 @@ pipeline {
                     sh '''
                         set -e
                         command -v python3 >/dev/null 2>&1 || { echo "python3 is required"; exit 1; }
-                        cd backend/tests/api-tests
+                        cd "$OPENRX_BASE/backend/tests/api-tests"
                         chmod +x ci/run-production-baseline.sh
                         ./ci/run-production-baseline.sh
                     '''
@@ -115,7 +122,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'openrx-baseline-token', variable: 'OPENRX_API_TOKEN')]) {
                     sh '''
                         set -e
-                        cd backend/tests/api-tests
+                        cd "$OPENRX_BASE/backend/tests/api-tests"
                         if [ ! -x "$OPENRX_VENV/bin/python" ]; then
                             python3 -m venv "$OPENRX_VENV"
                             "$OPENRX_VENV/bin/python" -m pip install --quiet --upgrade pip
@@ -136,7 +143,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'openrx-baseline-token', variable: 'OPENRX_API_TOKEN')]) {
                     sh '''
                         set -e
-                        cd tests/ui-tests
+                        cd "$OPENRX_BASE/tests/ui-tests"
                         python3 -m venv .venv
                         .venv/bin/python -m pip install --quiet --upgrade pip
                         .venv/bin/python -m pip install --quiet -r requirements.txt
@@ -235,12 +242,15 @@ pipeline {
             // report. Each call is wrapped because the plugin may not be
             // installed; both pages are archived as artifacts either way.
             script {
+                def apiDir = fileExists('openemr/backend/tests/api-tests/html-report/pytest-report.html')
+                    ? 'openemr/backend/tests/api-tests/html-report'
+                    : 'backend/tests/api-tests/html-report'
                 try {
                     publishHTML(target: [
                         allowMissing: true,
                         alwaysLinkToLastBuild: true,
                         keepAll: true,
-                        reportDir: 'backend/tests/api-tests/html-report',
+                        reportDir: apiDir,
                         reportFiles: 'pytest-report.html',
                         reportName: 'API Test Report',
                         reportTitles: 'OpenRx API baseline',
@@ -276,7 +286,8 @@ pipeline {
             }
 
             archiveArtifacts(
-                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html,**/reliability-report.html,**/reliability-report.json,**/reliability-history.jsonl',
+                // Globs so this works whether the tree is at the root or under openemr/.
+                artifacts: '**/production_discovery.json,**/pytest-results*.xml,**/pytest-report.html,**/reliability-report.html,**/reliability-report.json,**/reliability-history.jsonl',
                 allowEmptyArchive: true
             )
 
