@@ -241,6 +241,30 @@ pipeline {
                 artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html,tests/reliability-report.html,tests/reliability-report.json',
                 allowEmptyArchive: true
             )
+
+            // Surface the reliability index on the build page: set the build
+            // description (core Jenkins) and, when the Badge plugin is present,
+            // show it as a build badge too. Reads the JSON the report stage
+            // produced — no extra plugins required for the description.
+            script {
+                def report = 'tests/reliability-report.json'
+                if (fileExists(report)) {
+                    def txt = readFile(report)
+                    def score = (txt =~ /"reliability"\s*:\s*([0-9.]+)/)
+                    def label = (txt =~ /"confidence"\s*:\s*"([^"]+)"/)
+                    if (score) {
+                        def text = "reliability ${score[0][1]}/100 (${label ? label[0][1] : 'n/a'})"
+                        currentBuild.description = text
+                        try {
+                            addBadge icon: 'symbol-status-shield', text: text
+                        } catch (err) {
+                            echo "Badge plugin unavailable; set build description only: ${err}"
+                        }
+                    } else {
+                        echo "reliability: could not parse ${report}"
+                    }
+                }
+            }
         }
     }
 }

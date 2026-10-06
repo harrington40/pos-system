@@ -58,4 +58,31 @@ The full formula is also rendered on the HTML page.
 `backend/tests/api-tests/Jenkinsfile` runs the suites and then the report, and
 publishes both the API baseline report and the reliability report through the
 Jenkins **HTML Publisher** plugin (see that file's header). The JSON metrics are
-archived for trend tracking.
+archived for trend tracking, and the **reliability index is written to the build
+description** (plus a Badge-plugin badge when that plugin is installed).
+
+### Trigger a build with `RUN_JS_TESTS`
+
+`RUN_JS_TESTS` is a build parameter (default `true`). Trigger a build with it
+explicitly:
+
+```bash
+JENKINS_URL=https://jenkins.example.com \
+JENKINS_JOB=openrx-tests \
+JENKINS_USER=harrington JENKINS_TOKEN=<api-token> \
+    bash tests/ci/trigger-jenkins.sh
+```
+
+The script expands folder jobs (`JENKINS_JOB="team/openrx-tests"`), fetches the
+CSRF crumb, and posts to `buildWithParameters`. Options: `RUN_JS_TESTS`,
+`RUN_UI_TESTS`, `UI_BASE_URL`.
+
+Or the raw one-liner (a Jenkins API token authenticates the POST):
+
+```bash
+curl -fsS -X POST \
+  -u "$JENKINS_USER:$JENKINS_TOKEN" \
+  "$JENKINS_URL/job/openrx-tests/buildWithParameters?RUN_JS_TESTS=true"
+```
+
+To add the UI sweep in the same build, append `&RUN_UI_TESTS=true&UI_BASE_URL=<spa-origin>`.
