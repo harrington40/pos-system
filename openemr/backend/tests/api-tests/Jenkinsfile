@@ -238,7 +238,7 @@ pipeline {
             }
 
             archiveArtifacts(
-                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html,tests/reliability-report.html,tests/reliability-report.json',
+                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html,tests/reliability-report.html,tests/reliability-report.json,tests/reliability-history.jsonl',
                 allowEmptyArchive: true
             )
 

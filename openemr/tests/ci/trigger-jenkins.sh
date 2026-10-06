@@ -11,7 +11,17 @@
 #
 # Job inside folders works too: JENKINS_JOB="team/openrx-tests".
 #
-# Optional knobs (export before running):
+# Flags (override the environment):
+#   --js / --no-js              run (default) the Jest/Vitest stage, RUN_JS_TESTS
+#   --ui                        also run the Playwright sweep (needs a base URL)
+#   --ui-base-url URL           SPA origin for the UI sweep
+#   -h, --help                  show this help
+#
+# Example with the UI sweep:
+#   JENKINS_URL=... JENKINS_JOB=... \
+#       bash tests/ci/trigger-jenkins.sh --ui --ui-base-url https://openrx.transtechologies.com
+#
+# Optional environment knobs:
 #   RUN_JS_TESTS=true|false     default: true   (matches the pipeline default)
 #   RUN_UI_TESTS=true           default: unset  (opt into the Playwright sweep)
 #   UI_BASE_URL=https://...     required only when RUN_UI_TESTS=true
@@ -25,9 +35,31 @@ JENKINS_URL="${JENKINS_URL:-}"
 JENKINS_JOB="${JENKINS_JOB:-}"
 JENKINS_USER="${JENKINS_USER:-}"
 JENKINS_TOKEN="${JENKINS_TOKEN:-}"
+RUN_JS_TESTS="${RUN_JS_TESTS:-true}"
+RUN_UI_TESTS="${RUN_UI_TESTS:-}"
+UI_BASE_URL="${UI_BASE_URL:-}"
+
+# --- CLI flags (override the environment defaults above) --------------------
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --js)             RUN_JS_TESTS=true; shift ;;
+        --no-js)          RUN_JS_TESTS=false; shift ;;
+        --ui)             RUN_UI_TESTS=true; shift ;;
+        --no-ui)          RUN_UI_TESTS=false; shift ;;
+        --ui-base-url)    UI_BASE_URL="${2:?--ui-base-url needs a value}"; shift 2 ;;
+        --ui-base-url=*)  UI_BASE_URL="${1#*=}"; shift ;;
+        -h|--help)        awk 'NR==1{next} /^set -euo/{exit} {sub(/^# ?/,""); print}' "$0"; exit 0 ;;
+        *) echo "error: unknown option: $1 (try --help)" >&2; exit 2 ;;
+    esac
+done
 
 if [[ -z "$JENKINS_URL" || -z "$JENKINS_JOB" ]]; then
     echo "error: set JENKINS_URL and JENKINS_JOB (see header)." >&2
+    exit 2
+fi
+
+if [[ "$RUN_UI_TESTS" == "true" && -z "$UI_BASE_URL" ]]; then
+    echo "error: --ui / RUN_UI_TESTS=true needs UI_BASE_URL (--ui-base-url)." >&2
     exit 2
 fi
 

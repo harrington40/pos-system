@@ -48,6 +48,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TESTS = ROOT / "tests"
 ARTIFACTS = TESTS / "reliability-artifacts"
+#: Append-only record of each run's overall metrics; drives the trend chart.
+HISTORY_DEFAULT = TESTS / "reliability-history.jsonl"
 
 #: Test kinds, their weight in the reliability index, and how flaky/environment
 #: dependent they are. Unit tests run in-process and are deterministic, so they
@@ -713,6 +715,119 @@ def metrics(suites: list[Suite], struct: dict, generated: str) -> dict:
     }
 
 
+def load_history(path: Path) -> list[dict]:
+    """Read the JSONL metrics history (empty when the file is absent)."""
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
+
+
+def append_history(path: Path, m: dict) -> list[dict]:
+    """Append this run's headline metrics; replaces a same-timestamp entry."""
+    records = load_history(path)
+    rec = {
+        "generated": m["generated"],
+        "reliability": m["overall"]["reliability"],
+        "confidence": m["overall"]["confidence"],
+        "test_score": m["overall"]["test_score"],
+        "coverage_score": m["overall"]["coverage_score"],
+        "passed": m["overall"]["passed"],
+        "failed": m["overall"]["failed"],
+        "skipped": m["overall"]["skipped"],
+        "catalogued": m["overall"]["catalogued"],
+    }
+    if records and records[-1].get("generated") == rec["generated"]:
+        records[-1] = rec
+    else:
+        records.append(rec)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8"
+    )
+    return records
+
+
+def _trend_svg(history: list[dict], width: int = 920, height: int = 240) -> str:
+    """Inline SVG line chart of the reliability index across runs."""
+    pts = [
+        (str(h.get("generated", "")), float(h.get("reliability", 0)))
+        for h in history
+        if h.get("reliability") is not None
+    ]
+    if not pts:
+        return (
+            '<p class="muted">No history yet. Each run appends to '
+            "<code>tests/reliability-history.jsonl</code>, which this chart plots.</p>"
+        )
+
+    pad_l, pad_r, pad_t, pad_b = 46, 20, 20, 38
+    w = width - pad_l - pad_r
+    h = height - pad_t - pad_b
+
+    def x_at(i: int) -> float:
+        return pad_l + (w * (i / (len(pts) - 1)) if len(pts) > 1 else w / 2)
+
+    def y_at(v: float) -> float:
+        return pad_t + h * (1 - max(0.0, min(100.0, v)) / 100.0)
+
+    parts = [f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
+             'role="img" preserveAspectRatio="xMidYMid meet">']
+    # Threshold gridlines (High ≥ 90, Moderate ≥ 75).
+    for level, color in ((90, "#198754"), (75, "#fd7e14")):
+        y = y_at(level)
+        parts.append(
+            f'<line x1="{pad_l}" y1="{y:.1f}" x2="{pad_l + w}" y2="{y:.1f}" '
+            f'stroke="{color}" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>'
+            f'<text x="{pad_l - 6}" y="{y + 4:.1f}" text-anchor="end" font-size="10" '
+            f'fill="{color}">{level}</text>'
+        )
+    for level in (0, 100):
+        y = y_at(level)
+        parts.append(
+            f'<line x1="{pad_l}" y1="{y:.1f}" x2="{pad_l + w}" y2="{y:.1f}" '
+            'stroke="#e5e7eb" stroke-width="1"/>'
+        )
+
+    coords = " ".join(f"{x_at(i):.1f},{y_at(v):.1f}" for i, (_, v) in enumerate(pts))
+    fill = f"{pad_l},{y_at(0):.1f} " + coords + f" {x_at(len(pts) - 1):.1f},{y_at(0):.1f}"
+    parts.append(f'<polygon points="{fill}" fill="#0d6efd" opacity="0.10"/>')
+    parts.append(
+        f'<polyline points="{coords}" fill="none" stroke="#0d6efd" '
+        'stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
+    )
+    for i, (_, v) in enumerate(pts):
+        parts.append(
+            f'<circle cx="{x_at(i):.1f}" cy="{y_at(v):.1f}" r="3.5" fill="#fff" '
+            'stroke="#0d6efd" stroke-width="2"/>'
+        )
+    # x labels: first and last date (date part only).
+    first_date = pts[0][0].split(" ")[0]
+    last_date = pts[-1][0].split(" ")[0]
+    parts.append(
+        f'<text x="{pad_l}" y="{height - 12}" font-size="10" fill="#6b7280">{first_date}</text>'
+    )
+    if len(pts) > 1:
+        parts.append(
+            f'<text x="{pad_l + w}" y="{height - 12}" text-anchor="end" font-size="10" '
+            f'fill="#6b7280">{last_date}</text>'
+        )
+    parts.append(
+        f'<text x="{pad_l + w}" y="{y_at(pts[-1][1]) - 8:.1f}" text-anchor="end" '
+        f'font-size="11" font-weight="700" fill="#0d6efd">{pts[-1][1]:.1f}</text>'
+    )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def _overall_section(agg: dict, catalogued: int, n_suites: int) -> str:
     return (
         "<section><h2>Overall reliability</h2>"
@@ -762,7 +877,23 @@ def _model_section() -> str:
     )
 
 
-def render_html(suites: list[Suite], struct: dict, generated: str) -> str:
+def _trend_section(history: list[dict]) -> str:
+    n = len(history)
+    caption = (
+        f"{n} recorded run{'s' if n != 1 else ''}"
+        if n
+        else "no runs recorded yet"
+    )
+    return (
+        "<section><h2>Reliability trend</h2>"
+        '<p class="sub">Overall reliability index across runs '
+        f"(<code>tests/reliability-history.jsonl</code>) &middot; {caption}.</p>"
+        f"{_trend_svg(history)}</section>"
+    )
+
+
+def render_html(suites: list[Suite], struct: dict, generated: str,
+                history: list[dict] | None = None) -> str:
     agg = overall(suites, struct)
     recorded = sum(s.result.total for s in suites if s.result.available)
     catalogued = sum(s.size for s in suites)
@@ -827,6 +958,7 @@ def render_html(suites: list[Suite], struct: dict, generated: str) -> str:
         f"{hero}\n"
         f'<div class="grid cards">{card_html}</div>\n'
         f"{_overall_section(agg, catalogued, len(suites))}\n"
+        f"{_trend_section(history or [])}\n"
         f"{results_section}\n"
         f"{coverage_section}\n"
         f"{_model_section()}\n"
@@ -846,16 +978,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", dest="json_out", default="",
                         help="also write machine-readable metrics to this path "
                              "(trend tracking / build badge)")
+    parser.add_argument("--history", default=str(HISTORY_DEFAULT),
+                        help="append-only JSONL metrics history (drives the trend chart)")
+    parser.add_argument("--no-history", dest="no_history", action="store_true",
+                        help="read the history for the chart but do not append to it")
     args = parser.parse_args(argv)
 
     suites, struct = gather(do_collect=args.collect)
     generated = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
-    html = render_html(suites, struct, generated)
+    data = metrics(suites, struct, generated)
+
+    history_path = Path(args.history)
+    history = load_history(history_path)
+    if not args.no_history:
+        history = append_history(history_path, data)
+
+    html = render_html(suites, struct, generated, history)
     Path(args.out).write_text(html, encoding="utf-8")
     print(f"[report] wrote {args.out}")
 
     if args.json_out:
-        data = metrics(suites, struct, generated)
         Path(args.json_out).write_text(json.dumps(data, indent=2), encoding="utf-8")
         print(f"[report] wrote {args.json_out}")
 

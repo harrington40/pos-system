@@ -53,6 +53,15 @@ It is standard-library-only and best-effort: a missing result file is shown as
 
 The full formula is also rendered on the HTML page.
 
+### Trend
+
+Each run appends its headline metrics to `tests/reliability-history.jsonl`
+(one JSON object per line), and the report renders that as a **reliability trend
+chart**. The file is committed so the history accumulates over time; use
+`--no-history` to draw the chart without recording a new point, or `--history
+PATH` to point elsewhere. A run with the same timestamp replaces the last entry
+instead of duplicating it.
+
 ## CI
 
 `backend/tests/api-tests/Jenkinsfile` runs the suites and then the report, and
@@ -74,8 +83,14 @@ JENKINS_USER=harrington JENKINS_TOKEN=<api-token> \
 ```
 
 The script expands folder jobs (`JENKINS_JOB="team/openrx-tests"`), fetches the
-CSRF crumb, and posts to `buildWithParameters`. Options: `RUN_JS_TESTS`,
-`RUN_UI_TESTS`, `UI_BASE_URL`.
+CSRF crumb, and posts to `buildWithParameters`. Flags: `--js`/`--no-js`,
+`--ui`, `--ui-base-url URL` (also readable from `RUN_JS_TESTS`, `RUN_UI_TESTS`,
+`UI_BASE_URL`). To include the Playwright sweep in the same build:
+
+```bash
+JENKINS_URL=... JENKINS_JOB=... \
+    bash tests/ci/trigger-jenkins.sh --ui --ui-base-url https://openrx.transtechologies.com
+```
 
 Or the raw one-liner (a Jenkins API token authenticates the POST):
 
