@@ -1,9 +1,33 @@
 import json
 import os
 import pathlib
+from urllib.parse import urlparse
 
 import pytest
 import requests
+
+#: Hosts that are the live / "main server". Pointing a run at any of these reads
+#: real patient data, so it must be a deliberate choice: set
+#: ``OPENRX_ALLOW_PRODUCTION=true``. See README.md ("Production access").
+_PRODUCTION_HOSTS = frozenset({
+    "openrx.transtechologies.com",
+    "94.250.201.58",
+})
+
+
+def _assert_not_production(url: str) -> None:
+    """Fail closed when a run targets the live/main server without opt-in."""
+    if (urlparse(url).hostname or "").lower() not in _PRODUCTION_HOSTS:
+        return
+    if os.getenv("OPENRX_ALLOW_PRODUCTION", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return
+    raise RuntimeError(
+        f"refusing to run against the live server ({url}): the API suite must "
+        f"not read main-server data. Point OPENRX_API_URL at the throwaway test "
+        f"backend (http://localhost:3202/api), or set "
+        f"OPENRX_ALLOW_PRODUCTION=true to override on purpose (read-only). "
+        f"See backend/tests/api-tests/README.md."
+    )
 
 #: Sanitized identifiers discovered from a real backend by
 #: ``discovery/run_discovery.py``. When present, they seed the ``OPENRX_TEST_*``
@@ -43,10 +67,12 @@ def base_url():
     never be one forgotten environment variable away from exercising real
     patient data. Point ``OPENRX_API_URL`` at production only on purpose.
     """
-    return os.getenv(
+    url = os.getenv(
         "OPENRX_API_URL",
         "http://localhost:3202/api",
     ).rstrip("/")
+    _assert_not_production(url)
+    return url
 
 
 @pytest.fixture(scope="session")

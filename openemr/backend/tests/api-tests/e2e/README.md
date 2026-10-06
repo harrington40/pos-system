@@ -64,8 +64,14 @@ so it is safe against production.
 ```bash
 OPENRX_API_URL=https://openrx.transtechologies.com/api \
 OPENRX_API_TOKEN=<service-token> \
+OPENRX_ALLOW_PRODUCTION=true \
 .venv/bin/python -m pytest e2e/ -q
 ```
+
+> `OPENRX_ALLOW_PRODUCTION=true` is **required** to target the live server. The
+> suite fails closed (`ProductionAccessError`) without it, so a stray
+> `OPENRX_API_URL` can never quietly read main-server data. The default target is
+> the throwaway test backend on `http://localhost:3202/api`.
 
 ## What the cases assert
 

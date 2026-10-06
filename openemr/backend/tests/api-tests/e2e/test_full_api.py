@@ -10,7 +10,7 @@ Common invocations::
     pytest e2e/ -k public                         # only public endpoints
     OPENRX_E2E_DOMAINS=imaging,patients pytest e2e/
     OPENRX_API_URL=https://openrx.transtechologies.com/api \
-        OPENRX_API_TOKEN=... pytest e2e/
+        OPENRX_API_TOKEN=... OPENRX_ALLOW_PRODUCTION=true pytest e2e/
 """
 from __future__ import annotations
 

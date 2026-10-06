@@ -131,6 +131,25 @@ still produces the JUnit XML; if the *HTML Publisher* plugin is not installed th
 Jenkinsfile logs a message and keeps the artifact link instead of failing the
 build.
 
+### Test reliability report
+
+After the sweeps, the `Test reliability report` stage runs
+`python3 tests/build_reliability_report.py --collect`, which aggregates every
+suite (backend unit, frontend unit, API contract, API e2e, UI) into one
+self-contained page — results by kind, per-suite **confidence level**, coverage
+breakdown, and an overall **reliability index** — written to
+`tests/reliability-report.html`. The Jenkinsfile publishes it a second time via
+`publishHTML` as **"Test Reliability Report"** and archives it beside the API
+report, plus a `tests/reliability-report.json` metrics file for trend tracking.
+It is standard-library Python (no venv) and best-effort: missing result files are
+shown as "not run" rather than failing the job.
+
+The preceding `JS unit tests (Jest + Vitest)` stage (gated by `RUN_JS_TESTS`,
+default on) runs the backend Jest and frontend Vitest suites and writes their
+JSON/coverage into `tests/reliability-artifacts/`, so the report's JS numbers are
+fresh. If node/npm are unavailable the stage clears the staged snapshot so the
+report shows those suites as "not run" rather than stale.
+
 Jenkins may show the page unstyled until its Content-Security-Policy allows the
 report's inline assets (Manage Jenkins → Script Console:
 `System.setProperty("hudson.model.DirectoryBrowserSupport.CSP", "")`, then
@@ -172,6 +191,7 @@ To run the baseline **without Jenkins**, point system cron at the same script:
 | --- | --- |
 | `OPENRX_API_URL` | API base URL, including the `/api` prefix. Defaults to the local test backend (`http://localhost:3202/api`) — never production. |
 | `OPENRX_API_TOKEN` | Staff JWT. Without it, every `@authenticated` test skips. The tests in `auth/` log in themselves and need no token. |
+| `OPENRX_ALLOW_PRODUCTION` | Must be `true` to target the live/main server. Off by default — the suite fails closed (see below). The Jenkins pipeline and `ci/run-production-baseline.sh` set it explicitly. |
 | `OPENRX_TEST_USER` / `OPENRX_TEST_PASSWORD` | Credentials the authentication tests log in with. Default to the seeded `admin` / `OpenRxTest123`. |
 | `OPENRX_RUN_WRITES` | Set to `true` to stop skipping `production_write`/`destructive` tests. Leave unset unless you are pointed at a throwaway environment. |
 | `OPENRX_TEST_PATIENT_ID` | Patient id for patient-scoped tests. |
@@ -196,6 +216,29 @@ Nothing in this suite creates, modifies or deletes production data by default:
 * the remaining write tests call `pytest.fail(...)` so they cannot quietly do
   something destructive once writes are enabled — they have to be rewritten
   against real test data first.
+
+## Production access
+
+The suites **fail closed** against the main server. If `OPENRX_API_URL` (or
+`OPENRX_BASELINE_API_URL`, or the `e2e/` `OPENRX_API_URL`) resolves to
+`openrx.transtechologies.com` or `94.250.201.58`, they raise before any request
+is sent:
+
+```
+ProductionAccessError: refusing to run against the live server (...) : tests
+must not read main-server data. ... set OPENRX_ALLOW_PRODUCTION=true ...
+```
+
+This is enforced in three places — the root `conftest.py` `base_url` fixture,
+`e2e/config.py`, and `ci/run-production-baseline.sh` — so a stray environment
+variable cannot quietly point a run at real patient data. A **deliberate**
+read-only production baseline (what the Jenkins pipeline is) sets
+`OPENRX_ALLOW_PRODUCTION=true`; nothing else should.
+
+Related guardrails: `fixtures/production_discovery.json` carries identifiers
+discovered from the live server, and `conftest.py` only feeds them into the
+`OPENRX_TEST_*` variables when `OPENRX_API_URL` matches that recorded URL — so a
+test-database run is never handed production row ids.
 
 ## Markers
 

@@ -53,6 +53,9 @@ fi
 
 export OPENRX_API_URL="$API_URL"
 export OPENRX_API_TOKEN="$TOKEN"
+# This script's whole job is the read-only production baseline, so opt in
+# explicitly to the live server. Without this the suite fails closed.
+export OPENRX_ALLOW_PRODUCTION="${OPENRX_ALLOW_PRODUCTION:-true}"
 
 echo "[baseline] discovering fixtures from $API_URL (read-only)"
 "$VENV/bin/python" "$HERE/discovery/run_discovery.py" --quiet --api-url "$API_URL" --token "$TOKEN"

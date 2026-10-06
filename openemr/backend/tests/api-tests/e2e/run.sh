@@ -5,7 +5,8 @@
 #
 #   ./run.sh
 #   OPENRX_E2E_DOMAINS=imaging ./run.sh
-#   OPENRX_API_URL=https://openrx.transtechologies.com/api OPENRX_API_TOKEN=... ./run.sh
+#   OPENRX_API_URL=https://openrx.transtechologies.com/api OPENRX_API_TOKEN=... \
+#       OPENRX_ALLOW_PRODUCTION=true ./run.sh   # opt-in required for the live server
 #
 set -euo pipefail
 

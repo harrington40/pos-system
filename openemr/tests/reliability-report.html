@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenRx &mdash; Test Reliability Report</title>
+<style>
+:root{--bg:#0f172a;--surface:#ffffff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;
+--high:#198754;--mod:#fd7e14;--low:#dc3545;--accent:#0d6efd;--accent2:#00c9a7;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+color:var(--ink);background:linear-gradient(160deg,#eef4ff 0%,#f7fffb 55%,#eaf7f1 100%);line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+header.hero{background:linear-gradient(135deg,#0d6efd 0%,#6610f2 50%,#00c9a7 100%);color:#fff;
+border-radius:20px;padding:26px 28px;box-shadow:0 18px 40px rgba(13,110,253,.25)}
+header.hero h1{margin:0 0 4px;font-size:1.7rem}
+header.hero p{margin:0;opacity:.9;font-size:.9rem}
+.grid{display:grid;gap:16px}
+.cards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;
+box-shadow:0 8px 22px rgba(15,23,42,.06)}
+.card .n{font-size:1.7rem;font-weight:700}
+.card .l{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+section{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 24px;
+margin-top:20px;box-shadow:0 8px 22px rgba(15,23,42,.06)}
+section h2{margin:0 0 4px;font-size:1.15rem}
+section .sub{color:var(--muted);font-size:.85rem;margin:0 0 16px}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.74rem;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.7rem;font-weight:600}
+.tag.unit{background:#e7f1ff;color:#0d6efd}.tag.component{background:#eafaf3;color:#0f9d6b}
+.tag.contract{background:#f2ecff;color:#6f42c1}.tag.e2e{background:#fff2e2;color:#c2600a}
+.tag.ui{background:#e6f7fb;color:#0d7a99}
+.badge{display:inline-block;padding:3px 11px;border-radius:999px;font-size:.74rem;font-weight:700;color:#fff}
+.badge.High{background:var(--high)}.badge.Moderate{background:var(--mod)}.badge.Low{background:var(--low)}
+.badge.unknown{background:#9ca3af}
+.bar{height:9px;border-radius:6px;background:#eef1f5;overflow:hidden;min-width:90px}
+.bar>span{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#0d6efd,#00c9a7)}
+.coverage-row{display:grid;grid-template-columns:1fr 60px;gap:14px;align-items:center;margin:9px 0}
+.coverage-row .lbl{font-size:.86rem}
+.pct{font-weight:700;font-size:.86rem;text-align:right}
+.gauge{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+.gauge .cap{max-width:420px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:.78rem;margin-top:6px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+code{background:#f3f4f6;padding:1px 6px;border-radius:5px;font-size:.82rem}
+ul.fail{margin:6px 0 0 18px;padding:0}
+ul.fail li{margin:3px 0;font-size:.85rem}
+.note{background:#fbfbfa;border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin-top:14px;
+font-size:.82rem;color:#475569}
+footer{color:var(--muted);font-size:.8rem;margin-top:26px;text-align:center}
+.muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero"><h1>OpenRx &mdash; Test Reliability Report</h1><p>Aggregated evidence from every automated suite: unit, API contract, end-to-end and browser UI.</p><p style="opacity:.75;font-size:.8rem;margin-top:6px">Generated 2026-10-06 09:41</p></header>
+<div class="grid cards"><div class="card"><div class="n">1,796</div><div class="l">Catalogued cases</div></div><div class="card"><div class="n">1,704</div><div class="l">Last recorded run</div></div><div class="card"><div class="n">1,640</div><div class="l">Passed</div></div><div class="card"><div class="n">2</div><div class="l">Failed</div></div><div class="card"><div class="n">62</div><div class="l">Skipped</div></div><div class="card"><div class="n">99.9%</div><div class="l">Overall pass rate</div></div></div>
+<section><h2>Overall reliability</h2><p class="sub">A transparent blend of the weighted test score (75%) and coverage signals (25%).</p><div class="gauge"><svg width="150" height="150" viewBox="0 0 150 150" role="img"><circle cx="75" cy="75" r="52" fill="none" stroke="#eef1f5" stroke-width="15"/><circle cx="75" cy="75" r="52" fill="none" stroke="#fd7e14" stroke-width="15" stroke-linecap="round" stroke-dasharray="291.1 35.6" transform="rotate(-90 75 75)"/><text x="75" y="73" text-anchor="middle" font-size="30" font-weight="700" fill="#fd7e14">89</text><text x="75" y="93" text-anchor="middle" font-size="11" fill="#6b7280">/ 100</text></svg><div class="cap"><p style="margin:0 0 6px"><span class="badge Moderate">Moderate</span> <strong style="font-size:1.05rem">Reliability index 89.1 / 100</strong></p><p class="muted" style="margin:0 0 8px">Weighted test score <strong>94.4</strong> &middot; coverage score <strong>73.3</strong> &middot; 1,796 catalogued cases across 5 suites.</p><div class="legend"><span><span class="dot" style="background:#198754"></span>High &ge; 90</span><span><span class="dot" style="background:#fd7e14"></span>Moderate 75&ndash;89</span><span><span class="dot" style="background:#dc3545"></span>Low &lt; 75</span></div></div></div></section>
+<section><h2>Test results by kind</h2><p class="sub">Confidence per suite = 60% pass-rate + 20% execution ratio + 20% code coverage (75/25 pass-rate + execution when no coverage is available).</p><table><thead><tr><th>Suite</th><th>Kind</th><th>Framework</th><th style='text-align:right'>Catalogued</th><th style='text-align:right'>Last run</th><th style='text-align:right'>Passed</th><th style='text-align:right'>Failed</th><th style='text-align:right'>Skipped</th><th style='text-align:right'>Pass rate</th><th>Confidence</th></tr></thead><tbody><tr><td><strong>Backend unit tests</strong><br><span class="muted">Service/controller logic with mocked I/O</span></td><td><span class="tag unit">unit</span></td><td>Jest + ts-jest<br><span class="muted">TypeScript</span></td><td style="text-align:right"><span class="muted">—</span></td><td style="text-align:right">408</td><td style="text-align:right">408</td><td style="text-align:right">0</td><td style="text-align:right">0</td><td style="text-align:right">100.0%</td><td><span class="badge Moderate">Moderate</span></td></tr><tr><td><strong>Frontend unit / component tests</strong><br><span class="muted">Rendered components, utilities, clinical logic</span></td><td><span class="tag component">component</span></td><td>Vitest + Testing Library<br><span class="muted">TypeScript/React</span></td><td style="text-align:right"><span class="muted">—</span></td><td style="text-align:right">103</td><td style="text-align:right">101</td><td style="text-align:right">2</td><td style="text-align:right">0</td><td style="text-align:right">98.1%</td><td><span class="badge Moderate">Moderate</span></td></tr><tr><td><strong>API contract &amp; domain tests</strong><br><span class="muted">Route inventory, guards, per-domain behaviour</span></td><td><span class="tag contract">contract</span></td><td>pytest + requests<br><span class="muted">Python</span></td><td style="text-align:right">627</td><td style="text-align:right">571</td><td style="text-align:right">522</td><td style="text-align:right">0</td><td style="text-align:right">49</td><td style="text-align:right">100.0%</td><td><span class="badge High">High</span></td></tr><tr><td><strong>API end-to-end sweep</strong><br><span class="muted">Every backend route, one case each</span></td><td><span class="tag e2e">e2e</span></td><td>pytest + requests<br><span class="muted">Python</span></td><td style="text-align:right">565</td><td style="text-align:right">565</td><td style="text-align:right">553</td><td style="text-align:right">0</td><td style="text-align:right">12</td><td style="text-align:right">100.0%</td><td><span class="badge High">High</span></td></tr><tr><td><strong>UI tests (browser)</strong><br><span class="muted">Route render, auth, DICOM, role dashboards</span></td><td><span class="tag ui">ui</span></td><td>Playwright + pytest<br><span class="muted">Python</span></td><td style="text-align:right">93</td><td style="text-align:right">57</td><td style="text-align:right">56</td><td style="text-align:right">0</td><td style="text-align:right">1</td><td style="text-align:right">100.0%</td><td><span class="badge High">High</span></td></tr></tbody></table></section>
+<section><h2>Coverage</h2><p class="sub">Structural coverage is always computed from the test catalogs; code coverage appears when a report is present.</p><h3 style="font-size:.95rem;margin:14px 0 4px">Structural / inventory coverage</h3><p class="sub">Inventory: <strong>367</strong> API routes across <strong>33</strong> domains; <strong>68</strong> UI routes (<strong>51</strong> render-smoke); <strong>6</strong> staff roles.</p><div class="coverage-row"><div class="lbl">Backend unit tests — lines</div><div class="pct">18%</div></div><div class="bar"><span style="width:18.2%"></span></div><div class="coverage-row"><div class="lbl">API routes with a test case</div><div class="pct">100%</div></div><div class="bar"><span style="width:100.0%"></span></div><div class="coverage-row"><div class="lbl">UI routes with a render smoke case</div><div class="pct">75%</div></div><div class="bar"><span style="width:75.0%"></span></div><div class="coverage-row"><div class="lbl">Staff roles with dashboard cases</div><div class="pct">100%</div></div><div class="bar"><span style="width:100.0%"></span></div><h3 style="font-size:.95rem;margin:18px 0 4px">Code coverage</h3><div class="coverage-row"><div class="lbl">Backend unit tests — lines</div><div class="pct">18.2%</div></div><div class="bar"><span style="width:18.2%"></span></div><div class="coverage-row"><div class="lbl">Backend unit tests — statements</div><div class="pct">18.6%</div></div><div class="bar"><span style="width:18.6%"></span></div><div class="coverage-row"><div class="lbl">Backend unit tests — functions</div><div class="pct">12.9%</div></div><div class="bar"><span style="width:12.9%"></span></div><div class="coverage-row"><div class="lbl">Backend unit tests — branches</div><div class="pct">16.9%</div></div><div class="bar"><span style="width:16.9%"></span></div></section>
+<section><h2>How the confidence level is computed</h2><p class="sub">The model is intentionally simple and fully auditable.</p><div class="note"><p style="margin:0 0 8px"><strong>Per-suite score (0&ndash;100):</strong></p><p style="margin:0 0 6px"><code>pass_rate = passed / (total &minus; skipped)</code></p><p style="margin:0 0 6px"><code>execution = (total &minus; skipped) / total</code></p><p style="margin:0 0 6px"><code>score = 100&middot;(0.60&middot;pass_rate + 0.20&middot;execution + 0.20&middot;coverage)</code></p><p style="margin:0 0 10px"><code>score = 100&middot;(0.75&middot;pass_rate + 0.25&middot;execution)</code> when no coverage</p><p style="margin:0 0 8px"><strong>Overall reliability (0&ndash;100):</strong></p><p style="margin:0 0 6px"><code>test_score = &Sigma;(score&middot;weight&middot;&radic;size) / &Sigma;(weight&middot;&radic;size)</code></p><p style="margin:0"><code>reliability = 0.75&middot;test_score + 0.25&middot;coverage_score</code></p><p style="margin:10px 0 0" class="muted">Kind weights reflect how deterministic each layer is: unit 1.00 &middot; component 0.90 &middot; contract 0.80 &middot; e2e 0.70 &middot; ui 0.60. Heavier suites (&radic;size) and more deterministic layers move the index more. Skipped tests count as <em>not executed</em>, so a suite that mostly skips cannot claim high confidence. A suite with any failing case is capped at <strong>Moderate</strong>.</p></div></section>
+<section><h2>Failures that need attention</h2><p class="sub">Every failing case from the recorded runs.</p><ul class='fail'><li><strong>Frontend unit / component tests</strong> — <code>App.test.tsx :: renders login page when not authenticated</code></li><li><strong>Frontend unit / component tests</strong> — <code>App.test.tsx :: shows sign in button on login page</code></li></ul></section>
+<footer>Regenerate with <code>python3 tests/build_reliability_report.py --collect</code>.<br>Inputs: JUnit XMLs in the suites, plus <code>tests/reliability-artifacts/</code> (Jest/Vitest JSON &amp; coverage).</footer>
+</div>
+</body>
+</html>

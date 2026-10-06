@@ -131,8 +131,10 @@ Two black-box suites live alongside the app:
   (`test_api_surface.py`), a configurable full sweep (`e2e/`), and per-domain
   modules. See `backend/tests/api-tests/README.md`.
 - **UI tests** (`tests/ui-tests/`, Playwright for Python) — one UI case per SPA
-  route (route-render smoke sweep) plus per-feature modules (auth, DICOM viewer,
-  …), all environment-configurable. See `tests/ui-tests/README.md`.
+  route (route-render smoke sweep), per-feature modules (auth, DICOM viewer, …),
+  and a role Dashboard & access-control sweep for Registrar, Physician, Nurse
+  Aide, Administrator, Midwife and Laboratory (`test_role_dashboards_ui.py`), all
+  environment-configurable. See `tests/ui-tests/README.md`.
 
 ```bash
 # API (against a running backend)
@@ -143,6 +145,22 @@ cd backend/tests/api-tests && OPENRX_API_URL=http://localhost:3002/api \
 cd tests/ui-tests && .venv/bin/python -m playwright install chromium   # once
     UI_BASE_URL=http://localhost:5173 UI_TOKEN=<token> .venv/bin/python -m pytest -q
 ```
+
+### Test reliability report (single HTML page)
+
+`tests/build_reliability_report.py` aggregates every suite (backend unit, frontend
+unit, API contract, API e2e, browser UI) into one self-contained page showing the
+kind of each test, its results, a per-suite **confidence level** and a coverage
+breakdown (API routes, UI routes, roles, and code coverage when present), plus an
+overall **reliability index**.
+
+```bash
+python3 tests/build_reliability_report.py --collect   # writes tests/reliability-report.html
+```
+
+It is best-effort/offline: it reads the JUnit XMLs in each suite and any Jest/Vitest
+JSON or coverage summaries in `tests/reliability-artifacts/`, degrading gracefully
+(shown as "not run") when a result file is absent.
 
 ## History / maintenance notes
 

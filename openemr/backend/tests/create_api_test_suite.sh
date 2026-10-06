@@ -40,10 +40,27 @@ import requests
 
 @pytest.fixture(scope="session")
 def base_url():
-    return os.getenv(
+    url = os.getenv(
         "OPENRX_API_URL",
-        "https://openrx.transtechologies.com/api",
+        "http://localhost:3202/api",
     ).rstrip("/")
+    # Fail closed: never default to (or silently reach) the live server.
+    from urllib.parse import urlparse
+
+    if (urlparse(url).hostname or "").lower() in {
+        "openrx.transtechologies.com",
+        "94.250.201.58",
+    } and os.getenv("OPENRX_ALLOW_PRODUCTION", "").lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        raise RuntimeError(
+            f"refusing to run against the live server ({url}); "
+            "set OPENRX_ALLOW_PRODUCTION=true to override on purpose"
+        )
+    return url
 
 
 @pytest.fixture(scope="session")

@@ -21,8 +21,38 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 DEFAULT_API_URL = "http://localhost:3202/api"
+
+#: Hosts that are the live / "main server". A run pointed at any of these reads
+#: real patient data, so it must be a deliberate choice: set
+#: ``OPENRX_ALLOW_PRODUCTION=true`` (and know why). See README.md.
+PRODUCTION_HOSTS = frozenset({
+    "openrx.transtechologies.com",
+    "94.250.201.58",
+})
+
+
+class ProductionAccessError(RuntimeError):
+    """Raised when a run is pointed at the live server without opting in."""
+
+
+def is_production(url: str) -> bool:
+    """True when ``url`` targets the live/main OpenRx server."""
+    return (urlparse(url).hostname or "").lower() in PRODUCTION_HOSTS
+
+
+def _guard_production(url: str, allow: bool, var: str) -> None:
+    if allow or not is_production(url):
+        return
+    raise ProductionAccessError(
+        f"refusing to run against the live server ({url}): tests must not read "
+        f"main-server data. Point {var} at a throwaway test backend "
+        f"(e.g. http://localhost:3202/api), or set OPENRX_ALLOW_PRODUCTION=true "
+        f"to override on purpose (read-only). See "
+        f"backend/tests/api-tests/README.md."
+    )
 
 
 def _int(name: str, default: int) -> int:
@@ -68,6 +98,7 @@ class Settings:
     password: str
     run_writes: bool
     verify_tls: bool
+    allow_production: bool
     known_5xx: frozenset[str]
     non_json: frozenset[str]
 
@@ -93,6 +124,9 @@ def load_settings() -> Settings:
     domains = tuple(
         d.strip() for d in os.getenv("OPENRX_E2E_DOMAINS", "").split(",") if d.strip()
     )
+    allow_production = _bool("OPENRX_ALLOW_PRODUCTION", False)
+    # Fail closed: never let a run silently target the live/main server.
+    _guard_production(raw_url, allow_production, "OPENRX_API_URL")
     return Settings(
         api_url=raw_url.rstrip("/"),
         token=(os.getenv("OPENRX_API_TOKEN") or "").strip(),
@@ -107,6 +141,7 @@ def load_settings() -> Settings:
         ),
         run_writes=_bool("OPENRX_RUN_WRITES", False),
         verify_tls=_bool("OPENRX_E2E_VERIFY_TLS", True),
+        allow_production=allow_production,
         known_5xx=_csv("OPENRX_E2E_KNOWN_5XX", DEFAULT_KNOWN_5XX),
         non_json=_csv("OPENRX_E2E_NON_JSON", DEFAULT_NON_JSON),
     )

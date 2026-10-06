@@ -1,0 +1,129 @@
+{
+  "generated": "2026-10-06 09:41",
+  "overall": {
+    "reliability": 89.1,
+    "confidence": "Moderate",
+    "test_score": 94.4,
+    "coverage_score": 73.3,
+    "catalogued": 1796,
+    "recorded": 1704,
+    "passed": 1640,
+    "failed": 2,
+    "skipped": 62
+  },
+  "coverage_signals": [
+    {
+      "label": "Backend unit tests \u2014 lines",
+      "pct": 18.2
+    },
+    {
+      "label": "API routes with a test case",
+      "pct": 100.0
+    },
+    {
+      "label": "UI routes with a render smoke case",
+      "pct": 75.0
+    },
+    {
+      "label": "Staff roles with dashboard cases",
+      "pct": 100.0
+    }
+  ],
+  "suites": [
+    {
+      "id": "backend-unit",
+      "name": "Backend unit tests",
+      "kind": "unit",
+      "framework": "Jest + ts-jest",
+      "catalogued": 408,
+      "recorded": 408,
+      "passed": 408,
+      "failed": 0,
+      "skipped": 0,
+      "pass_rate": 100.0,
+      "execution": 100.0,
+      "coverage": 16.6,
+      "score": 83.3,
+      "confidence": "Moderate",
+      "timestamp": "2026-10-06T13:28:19.680000+00:00"
+    },
+    {
+      "id": "frontend-unit",
+      "name": "Frontend unit / component tests",
+      "kind": "component",
+      "framework": "Vitest + Testing Library",
+      "catalogued": 103,
+      "recorded": 103,
+      "passed": 101,
+      "failed": 2,
+      "skipped": 0,
+      "pass_rate": 98.1,
+      "execution": 100.0,
+      "coverage": null,
+      "score": 98.5,
+      "confidence": "Moderate",
+      "timestamp": null
+    },
+    {
+      "id": "api-contract",
+      "name": "API contract & domain tests",
+      "kind": "contract",
+      "framework": "pytest + requests",
+      "catalogued": 627,
+      "recorded": 571,
+      "passed": 522,
+      "failed": 0,
+      "skipped": 49,
+      "pass_rate": 100.0,
+      "execution": 91.4,
+      "coverage": null,
+      "score": 97.9,
+      "confidence": "High",
+      "timestamp": "2026-09-30T21:56:10.784398-04:00"
+    },
+    {
+      "id": "api-e2e",
+      "name": "API end-to-end sweep",
+      "kind": "e2e",
+      "framework": "pytest + requests",
+      "catalogued": 565,
+      "recorded": 565,
+      "passed": 553,
+      "failed": 0,
+      "skipped": 12,
+      "pass_rate": 100.0,
+      "execution": 97.9,
+      "coverage": null,
+      "score": 99.5,
+      "confidence": "High",
+      "timestamp": "2026-10-03T23:17:33.695347-04:00"
+    },
+    {
+      "id": "ui",
+      "name": "UI tests (browser)",
+      "kind": "ui",
+      "framework": "Playwright + pytest",
+      "catalogued": 93,
+      "recorded": 57,
+      "passed": 56,
+      "failed": 0,
+      "skipped": 1,
+      "pass_rate": 100.0,
+      "execution": 98.2,
+      "coverage": null,
+      "score": 99.6,
+      "confidence": "High",
+      "timestamp": "2026-10-03T23:17:33.777271-04:00"
+    }
+  ],
+  "failures": [
+    "Frontend unit / component tests :: App.test.tsx :: renders login page when not authenticated",
+    "Frontend unit / component tests :: App.test.tsx :: shows sign in button on login page"
+  ],
+  "badge": {
+    "schemaVersion": 1,
+    "label": "reliability",
+    "message": "89/100 Moderate",
+    "color": "orange"
+  }
+}

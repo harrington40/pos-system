@@ -7,6 +7,13 @@
 //   1. Production discovery + baseline   (ci/run-production-baseline.sh)
 //   2. Full API sweep (e2e)              (backend/tests/api-tests/e2e/)
 //   3. UI sweep (Playwright)             (tests/ui-tests/) — opt-in via RUN_UI_TESTS
+//   4. JS unit tests (Jest + Vitest)     (backend/src, interface/new) — RUN_JS_TESTS
+//   5. Test reliability report           (tests/build_reliability_report.py)
+//
+// Published HTML (HTML Publisher plugin, both self-contained):
+//   * "API Test Report"          — backend/tests/api-tests/html-report/pytest-report.html
+//   * "Test Reliability Report"  — tests/reliability-report.html
+// Machine-readable metrics: tests/reliability-report.json (archived for trends).
 //
 // Point a Jenkins job at this file ("Pipeline script from SCM", script path
 // backend/tests/api-tests/Jenkinsfile).
@@ -58,14 +65,22 @@ pipeline {
             description: 'Run the Playwright UI sweep (needs UI_BASE_URL and a browser-capable agent).')
         string(name: 'UI_BASE_URL', defaultValue: '',
             description: 'SPA origin for UI tests, e.g. https://openrx.transtechologies.com')
+        booleanParam(name: 'RUN_JS_TESTS', defaultValue: true,
+            description: 'Run the Jest/Vitest unit suites so the reliability report uses fresh JS numbers (needs node/npm; skipped automatically if absent).')
     }
 
     environment {
         OPENRX_BASELINE_API_URL = "${env.OPENRX_BASELINE_API_URL ?: 'https://openrx.transtechologies.com/api'}"
         OPENRX_API_URL = "${env.OPENRX_BASELINE_API_URL ?: 'https://openrx.transtechologies.com/api'}"
+        // This pipeline is the *sanctioned* read-only production baseline: it
+        // deliberately reads the live API. The suites now refuse to touch the
+        // main server unless this is set, so an ad-hoc/local run (or a stray
+        // OPENRX_API_URL) fails closed instead of quietly reading real data.
+        OPENRX_ALLOW_PRODUCTION = 'true'
         OPENRX_VENV = "${env.OPENRX_VENV ?: (env.WORKSPACE + '/.api-tests-venv')}"
         OPENRX_JUNIT_XML = "${env.WORKSPACE}/backend/tests/api-tests/pytest-results.xml"
         OPENRX_HTML_REPORT = "${env.WORKSPACE}/backend/tests/api-tests/html-report/pytest-report.html"
+        OPENRX_RELIABILITY_REPORT = "${env.WORKSPACE}/tests/reliability-report.html"
     }
 
     triggers {
@@ -132,6 +147,55 @@ pipeline {
                 }
             }
         }
+
+        // Unit suites (Jest backend, Vitest frontend). Feeds the reliability
+        // report fresh numbers. Best-effort: if node/npm are unavailable the
+        // stage clears any committed snapshot so the report shows "not run"
+        // rather than stale data. Gated by RUN_JS_TESTS (default on).
+        stage('JS unit tests (Jest + Vitest)') {
+            when { expression { return params.RUN_JS_TESTS } }
+            steps {
+                sh '''
+                    set -e
+                    mkdir -p tests/reliability-artifacts
+                    rm -f tests/reliability-artifacts/jest-results.json \
+                          tests/reliability-artifacts/jest-coverage-summary.json \
+                          tests/reliability-artifacts/vitest-results.json
+                    if ! command -v npm >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
+                        echo "[js] node/npm not available; JS suites will show as 'not run'"
+                        exit 0
+                    fi
+                    echo "[js] backend Jest (+ coverage)"
+                    ( cd backend && npm ci --no-audit --no-fund >/dev/null 2>&1 || true
+                      npx jest --ci --coverage --coverageReporters=json-summary \
+                        --json --outputFile=../tests/reliability-artifacts/jest-results.json || true )
+                    cp -f backend/coverage/coverage-summary.json \
+                          tests/reliability-artifacts/jest-coverage-summary.json 2>/dev/null || true
+                    echo "[js] frontend Vitest"
+                    ( cd interface/new && npm ci --no-audit --no-fund >/dev/null 2>&1 || true
+                      npx vitest run --reporter=json \
+                        --outputFile=../../tests/reliability-artifacts/vitest-results.json || true )
+                    echo "[js] done"
+                '''
+            }
+        }
+
+        // Aggregate every suite (backend unit, frontend unit, API contract,
+        // API e2e, UI) into one self-contained reliability page: kind, results,
+        // per-suite confidence and coverage. Best-effort — it reads the JUnit
+        // XMLs the stages above produced and degrades gracefully when a result
+        // file is missing. Pure standard-library Python, so no venv is needed.
+        stage('Test reliability report') {
+            steps {
+                sh '''
+                    set -e
+                    OUT="${OPENRX_RELIABILITY_REPORT:-$WORKSPACE/tests/reliability-report.html}"
+                    python3 tests/build_reliability_report.py --collect \
+                        --out "$OUT" --json "${OUT%.html}.json"
+                    echo "[reliability] wrote $OUT and ${OUT%.html}.json"
+                '''
+            }
+        }
     }
 
     post {
@@ -140,9 +204,10 @@ pipeline {
             // all three suites (baseline, full API sweep, UI sweep).
             junit allowEmptyResults: true, testResults: '**/pytest-results*.xml'
 
-            // Renders the full pytest output as a page inside the build. Wrapped
-            // because the HTML Publisher plugin may not be installed; the report
-            // is archived as a build artifact either way.
+            // Publish both self-contained HTML pages via the HTML Publisher
+            // plugin: the pytest baseline report and the aggregated reliability
+            // report. Each call is wrapped because the plugin may not be
+            // installed; both pages are archived as artifacts either way.
             script {
                 try {
                     publishHTML(target: [
@@ -157,10 +222,23 @@ pipeline {
                 } catch (err) {
                     echo "HTML Publisher unavailable (install the 'HTML Publisher' plugin): ${err}"
                 }
+                try {
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'tests',
+                        reportFiles: 'reliability-report.html',
+                        reportName: 'Test Reliability Report',
+                        reportTitles: 'OpenRx test reliability',
+                    ])
+                } catch (err) {
+                    echo "HTML Publisher unavailable (install the 'HTML Publisher' plugin): ${err}"
+                }
             }
 
             archiveArtifacts(
-                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html',
+                artifacts: 'backend/tests/api-tests/fixtures/production_discovery.json,backend/tests/api-tests/pytest-results.xml,backend/tests/api-tests/e2e/pytest-results.xml,tests/ui-tests/pytest-results.xml,backend/tests/api-tests/html-report/pytest-report.html,tests/reliability-report.html,tests/reliability-report.json',
                 allowEmptyArchive: true
             )
         }

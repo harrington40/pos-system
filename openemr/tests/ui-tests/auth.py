@@ -91,3 +91,73 @@ def storage_state(settings: Settings) -> dict | None:
             }
         ],
     }
+
+
+def _read_user(state: dict) -> dict | None:
+    """Extract the ``openemr_user`` object from a storage state, if present."""
+    for origin in state.get("origins") or []:
+        for entry in origin.get("localStorage") or []:
+            if entry.get("name") == STORAGE_KEY:
+                try:
+                    return json.loads(entry.get("value") or "{}")
+                except ValueError:
+                    return {}
+    return None
+
+
+def _write_user(state: dict, origin: str, user: dict) -> dict:
+    """Write ``user`` back into ``state`` under ``origin`` (creating it if needed)."""
+    origin_entry = next(
+        (o for o in state.setdefault("origins", []) if o.get("origin") == origin),
+        None,
+    )
+    if origin_entry is None:
+        origin_entry = {"origin": origin, "localStorage": []}
+        state["origins"].append(origin_entry)
+
+    entries = origin_entry.setdefault("localStorage", [])
+    value = json.dumps(user)
+    for entry in entries:
+        if entry.get("name") == STORAGE_KEY:
+            entry["value"] = value
+            return state
+    entries.append({"name": STORAGE_KEY, "value": value})
+    return state
+
+
+def role_storage_state(
+    settings: Settings,
+    role: str,
+    display_name: str | None = None,
+    main_menu_role: str | None = None,
+) -> dict | None:
+    """Storage state that keeps the session but presents ``role`` to the SPA.
+
+    The SPA reads its signed-in user — *including the role* — from
+    ``localStorage['openemr_user']`` and uses it purely for **client-side
+    gating**: the ``/`` redirect (``RoleRedirect``), the sidebar's role filters,
+    and role-only controls. API authorisation still uses the JWT.
+
+    Reusing the session token while overriding the stored role therefore lets us
+    exercise any role's UI from a single account, without provisioning a backend
+    user per role. Returns ``None`` when no session is available (the caller
+    should skip).
+    """
+    base = storage_state(settings)
+    if base is None:
+        return None
+
+    user = _read_user(base)
+    if user is None:
+        session = obtain_session(settings)
+        if not session:
+            return None
+        user = session.as_user()
+
+    user["role"] = role
+    if display_name:
+        user["displayName"] = display_name
+    if main_menu_role is not None:
+        user["main_menu_role"] = main_menu_role
+
+    return _write_user(base, settings.origin, user)

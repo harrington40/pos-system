@@ -21,16 +21,54 @@ UI_NAV_WAIT      Playwright wait state after navigation: load|domcontentloaded|
                  networkidle (default domcontentloaded)
 UI_ALLOW_PAGE_ERRORS  "true" to not fail on uncaught page errors
 UI_STORAGE_STATE      Optional path to a Playwright storage-state JSON to reuse.
+UI_ALLOW_PRODUCTION   "true" to allow targeting the live/main server. Off by
+                      default: the suite refuses to run against it (reads real
+                      patient data), so a stray UI_BASE_URL can't reach it.
 """
 from __future__ import annotations
 
 import os
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 DEFAULT_BASE_URL = "http://localhost:5173"
-DEFAULT_API_URL = "http://localhost:3002/api"
+# Point at the throwaway test backend (backend/test-db, :3202) — NOT the dev
+# backend on :3002, whose backend/.env may be wired to a real database.
+DEFAULT_API_URL = "http://localhost:3202/api"
 _ORIGIN_RE = re.compile(r"^(https?://[^/]+)")
+
+#: Hosts that are the live / "main server". A test run pointed at any of these
+#: reads real patient data, so it must be a deliberate choice: set
+#: ``UI_ALLOW_PRODUCTION=true`` (and know why). See README.md.
+PRODUCTION_HOSTS = frozenset({
+    "openrx.transtechologies.com",
+    "94.250.201.58",
+})
+
+
+class ProductionAccessError(RuntimeError):
+    """Raised when a run is pointed at the live server without opting in."""
+
+
+def host_of(url: str) -> str:
+    return (urlparse(url).hostname or "").lower()
+
+
+def is_production(url: str) -> bool:
+    """True when ``url`` targets the live/main OpenRx server."""
+    return host_of(url) in PRODUCTION_HOSTS
+
+
+def _guard_production(url: str, allow: bool, var: str) -> None:
+    if allow or not is_production(url):
+        return
+    raise ProductionAccessError(
+        f"refusing to run against the live server ({url}): tests must not read "
+        f"main-server data. Point {var} at a throwaway test backend "
+        f"(e.g. http://localhost:3202/api), or set UI_ALLOW_PRODUCTION=true to "
+        f"override on purpose. See tests/ui-tests/README.md."
+    )
 
 
 def _int(name: str, default: int) -> int:
@@ -64,6 +102,7 @@ class Settings:
     nav_wait: str
     domains: tuple[str, ...]
     allow_page_errors: bool
+    allow_production: bool
     storage_state: str
 
     @property
@@ -78,9 +117,17 @@ def load_settings() -> Settings:
     domains = tuple(
         d.strip() for d in os.getenv("UI_DOMAINS", "").split(",") if d.strip()
     )
+    base_url = (os.getenv("UI_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+    api_url = (os.getenv("UI_API_URL") or DEFAULT_API_URL).rstrip("/")
+    allow_production = _bool("UI_ALLOW_PRODUCTION", False)
+
+    # Fail closed: never let a run silently target the live/main server.
+    _guard_production(base_url, allow_production, "UI_BASE_URL")
+    _guard_production(api_url, allow_production, "UI_API_URL")
+
     return Settings(
-        base_url=(os.getenv("UI_BASE_URL") or DEFAULT_BASE_URL).rstrip("/"),
-        api_url=(os.getenv("UI_API_URL") or DEFAULT_API_URL).rstrip("/"),
+        base_url=base_url,
+        api_url=api_url,
         user=os.getenv("UI_USER") or "admin",
         password=os.getenv("UI_PASSWORD") or "admin123",
         token=(os.getenv("UI_TOKEN") or "").strip(),
@@ -88,5 +135,6 @@ def load_settings() -> Settings:
         nav_wait=os.getenv("UI_NAV_WAIT") or "domcontentloaded",
         domains=domains,
         allow_page_errors=_bool("UI_ALLOW_PAGE_ERRORS", False),
+        allow_production=allow_production,
         storage_state=(os.getenv("UI_STORAGE_STATE") or "").strip(),
     )
