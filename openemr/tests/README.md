@@ -56,11 +56,13 @@ The full formula is also rendered on the HTML page.
 ### Trend
 
 Each run appends its headline metrics to `tests/reliability-history.jsonl`
-(one JSON object per line), and the report renders that as a **reliability trend
-chart**. The file is committed so the history accumulates over time; use
-`--no-history` to draw the chart without recording a new point, or `--history
-PATH` to point elsewhere. A run with the same timestamp replaces the last entry
-instead of duplicating it.
+(one JSON object per line, including a per-suite score map), and the report
+renders that as a **reliability trend chart**: a bold line for the overall
+reliability index plus a thinner line per suite (backend unit, frontend unit,
+API contract, API e2e, UI), with a legend. The file is committed so the history
+accumulates over time; use `--no-history` to draw the chart without recording a
+new point, or `--history PATH` to point elsewhere. A run with the same timestamp
+replaces the last entry instead of duplicating it.
 
 ## CI
 

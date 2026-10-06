@@ -51,6 +51,16 @@ ARTIFACTS = TESTS / "reliability-artifacts"
 #: Append-only record of each run's overall metrics; drives the trend chart.
 HISTORY_DEFAULT = TESTS / "reliability-history.jsonl"
 
+#: Line colours for the reliability trend chart (overall + one per suite).
+TREND_COLORS = {
+    "overall": "#0d6efd",
+    "backend-unit": "#6f42c1",
+    "frontend-unit": "#00c9a7",
+    "api-contract": "#fd7e14",
+    "api-e2e": "#dc3545",
+    "ui": "#198754",
+}
+
 #: Test kinds, their weight in the reliability index, and how flaky/environment
 #: dependent they are. Unit tests run in-process and are deterministic, so they
 #: carry the most weight; browser/UI tests depend on a live stack, so less.
@@ -744,6 +754,10 @@ def append_history(path: Path, m: dict) -> list[dict]:
         "failed": m["overall"]["failed"],
         "skipped": m["overall"]["skipped"],
         "catalogued": m["overall"]["catalogued"],
+        # Per-suite confidence score, so the trend can plot each layer.
+        "suites": {
+            s["id"]: s["score"] for s in m["suites"] if s.get("score") is not None
+        },
     }
     if records and records[-1].get("generated") == rec["generated"]:
         records[-1] = rec
@@ -756,14 +770,14 @@ def append_history(path: Path, m: dict) -> list[dict]:
     return records
 
 
-def _trend_svg(history: list[dict], width: int = 920, height: int = 240) -> str:
-    """Inline SVG line chart of the reliability index across runs."""
-    pts = [
-        (str(h.get("generated", "")), float(h.get("reliability", 0)))
-        for h in history
-        if h.get("reliability") is not None
-    ]
-    if not pts:
+def _trend_svg(history: list[dict], series: list[dict],
+               width: int = 920, height: int = 240) -> str:
+    """Inline SVG multi-line chart: one line per series (overall + suites).
+
+    ``series`` is a list of ``{"label", "color", "width", "values"}`` where
+    ``values`` aligns with ``history`` and ``None`` means "no data that run".
+    """
+    if not history:
         return (
             '<p class="muted">No history yet. Each run appends to '
             "<code>tests/reliability-history.jsonl</code>, which this chart plots.</p>"
@@ -772,16 +786,17 @@ def _trend_svg(history: list[dict], width: int = 920, height: int = 240) -> str:
     pad_l, pad_r, pad_t, pad_b = 46, 20, 20, 38
     w = width - pad_l - pad_r
     h = height - pad_t - pad_b
+    n = len(history)
 
     def x_at(i: int) -> float:
-        return pad_l + (w * (i / (len(pts) - 1)) if len(pts) > 1 else w / 2)
+        return pad_l + (w * (i / (n - 1)) if n > 1 else w / 2)
 
     def y_at(v: float) -> float:
         return pad_t + h * (1 - max(0.0, min(100.0, v)) / 100.0)
 
     parts = [f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
              'role="img" preserveAspectRatio="xMidYMid meet">']
-    # Threshold gridlines (High ≥ 90, Moderate ≥ 75).
+    # Threshold gridlines (High >= 90, Moderate >= 75).
     for level, color in ((90, "#198754"), (75, "#fd7e14")):
         y = y_at(level)
         parts.append(
@@ -797,33 +812,46 @@ def _trend_svg(history: list[dict], width: int = 920, height: int = 240) -> str:
             'stroke="#e5e7eb" stroke-width="1"/>'
         )
 
-    coords = " ".join(f"{x_at(i):.1f},{y_at(v):.1f}" for i, (_, v) in enumerate(pts))
-    fill = f"{pad_l},{y_at(0):.1f} " + coords + f" {x_at(len(pts) - 1):.1f},{y_at(0):.1f}"
-    parts.append(f'<polygon points="{fill}" fill="#0d6efd" opacity="0.10"/>')
-    parts.append(
-        f'<polyline points="{coords}" fill="none" stroke="#0d6efd" '
-        'stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
-    )
-    for i, (_, v) in enumerate(pts):
-        parts.append(
-            f'<circle cx="{x_at(i):.1f}" cy="{y_at(v):.1f}" r="3.5" fill="#fff" '
-            'stroke="#0d6efd" stroke-width="2"/>'
-        )
+    for s in series:
+        color = s["color"]
+        # Split the series into contiguous runs of defined values.
+        segments: list[list[tuple[int, float]]] = []
+        run: list[tuple[int, float]] = []
+        for i, val in enumerate(s["values"]):
+            if val is None:
+                if run:
+                    segments.append(run)
+                    run = []
+            else:
+                run.append((i, float(val)))
+        if run:
+            segments.append(run)
+
+        for seg in segments:
+            if len(seg) > 1:
+                pts = " ".join(f"{x_at(i):.1f},{y_at(v):.1f}" for i, v in seg)
+                parts.append(
+                    f'<polyline points="{pts}" fill="none" stroke="{color}" '
+                    f'stroke-width="{s.get("width", 2)}" stroke-linejoin="round" '
+                    'stroke-linecap="round"/>'
+                )
+            for i, v in seg:
+                parts.append(
+                    f'<circle cx="{x_at(i):.1f}" cy="{y_at(v):.1f}" r="3" '
+                    f'fill="#fff" stroke="{color}" stroke-width="2"/>'
+                )
+
     # x labels: first and last date (date part only).
-    first_date = pts[0][0].split(" ")[0]
-    last_date = pts[-1][0].split(" ")[0]
+    first_date = str(history[0].get("generated", "")).split(" ")[0]
+    last_date = str(history[-1].get("generated", "")).split(" ")[0]
     parts.append(
         f'<text x="{pad_l}" y="{height - 12}" font-size="10" fill="#6b7280">{first_date}</text>'
     )
-    if len(pts) > 1:
+    if n > 1:
         parts.append(
             f'<text x="{pad_l + w}" y="{height - 12}" text-anchor="end" font-size="10" '
             f'fill="#6b7280">{last_date}</text>'
         )
-    parts.append(
-        f'<text x="{pad_l + w}" y="{y_at(pts[-1][1]) - 8:.1f}" text-anchor="end" '
-        f'font-size="11" font-weight="700" fill="#0d6efd">{pts[-1][1]:.1f}</text>'
-    )
     parts.append("</svg>")
     return "".join(parts)
 
@@ -884,11 +912,40 @@ def _trend_section(history: list[dict]) -> str:
         if n
         else "no runs recorded yet"
     )
+
+    names = {s["id"]: s["name"] for s in SPECS}
+    series = [{
+        "label": "overall reliability",
+        "color": TREND_COLORS["overall"],
+        "width": 2.8,
+        "values": [h.get("reliability") for h in history],
+    }]
+    for sid in [s["id"] for s in SPECS]:
+        vals = [(h.get("suites") or {}).get(sid) for h in history]
+        if any(v is not None for v in vals):
+            series.append({
+                "label": names.get(sid, sid),
+                "color": TREND_COLORS.get(sid, "#9ca3af"),
+                "width": 1.6,
+                "values": vals,
+            })
+
+    legend = []
+    for s in series:
+        latest = next((v for v in reversed(s["values"]) if v is not None), None)
+        txt = s["label"] + (f" — {latest:.1f}" if latest is not None else "")
+        legend.append(
+            f'<span><span class="dot" style="background:{s["color"]}"></span>'
+            f"{html.escape(txt)}</span>"
+        )
+    legend_html = '<div class="legend">' + "".join(legend) + "</div>"
+
     return (
         "<section><h2>Reliability trend</h2>"
-        '<p class="sub">Overall reliability index across runs '
+        '<p class="sub">Overall reliability and per-suite confidence across runs '
         f"(<code>tests/reliability-history.jsonl</code>) &middot; {caption}.</p>"
-        f"{_trend_svg(history)}</section>"
+        f"{_trend_svg(history, series)}"
+        f"{legend_html}</section>"
     )
 
 
