@@ -41,7 +41,9 @@ So the recommended shape is:
 | --- | --- |
 | `sql/database.sql` | The 283 upstream tables (schema only, no rows) |
 | `backend/test-db/patches.sql` | Columns and tables the repository is missing (see below) |
-| `backend/test-db/seed.sql` | Synthetic staff, patients, one appointment |
+| `backend/test-db/seed.sql` | Synthetic staff, patients, one appointment, demo vitals |
+| `backend/test-db/demo-seed.sql` | Demo emergency workload (run after boot — see below) |
+| `backend/test-db/ed-load-seed.sql` | 50-patient ED load for dashboard/UX testing (run after boot) |
 | The backend itself | Its ~30 own tables, created via `CREATE TABLE IF NOT EXISTS` on boot |
 
 If you ever genuinely need production-*shaped* data rather than production
@@ -220,7 +222,7 @@ spec, and the API suite (totals below).
 
 ## Seeded credentials (test-only)
 
-All five accounts share the password `OpenRxTest123`.
+All accounts share the password `OpenRxTest123`.
 
 | Username | Role | State |
 | --- | --- | --- |
@@ -229,12 +231,84 @@ All five accounts share the password `OpenRxTest123`.
 | `pending.user` | physician | awaiting approval — **must not** log in |
 | `rejected.user` | physician | registration refused — **must not** log in |
 | `inactive.user` | physician | approved then deactivated — **must not** log in |
+| `dr.chan` | physician | approved — demo ED clinician (carries the demo emergency patients) |
+| `rn.nurse` | nurse | approved — demo RN, routes to `/nurse-dashboard` |
+| `rn.charge` | registered nurse | approved — routes to `/rn-dashboard` |
 
-The last three exist so the authentication tests can prove every refusal path
-without creating anything: `login()` only reads (`users` and `users_secure`), it
-never touches the failure counters, so none of those cases can lock an account.
+The first three `must not` rows exist so the authentication tests can prove every
+refusal path without creating anything: `login()` only reads (`users` and
+`users_secure`), it never touches the failure counters, so none of those cases can
+lock an account.
 
-Seeded patient ids: `1`, `2`, `3`. Appointment id: `1`.
+Seeded patient ids: `1`, `2`, `3`, plus the demo ED patients `4`–`9`
+(registered to `dr.chan`, status `active`) and the 50-patient ED load `10`–`59`.
+Appointment id: `1`. Demo vitals carry fixed ids `9001`–`9011`; the load's vitals
+use `9101`–`9150`.
+
+## Demo emergency workload (optional, for the UI)
+
+`seed.sql` runs before the backend exists, so it cannot write to the tables the
+backend creates at runtime (`emergency_visits`, `emergency_reassessments`,
+`patient_care_assignment`). Those rows live in `demo-seed.sql` instead. Boot the
+backend against the test database once, then apply them:
+
+```bash
+bash ./backend/test-db/setup-test-db.sh
+bash ./backend/test-db/run-backend-against-test-db.sh   # Ctrl-C once it is up
+bash ./backend/test-db/seed-demo.sh                     # emergency_visits + ward board
+```
+
+It seeds six active ED visits across the triage spectrum (one per demo patient,
+all assigned to `dr.chan` so they appear on his provider dashboard) with matching
+ward assignments for the nurse dashboard. `demo-seed.sql` is re-runnable — the
+demo visits carry a `created_by = 'demo-seed'` marker and are replaced on each
+run.
+
+## Bulk ED load — 50 patients (optional, for dashboard/UX testing)
+
+`ed-load-seed.sql` generates **50** synthetic emergency patients (pids `10`–`59`)
+for load and UI testing. Each one is an `active` patient with a charted set of
+vitals, a ward assignment (room `ED-101`…, acuity, assigned to `rn.nurse`) and an
+active ED visit, so all 50 appear on the **nursing dashboards**
+(`/nurse/dashboard`), the ED board, and Dr. Chan's provider dashboard. Triage
+levels cycle `1`–`5` (10 patients per colour) so every board state is populated.
+
+It is generated with a recursive-CTE counter table, so changing the count is a
+one-line edit (the `n < 50` in `ed-load-seed.sql`). It depends on `seed.sql`
+(for the clinicians) and a booted backend (for the ward/ED tables), then:
+
+```bash
+bash ./backend/test-db/seed-ed-load.sh
+```
+
+`ed-load-seed.sql` is re-runnable: the pids are fixed (`ON DUPLICATE KEY
+UPDATE`) and the visits carry a `created_by = 'ed-load'` marker, so re-applying
+it replaces rather than duplicates the load.
+
+## Loading into the running app database (so it shows in the UI)
+
+`live-ed-load.sql` is the variant to use against the **populated** database the
+running app talks to (the NestJS backend's `DB_*` in `backend/.env`; the SPA
+proxies `/api` to the backend). Unlike `ed-load-seed.sql` it uses a high,
+non-colliding pid range (`900001`–`900050`) and never overwrites an existing
+chart. It resolves real clinicians by username — `dr.chen` (provider),
+`nurse.amy` (nursing assistant dashboard), `rn.patricia` (RN dashboard) — so it
+creates **no** user rows.
+
+```bash
+bash ./backend/test-db/load-live-ed.sh          # reads backend/.env for DB_*
+```
+
+It adds 50 active patients with vitals, ward assignments and active ED visits,
+which then appear on the nursing dashboards, the ED board and the provider
+dashboard. To remove everything it adds:
+
+```sql
+DELETE FROM emergency_visits        WHERE created_by = 'ed-load';
+DELETE FROM patient_care_assignment WHERE pid BETWEEN 900001 AND 900050;
+DELETE FROM form_vitals             WHERE pid BETWEEN 900001 AND 900050;
+DELETE FROM patient_data            WHERE pid BETWEEN 900001 AND 900050;
+```
 
 ## What Jenkins runs
 

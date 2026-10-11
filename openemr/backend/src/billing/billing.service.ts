@@ -7,6 +7,10 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { assignOneToOne } from './billing-integrity.util';
+import {
+    allocatePaymentToHolds,
+    shouldReleaseHold,
+} from './billing-payment-allocation.util';
 import { resolveVisitCategoryId } from '../common/calendar-categories.util';
 
 export interface BillingPatient {
@@ -122,6 +126,48 @@ export interface BillingHoldRow {
     cleared_by: string | null;
     cleared_at: string | null;
     created_at: string;
+    /** Amount applied against this hold so far (partial-payment tracking). */
+    paid_amount?: number | string | null;
+    /** What is still owed on this hold. 0 once it is settled. */
+    balance_due?: number | string | null;
+    /** 'full' | 'partial' when the block was lifted; NULL while still held. */
+    released_on?: string | null;
+}
+
+/** One held order with the money still owed on it (partial-payment view). */
+export interface BalanceDueHold {
+    id: number;
+    holdType: string;
+    orderId: number;
+    description: string | null;
+    code: string | null;
+    /** Amount billed for the order. */
+    fee: number;
+    /** Amount applied against it so far. */
+    paid: number;
+    /** Amount still owed on it. */
+    balanceDue: number;
+    status: string;
+    releasedOn: string | null;
+    createdAt: string;
+}
+
+/**
+ * A patient's outstanding balance, expressed both as a whole-account figure and
+ * per held order. `pendingHoldBalance` is the money the lab / pharmacy are
+ * blocked on; `accountBalance` is the wider charges-minus-payments figure.
+ */
+export interface PatientBalanceDue {
+    pid: number;
+    totalCharges: number;
+    totalPayments: number;
+    /** Whole-account balance still owed (charges - payments), never negative. */
+    accountBalance: number;
+    /** Sum of the balance still due on orders that are still blocked. */
+    pendingHoldBalance: number;
+    /** Number of orders still blocking the lab / pharmacy. */
+    pendingHolds: number;
+    holds: BalanceDueHold[];
 }
 
 /** `billing_holds` row joined to its patient name (dashboard listing). */
@@ -1078,6 +1124,7 @@ export class BillingService implements OnModuleInit {
         await this.ensurePriceCatalogSchema();
         await this.ensureBillingSettingsSchema();
         await this.ensureBillingHoldSchema();
+        await this.ensurePartialPaymentSchema();
         await this.ensureEncounterBillingSchema();
         await this.loadHospitalTimezone();
         await this.backfillHolds();
@@ -1274,6 +1321,50 @@ export class BillingService implements OnModuleInit {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
         );
         this.logger.log('Billing holds schema ready');
+    }
+
+    /**
+     * Additive schema for partial payments. Kept separate from
+     * `ensureBillingHoldSchema` so the baseline holds table is untouched for
+     * existing installs: the columns are added only when missing, and every
+     * default keeps current rows behaving exactly as before (nothing paid, so
+     * nothing released by allocation).
+     */
+    private async ensurePartialPaymentSchema(): Promise<void> {
+        // Track how much has been applied to each hold and what is left.
+        for (const ddl of [
+            `ALTER TABLE billing_holds ADD COLUMN paid_amount DECIMAL(10,2) NOT NULL DEFAULT 0`,
+            `ALTER TABLE billing_holds ADD COLUMN balance_due DECIMAL(10,2) NOT NULL DEFAULT 0`,
+            `ALTER TABLE billing_holds ADD COLUMN released_on VARCHAR(20) NULL`,
+        ]) {
+            try {
+                await this.dataSource.query(ddl);
+            } catch {
+                /* column already exists on this deployment */
+            }
+        }
+
+        // Audit trail: every payment-to-hold allocation is recorded, so the
+        // balance left after a partial payment is always reconstructable.
+        await this.dataSource.query(
+            `CREATE TABLE IF NOT EXISTS billing_payment_allocations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        pid INT NOT NULL,
+        hold_id INT NULL,
+        hold_type VARCHAR(20) NULL,
+        order_id INT NULL,
+        payment_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        allocated_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        balance_due DECIMAL(10,2) NOT NULL DEFAULT 0,
+        released TINYINT(1) NOT NULL DEFAULT 0,
+        released_by VARCHAR(120) NULL,
+        reason VARCHAR(160) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_alloc_pid (pid),
+        INDEX idx_alloc_hold (hold_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        );
+        this.logger.log('Partial-payment billing schema ready');
     }
 
     /** Best-effort fee/code estimate for an un-billed lab test (no billing insert). */
@@ -1518,6 +1609,254 @@ export class BillingService implements OnModuleInit {
        ORDER BY bh.created_at DESC LIMIT 200`,
             status ? [status] : [],
         );
+    }
+
+    // ─── Partial payments: balance due + block release ───────────────
+
+    /** Map a hold row to the balance-due view shown to staff. */
+    private toBalanceDueHold(h: BillingHoldRow): BalanceDueHold {
+        const fee = this.round2(Number(h.fee) || 0);
+        const paid = this.round2(Number(h.paid_amount) || 0);
+        // A released hold owes nothing on its block even if it was not fully
+        // paid — the money left lives on the account balance and in the audit
+        // trail, not as a reason to keep the lab / pharmacy waiting.
+        const released = h.status === 'cleared' || h.status === 'cancelled';
+        const balanceDue = released ? 0 : this.round2(Math.max(0, fee - paid));
+        return {
+            id: Number(h.id),
+            holdType: h.hold_type,
+            orderId: Number(h.order_id),
+            description: h.description ?? null,
+            code: h.code ?? null,
+            fee,
+            paid,
+            balanceDue,
+            status: h.status,
+            releasedOn: h.released_on ?? null,
+            createdAt: h.created_at,
+        };
+    }
+
+    /** Record one payment-to-hold allocation in the audit trail. */
+    private async recordHoldAllocation(row: {
+        pid: number;
+        hold: BillingHoldRow | null;
+        paymentAmount: number;
+        allocatedAmount: number;
+        balanceDue: number;
+        released: boolean;
+        releasedBy?: string | null;
+        reason?: string | null;
+    }): Promise<void> {
+        try {
+            await this.dataSource.query(
+                `INSERT INTO billing_payment_allocations
+           (pid, hold_id, hold_type, order_id, payment_amount, allocated_amount,
+            balance_due, released, released_by, reason)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    row.pid,
+                    row.hold ? Number(row.hold.id) : null,
+                    row.hold?.hold_type ?? null,
+                    row.hold ? Number(row.hold.order_id) : null,
+                    this.round2(row.paymentAmount),
+                    this.round2(row.allocatedAmount),
+                    this.round2(row.balanceDue),
+                    row.released ? 1 : 0,
+                    row.releasedBy ?? null,
+                    row.reason ?? null,
+                ],
+            );
+        } catch {
+            /* audit is best-effort; the hold update is the source of truth */
+        }
+    }
+
+    /**
+     * Spread a payment across a patient's still-blocked lab / pharmacy orders.
+     * Orders the payment fully covers are unblocked; anything left owed is
+     * written to each hold as `balance_due` and journalled in
+     * `billing_payment_allocations`.
+     *
+     * Additive to `recordPayment`: the whole-account settlement rule still runs
+     * first, so a full payment behaves exactly as before.
+     */
+    private async applyPaymentToHolds(
+        pid: number,
+        amountUsd: number,
+        receivedBy: string,
+        reason = 'Payment allocation',
+    ): Promise<PatientBalanceDue> {
+        const holds = await this.dataSource.query<BillingHoldRow[]>(
+            `SELECT * FROM billing_holds
+        WHERE pid = ? AND status = 'hold'
+        ORDER BY created_at ASC, id ASC`,
+            [pid],
+        );
+
+        if (holds.length) {
+            const result = allocatePaymentToHolds(
+                amountUsd,
+                holds.map((h) => ({
+                    id: Number(h.id),
+                    fee: Number(h.fee) || 0,
+                    paid: Number(h.paid_amount) || 0,
+                })),
+            );
+
+            for (const allocation of result.allocations) {
+                const hold =
+                    holds.find((h) => Number(h.id) === allocation.id) ?? null;
+                const release = shouldReleaseHold(allocation);
+                await this.dataSource.query(
+                    `UPDATE billing_holds
+              SET paid_amount = ?,
+                  balance_due = ?,
+                  status = CASE WHEN ? THEN 'cleared' ELSE status END,
+                  released_on = CASE WHEN ? THEN 'full' ELSE released_on END,
+                  cleared_by = CASE WHEN ? THEN ? ELSE cleared_by END,
+                  cleared_at = CASE WHEN ? THEN NOW() ELSE cleared_at END
+            WHERE id = ?`,
+                    [
+                        allocation.paid,
+                        allocation.balanceDue,
+                        release ? 1 : 0,
+                        release ? 1 : 0,
+                        release ? 1 : 0,
+                        `auto:${receivedBy}`,
+                        release ? 1 : 0,
+                        allocation.id,
+                    ],
+                );
+                await this.recordHoldAllocation({
+                    pid,
+                    hold,
+                    paymentAmount: amountUsd,
+                    allocatedAmount: allocation.allocated,
+                    balanceDue: allocation.balanceDue,
+                    released: release,
+                    releasedBy: release ? `auto:${receivedBy}` : null,
+                    reason,
+                });
+            }
+
+            if (result.releasedCount > 0) {
+                this.logger.log(
+                    `Partial payment released ${result.releasedCount} billing hold(s) for patient ${pid}; L$${this.usdToLrd(result.totalBalanceDue)} still pending.`,
+                );
+            }
+        }
+
+        return this.getPatientBalanceDue(pid);
+    }
+
+    /** A patient's balance due, whole-account and per held order. */
+    async getPatientBalanceDue(pid: number): Promise<PatientBalanceDue> {
+        const holds = await this.dataSource.query<BillingHoldRow[]>(
+            `SELECT * FROM billing_holds WHERE pid = ? ORDER BY created_at ASC, id ASC`,
+            [pid],
+        );
+        const [totals] = await this.dataSource.query<BalanceTotalsRow[]>(
+            `SELECT
+           COALESCE((SELECT SUM(fee) FROM billing WHERE pid = ? AND activity = 1), 0) AS charges,
+           COALESCE((SELECT SUM(pay_amount) FROM ar_activity WHERE pid = ?), 0) AS payments`,
+            [pid, pid],
+        );
+
+        const items = holds.map((h) => this.toBalanceDueHold(h));
+        const pending = items.filter(
+            (h) => h.status === 'hold' && h.balanceDue > 0,
+        );
+        const charges = this.round2(Number(totals?.charges) || 0);
+        const payments = this.round2(Number(totals?.payments) || 0);
+
+        return {
+            pid,
+            totalCharges: charges,
+            totalPayments: payments,
+            accountBalance: this.round2(Math.max(0, charges - payments)),
+            pendingHoldBalance: this.round2(
+                pending.reduce((sum, h) => sum + h.balanceDue, 0),
+            ),
+            pendingHolds: items.filter((h) => h.status === 'hold').length,
+            holds: items,
+        };
+    }
+
+    /**
+     * Staff-triggered "release on partial payment": lift the block on a
+     * patient's lab / pharmacy orders even though money is still outstanding,
+     * recording the balance left on each order and in the audit trail.
+     *
+     * Optional `holdIds` limits the release to specific orders; otherwise every
+     * still-held order for the patient is released.
+     */
+    async releaseHoldsOnPartialPayment(
+        pid: number,
+        opts: { holdIds?: number[]; releasedBy?: string; reason?: string } = {},
+    ): Promise<{
+        pid: number;
+        released: number;
+        pendingBalance: number;
+        balanceDue: PatientBalanceDue;
+    }> {
+        const releasedBy = opts.releasedBy || 'billing';
+        const reason = opts.reason || 'Released on partial payment';
+        const ids = Array.isArray(opts.holdIds)
+            ? opts.holdIds
+                  .map((n) => Number(n))
+                  .filter((n) => Number.isFinite(n) && n > 0)
+            : [];
+
+        const holds = await this.dataSource.query<BillingHoldRow[]>(
+            `SELECT * FROM billing_holds WHERE pid = ? AND status = 'hold'
+        ${ids.length ? `AND id IN (${ids.map(() => '?').join(',')})` : ''}
+        ORDER BY created_at ASC, id ASC`,
+            ids.length ? [pid, ...ids] : [pid],
+        );
+
+        let released = 0;
+        let pendingBalance = 0;
+        for (const hold of holds) {
+            const balanceDue = this.round2(
+                Math.max(
+                    0,
+                    (Number(hold.fee) || 0) - (Number(hold.paid_amount) || 0),
+                ),
+            );
+            await this.dataSource.query(
+                `UPDATE billing_holds
+            SET status = 'cleared', released_on = 'partial', balance_due = ?,
+                cleared_by = ?, cleared_at = NOW()
+          WHERE id = ?`,
+                [balanceDue, `partial:${releasedBy}`, hold.id],
+            );
+            await this.recordHoldAllocation({
+                pid,
+                hold,
+                paymentAmount: 0,
+                allocatedAmount: 0,
+                balanceDue,
+                released: true,
+                releasedBy: `partial:${releasedBy}`,
+                reason,
+            });
+            released += 1;
+            pendingBalance = this.round2(pendingBalance + balanceDue);
+        }
+
+        if (released > 0) {
+            this.logger.log(
+                `Released ${released} hold(s) on partial payment for patient ${pid}; L$${this.usdToLrd(pendingBalance)} still pending.`,
+            );
+        }
+
+        return {
+            pid,
+            released,
+            pendingBalance,
+            balanceDue: await this.getPatientBalanceDue(pid),
+        };
     }
 
     /** Encounter-based billing breakdown for a single patient. */
@@ -3409,6 +3748,8 @@ export class BillingService implements OnModuleInit {
         paymentId: number | string;
         receipt: ReceiptData;
         duplicate?: boolean;
+        /** Balance still owed after this payment, per held order (additive). */
+        balanceDue?: PatientBalanceDue;
     }> {
         const amountLRD = this.usdToLrd(amountUSD);
 
@@ -3575,6 +3916,24 @@ export class BillingService implements OnModuleInit {
             /* non-fatal */
         }
 
+        // Partial-payment tracking: apply this payment across any still-held lab /
+        // pharmacy orders — the ones it fully covers are unblocked, the rest
+        // record the balance they still owe. Runs after the settlement rule above,
+        // so a full payment behaves exactly as before. Failures here must never
+        // take the payment down with them; the receipt is already final.
+        let balanceDue: PatientBalanceDue | undefined;
+        try {
+            balanceDue = await this.applyPaymentToHolds(
+                pid,
+                amountUSD,
+                receivedBy,
+            );
+        } catch (e) {
+            this.logger.warn(
+                `Hold allocation skipped for patient ${pid}: ${(e as Error).message}`,
+            );
+        }
+
         this.logger.log(
             `Payment recorded for patient ${pid}: ${this.formatLrd(amountLRD)} via ${paymentMethod}. Receipt generated.`,
         );
@@ -3583,6 +3942,7 @@ export class BillingService implements OnModuleInit {
             success: true,
             paymentId: result.insertId,
             receipt,
+            balanceDue,
         };
     }
 

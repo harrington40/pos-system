@@ -432,6 +432,38 @@ export class BillingController {
         return this.billing.clearHoldForOrder(type, +orderId, by);
     }
 
+    // ─── Partial payments: balance due + release ─────────────────────
+
+    /**
+     * What a patient still owes, both as a whole-account figure and per blocked
+     * lab / pharmacy order — so front desk can see the pending balance left.
+     */
+    @Get('billing/patients/:pid/balance-due')
+    @Roles('admin', 'billing', 'physician', 'front_desk')
+    getBalanceDue(@Param('pid') pid: string) {
+        return this.billing.getPatientBalanceDue(+pid);
+    }
+
+    /**
+     * Lift the block on a patient's lab / pharmacy orders on the strength of a
+     * partial payment, recording the balance still owed. Optionally limited to
+     * specific hold ids via `{ holdIds: [...] }`.
+     */
+    @Post('billing/patients/:pid/holds/release-on-partial')
+    @Roles('admin', 'billing')
+    async releaseHoldsOnPartialPayment(
+        @Param('pid') pid: string,
+        @Body() body: { holdIds?: number[]; reason?: string },
+        @Req() req: BillingRequest,
+    ) {
+        const by = req.user?.displayName || req.user?.username || 'billing';
+        return this.billing.releaseHoldsOnPartialPayment(+pid, {
+            holdIds: body?.holdIds,
+            releasedBy: by,
+            reason: body?.reason,
+        });
+    }
+
     // ─── Encounter-based billing breakdown (per patient) ─────────────
 
     @Get('patients/:pid/encounter-breakdown')

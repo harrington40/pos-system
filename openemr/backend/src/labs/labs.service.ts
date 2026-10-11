@@ -147,6 +147,8 @@ interface LabOrderHoldFields {
     billingHoldFee: number;
     billingHoldCode: string | null;
     billingHeld: boolean;
+    /** Money still owed on a blocked order (0 once released/paid). */
+    billingBalanceDue: number;
 }
 
 /** Affected-row result of an INSERT / UPDATE / DELETE. */
@@ -609,6 +611,14 @@ export class LabsService implements OnModuleInit {
             o.billingHoldFee = h ? Number(h.fee) || 0 : 0;
             o.billingHoldCode = h ? h.code || null : null;
             o.billingHeld = !!(h && h.status === 'hold');
+            // Pending balance left on the block — 0 once the order is released.
+            o.billingBalanceDue =
+                h && h.status === 'hold'
+                    ? Math.max(
+                          0,
+                          (Number(h.fee) || 0) - (Number(h.paid_amount) || 0),
+                      )
+                    : 0;
         }
         return withHolds;
     }
