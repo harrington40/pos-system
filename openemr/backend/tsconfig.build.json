@@ -1,6 +1,10 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"],
+  // `scripts/` holds the offline licence-key CLI, which runs through ts-node and
+  // does not belong in the shipped build. It must stay excluded: compiling a file
+  // outside src/ moves TypeScript's inferred root up a level, so the build emits
+  // dist/src/main.js instead of dist/main.js and the deploy refuses the tarball.
+  "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"],
   "compilerOptions": {
     // Source maps must not ship to production: they map the compiled output
     // straight back to the TypeScript sources, exposing the whole backend to
