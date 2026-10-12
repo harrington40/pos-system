@@ -1,13 +1,32 @@
-import { Controller, Post, Get, Body, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Get,
+    Put,
+    Body,
+    Req,
+    UseGuards,
+    BadRequestException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { LicenseService } from './license.service';
+import type { LicensePromotion } from './license.service';
+import { LicensePromotionService } from './license-promotion.service';
 import type { LicenseTier } from './license.entity';
+
+/** The authenticated user, as the JWT strategy attaches it. */
+interface AdminRequest {
+    user?: { username?: string; role?: string };
+}
 
 @Controller('license')
 export class LicenseController {
-    constructor(private readonly licenseService: LicenseService) {}
+    constructor(
+        private readonly licenseService: LicenseService,
+        private readonly promotionService: LicensePromotionService,
+    ) {}
 
     /**
      * Verify the generator passphrase server-side.
@@ -59,8 +78,59 @@ export class LicenseController {
      * Public, for the same reason as status: the pricing page is public.
      */
     @Get('promotion')
-    promotion() {
-        return { promotion: this.licenseService.getPromotion() };
+    async promotion() {
+        const stored = await this.promotionService.getEffective();
+        return { promotion: stored ?? this.licenseService.getPromotion() };
+    }
+
+    /**
+     * Promotion control for the marketing console.
+     *
+     * Admin only, and that is the whole of the security: the console hides itself
+     * behind a seven-click gesture, but hiding is not protection - anyone reading
+     * the bundle can find the route. The gesture is a convenience, these guards
+     * are the door. Every change records who made it.
+     */
+    @Get('promotion/admin')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('admin')
+    async readPromotion() {
+        return {
+            promotion: await this.promotionService.getRecord(),
+            effective:
+                (await this.promotionService.getEffective()) ??
+                this.licenseService.getPromotion(),
+        };
+    }
+
+    @Put('promotion/admin')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('admin')
+    async savePromotion(
+        @Body() body: Partial<LicensePromotion>,
+        @Req() req: AdminRequest,
+    ) {
+        return {
+            promotion: await this.promotionService.save(
+                body,
+                req.user?.username ?? 'unknown',
+            ),
+        };
+    }
+
+    @Post('promotion/admin/toggle')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('admin')
+    async togglePromotion(
+        @Body('active') active: boolean,
+        @Req() req: AdminRequest,
+    ) {
+        return {
+            promotion: await this.promotionService.setActive(
+                active === true,
+                req.user?.username ?? 'unknown',
+            ),
+        };
     }
 
     /**

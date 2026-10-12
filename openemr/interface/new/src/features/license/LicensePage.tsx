@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
+import { setConsoleSession } from './consoleSession';
 
 interface LicenseStatus {
   valid: boolean;
@@ -60,6 +62,56 @@ export default function LicensePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const navigate = useNavigate();
+
+  // Hidden marketing console. Seven clicks on the page title open the sign-in
+  // popup. Nothing in the UI advertises this, and nothing depends on the secrecy:
+  // the console's endpoints require an administrator token, so finding the route
+  // by reading the bundle gets you no further than the sign-in form.
+  const [secretClicks, setSecretClicks] = useState(0);
+  const [showConsoleLogin, setShowConsoleLogin] = useState(false);
+  const [consoleUser, setConsoleUser] = useState('');
+  const [consolePass, setConsolePass] = useState('');
+  const [consoleError, setConsoleError] = useState('');
+  const [consoleBusy, setConsoleBusy] = useState(false);
+
+  const handleSecretClick = () => {
+    const next = secretClicks + 1;
+    if (next >= 7) {
+      setSecretClicks(0);
+      setConsoleError('');
+      setShowConsoleLogin(true);
+    } else {
+      setSecretClicks(next);
+    }
+  };
+
+  const submitConsoleLogin = async () => {
+    setConsoleBusy(true);
+    setConsoleError('');
+    try {
+      const response = await nestClient.post('/auth/login', {
+        username: consoleUser,
+        password: consolePass,
+      });
+      const token = response.data?.token;
+      const user = response.data?.user;
+      if (!token || user?.role !== 'admin') {
+        setConsoleError('Administrator credentials are required.');
+        return;
+      }
+      // Held in memory only, and separate from the app's session.
+      setConsoleSession(token, user.username ?? consoleUser);
+      setConsolePass('');
+      setShowConsoleLogin(false);
+      navigate('/license-console');
+    } catch (e) {
+      const err = e as { response?: { data?: { message?: string } } };
+      setConsoleError(err.response?.data?.message || 'Sign-in failed.');
+    } finally {
+      setConsoleBusy(false);
+    }
+  };
 
   const { data: status } = useQuery<LicenseStatus>({
     queryKey: ['license-status'],
@@ -108,6 +160,49 @@ export default function LicensePage() {
     <div className="glass-page position-relative overflow-hidden" style={{ maxWidth: '1100px', margin: '0 auto', padding: '1rem', background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh' }}>
       <div className="position-absolute rounded-circle" style={{ width: '340px', height: '340px', top: '-80px', right: '-60px', background: 'radial-gradient(circle, rgba(13,110,253,0.30), transparent 70%)', filter: 'blur(20px)', zIndex: 0 }}></div>
       <div className="position-absolute rounded-circle" style={{ width: '400px', height: '400px', bottom: '8%', left: '-120px', background: 'radial-gradient(circle, rgba(0,201,167,0.30), transparent 70%)', filter: 'blur(20px)', zIndex: 0 }}></div>
+
+      {/* Hidden console sign-in. Appears only after the title gesture; keeping it
+          in the same chunk means the console route is not linked from anywhere. */}
+      {showConsoleLogin && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.72)', zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setShowConsoleLogin(false)}
+        >
+          <div className="card border-0 shadow-lg" style={{ maxWidth: '380px', width: '100%', borderRadius: '16px' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="card-body p-4">
+              <div className="text-center mb-3">
+                <i className="bi bi-shield-lock-fill" style={{ fontSize: '1.9rem', color: '#6f42c1' }}></i>
+                <h6 className="fw-bold mt-2 mb-0">Marketing console</h6>
+                <div className="text-muted small">Administrator sign-in required</div>
+              </div>
+              <div className="mb-2">
+                <label className="form-label small fw-semibold">Username</label>
+                <input className="form-control" value={consoleUser} autoComplete="off"
+                  onChange={(e) => setConsoleUser(e.target.value)} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Password</label>
+                <input className="form-control" type="password" value={consolePass}
+                  onChange={(e) => setConsolePass(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitConsoleLogin(); }} />
+              </div>
+              {consoleError && <div className="alert alert-danger py-2 small">{consoleError}</div>}
+              <button className="btn btn-primary w-100 fw-semibold"
+                disabled={consoleBusy || !consoleUser || !consolePass}
+                onClick={() => void submitConsoleLogin()}>
+                {consoleBusy ? 'Checking…' : 'Unlock console'}
+              </button>
+              <button className="btn btn-link w-100 btn-sm text-muted mt-1"
+                onClick={() => setShowConsoleLogin(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`
         .glass-page .card {
           position: relative;
@@ -148,7 +243,7 @@ export default function LicensePage() {
               <i className="bi bi-shield-check me-1"></i>SECURE LICENSING
             </span>
           </div>
-          <h1 className="display-4 fw-bold mb-2">OpenRx License</h1>
+          <h1 className="display-4 fw-bold mb-2" style={{ userSelect: 'none' }} onClick={handleSecretClick}>OpenRx License</h1>
           <p className="lead mb-0 opacity-75" style={{ maxWidth: '600px', margin: '0 auto' }}>
             Choose the plan that fits your practice. All plans include offline validation and automatic updates.
           </p>

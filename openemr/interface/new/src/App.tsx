@@ -2,6 +2,7 @@
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
+import LicenseConsolePage from './features/license/LicenseConsolePage';
 import LoginPage from './features/auth/LoginPage';
 import RegisterPage from './features/auth/RegisterPage';
 import CallbackPage from './features/auth/CallbackPage';
@@ -101,6 +102,10 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/callback" element={<CallbackPage />} />
         <Route path="/license" element={<LicensePage />} />
+        {/* Hidden marketing console. Linked from nowhere: the only way in is the
+            seven-click gesture on the licence page title, and the server requires
+            an administrator token regardless of how you reach it. */}
+        <Route path="/license-console" element={<LicenseConsolePage />} />
         <Route path="/book-appointment" element={<BookAppointmentPage />} />
         {/* Public telehealth room — patients join from their booking link. */}
         <Route path="/video/:room" element={<VideoConsultPage />} />
