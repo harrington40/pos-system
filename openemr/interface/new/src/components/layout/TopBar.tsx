@@ -1,10 +1,14 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyAvatar } from '../../hooks/useMyAvatar';
+import { useLicenseStatus } from '../../hooks/useLicenseStatus';
 
 export default function TopBar() {
   const { user, logout } = useAuth();
   const { data: myAvatar } = useMyAvatar();
+  const { data: licenseStatus } = useLicenseStatus();
+  // Same cache entry the layout banner reads, so the two cannot disagree.
+  const unlicensed = licenseStatus !== undefined && licenseStatus.valid !== true;
   const myAvatarUrl = myAvatar?.url || undefined;
   // /provider/profile/:id only accepts these roles, so only they get a link.
   const canOpenProfile =
@@ -25,6 +29,17 @@ export default function TopBar() {
     <header className="bg-white border-bottom px-3 py-2 d-flex justify-content-between align-items-center">
       <div>
         {/* Breadcrumb or page title — filled by child routes via Outlet context */}
+        {unlicensed && (
+          <NavLink
+            to="/license"
+            className="badge text-decoration-none d-inline-flex align-items-center gap-1"
+            style={{ background: '#dc3545', color: 'white', fontSize: '0.72rem', padding: '0.4rem 0.7rem', fontWeight: 600 }}
+            title="This installation has no active licence — click to activate a key"
+          >
+            <i className="bi bi-exclamation-triangle-fill"></i>
+            Unlicensed
+          </NavLink>
+        )}
       </div>
       <div className="d-flex align-items-center gap-3">
         {user && (
