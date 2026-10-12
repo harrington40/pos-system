@@ -201,6 +201,11 @@ export class AuthController {
                 return 'physician';
             case 'admin':
                 return 'admin';
+            // Marketing owns the promotion console and nothing else. The roles
+            // guard grants a role only the routes it is named on, so this account
+            // cannot reach clinical or administrative endpoints.
+            case 'marketing':
+                return 'marketing';
             case 'front_office':
                 return 'front_desk';
             case 'nurse':

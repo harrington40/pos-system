@@ -96,8 +96,9 @@ export default function LicensePage() {
       });
       const token = response.data?.token;
       const user = response.data?.user;
-      if (!token || user?.role !== 'admin') {
-        setConsoleError('Administrator credentials are required.');
+      // Marketing owns the console and nothing else; admin can also open it.
+      if (!token || !['admin', 'marketing'].includes(user?.role)) {
+        setConsoleError('Marketing or administrator credentials are required.');
         return;
       }
       // Held in memory only, and separate from the app's session.

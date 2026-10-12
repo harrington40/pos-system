@@ -93,7 +93,7 @@ export class LicenseController {
      */
     @Get('promotion/admin')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin')
+    @Roles('admin', 'marketing')
     async readPromotion() {
         return {
             promotion: await this.promotionService.getRecord(),
@@ -105,7 +105,7 @@ export class LicenseController {
 
     @Put('promotion/admin')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin')
+    @Roles('admin', 'marketing')
     async savePromotion(
         @Body() body: Partial<LicensePromotion>,
         @Req() req: AdminRequest,
@@ -120,7 +120,7 @@ export class LicenseController {
 
     @Post('promotion/admin/toggle')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('admin')
+    @Roles('admin', 'marketing')
     async togglePromotion(
         @Body('active') active: boolean,
         @Req() req: AdminRequest,
