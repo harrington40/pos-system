@@ -379,7 +379,28 @@ export class AdminService implements OnModuleInit {
         return { id: result.insertId, defaultPassword };
     }
 
+    /** `active` arrives as 1 | '1' | 'active' | true, or an inactive equivalent. */
+    private isActivation(active: UserDto['active']): boolean {
+        if (active === undefined || active === null) return false;
+        const value = String(active).trim().toLowerCase();
+        return value === '1' || value === 'true' || value === 'active';
+    }
+
     async updateUser(id: number, dto: UserDto) {
+        // Reactivating an existing user takes a seat, exactly like creating one
+        // or approving a pending registration — otherwise the cap is bypassed by
+        // deactivating somebody and switching the old row back on. Only counted
+        // when the update actually flips the user on, so saving an
+        // already-active user's details is never blocked by the limit.
+        if (this.isActivation(dto.active)) {
+            const current = await this.dataSource.query<
+                { active: number | string }[]
+            >('SELECT active FROM users WHERE id = ?', [id]);
+            if (Number(current[0]?.active ?? 0) !== 1) {
+                await this.assertUserCapacity();
+            }
+        }
+
         const fields: Record<string, string> = {
             username: 'username',
             fname: 'fname',

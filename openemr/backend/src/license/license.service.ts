@@ -195,12 +195,33 @@ export class LicenseService implements OnModuleInit {
             this.canonicalPayload(tierCode, issuedAtHex, durationHex, nonce),
         );
 
+        return this.renderKey({
+            tierCode,
+            issuedAtHex,
+            durationHex,
+            nonce,
+            checksum,
+        });
+    }
+
+    /**
+     * Render the dashed, upper-case form. Generation and activation both come
+     * through here, so a key typed in any other shape still resolves to one
+     * string — and therefore to one row.
+     */
+    private renderKey(fields: {
+        tierCode: string;
+        issuedAtHex: string;
+        durationHex: string;
+        nonce: string;
+        checksum: string;
+    }): string {
         return [
             this.KEY_MAGIC,
-            `${tierCode}${issuedAtHex.slice(0, 4)}`,
-            `${issuedAtHex.slice(4)}${durationHex}`,
-            nonce,
-            checksum.toUpperCase(),
+            `${fields.tierCode}${fields.issuedAtHex.slice(0, 4)}`,
+            `${fields.issuedAtHex.slice(4)}${fields.durationHex}`,
+            fields.nonce,
+            fields.checksum.toUpperCase(),
         ].join('-');
     }
 
@@ -212,6 +233,12 @@ export class LicenseService implements OnModuleInit {
         tier: LicenseTier;
         generatedAt: number;
         durationMonths: number;
+        /**
+         * The key re-rendered in canonical form. A key typed without its dashes,
+         * in lower case, or with stray whitespace must address the same stored
+         * row rather than look like a second licence.
+         */
+        canonicalKey: string;
     } | null {
         for (const secret of this.SIGNING_SECRETS) {
             const result = this.decodeKeyWithSecret(key, secret);
@@ -227,9 +254,13 @@ export class LicenseService implements OnModuleInit {
         tier: LicenseTier;
         generatedAt: number;
         durationMonths: number;
+        canonicalKey: string;
     } | null {
         try {
-            const clean = key.replace(/-/g, '').toUpperCase();
+            // Dashes are presentation only, and a key pasted out of an email
+            // often carries a space or a newline — none of that changes which
+            // key this is.
+            const clean = key.replace(/[\s-]/g, '').toUpperCase();
             const expectedLength =
                 this.KEY_MAGIC.length +
                 1 +
@@ -290,6 +321,13 @@ export class LicenseService implements OnModuleInit {
                 // anyway — this is for diagnostics.
                 generatedAt: parseInt(issuedAtHex, 16) * 1000,
                 durationMonths,
+                canonicalKey: this.renderKey({
+                    tierCode,
+                    issuedAtHex,
+                    durationHex,
+                    nonce,
+                    checksum,
+                }),
             };
         } catch {
             return null;
@@ -303,9 +341,14 @@ export class LicenseService implements OnModuleInit {
         if (!decoded) {
             throw new BadRequestException('Invalid license key');
         }
+        // Address the stored row by canonical form: the same key pasted without
+        // its dashes or in lower case is the same licence, not a new one. A
+        // duplicate would otherwise surface as a raw unique-index error from
+        // the database instead of a readable already-activated message.
+        const canonicalKey = decoded.canonicalKey;
 
         const existing = await this.licenseRepo.findOne({
-            where: { licenseKey: key },
+            where: { licenseKey: canonicalKey },
         });
         // Refuse a key already in force: re-activating it would reset the term
         // from today, so repeating the call would extend it indefinitely.
@@ -350,7 +393,7 @@ export class LicenseService implements OnModuleInit {
         };
 
         const license = this.licenseRepo.create({
-            licenseKey: key,
+            licenseKey: canonicalKey,
             tier: decoded.tier,
             activatedAt,
             expiresAt,
@@ -361,7 +404,7 @@ export class LicenseService implements OnModuleInit {
 
         const saved = await this.licenseRepo.save(license);
         this.logger.log(
-            `License activated: ${key} → expires ${expiresAt.toISOString()}`,
+            `License activated: ${canonicalKey} → expires ${expiresAt.toISOString()}`,
         );
         return saved;
     }
@@ -416,6 +459,14 @@ export class LicenseService implements OnModuleInit {
      * How many users the active license allows, or null when nothing is
      * licensed — callers must then impose no cap. An unlicensed install is not
      * a licensed install with zero seats, and enforcement is opt-in elsewhere.
+     *
+     * The cap is counted across the whole install, which is the only reading
+     * the data supports: a licence carries no facility, so scoping now would
+     * mean inventing one and silently under-enforcing. Per-site licences need
+     * three things together — a scope stored on the license row, a scope
+     * carried in the key, and this count filtered by users.facility_id. Do all
+     * three or none: a half-applied scope is worse than a global count, because
+     * it hides which sites a licence actually covers.
      */
     async getUserLimit(): Promise<number | null> {
         const license = await this.getActiveLicense();

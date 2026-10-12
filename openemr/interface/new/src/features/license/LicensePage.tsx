@@ -292,7 +292,10 @@ export default function LicensePage() {
                 style={{ fontFamily: 'monospace', letterSpacing: '0.08em', borderRadius: '12px', fontSize: '0.95rem' }}
                 placeholder="OPENRX-XXXXX-XXXXXX-XXXXXXXX-XXXXXXXX"
                 value={key}
-                onChange={(e) => { setKey(e.target.value.toUpperCase()); setError(''); setSuccess(''); }} />
+                autoComplete="off"
+                spellCheck={false}
+                inputMode="text"
+                onChange={(e) => { setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '')); setError(''); setSuccess(''); }} />
             </div>
             <div className="col-md-5">
               <label className="form-label small fw-semibold text-uppercase text-muted">Organization (optional)</label>
