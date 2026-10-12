@@ -4331,8 +4331,49 @@
     "wiki": {
       "searchPlaceholder": "Buscar en la wiki...",
       "contents": "Contenido",
-      "relatedLinks": "Enlaces relacionados",
-      "support": "¿Necesita más ayuda? Escriba a"
+      "relatedLinks": "Enlaces relacionados"
+    },
+    "howto": {
+      "subtitle": "Instrucciones paso a paso para cada función de OpenRx",
+      "searchPlaceholder": "Buscar guías prácticas...",
+      "noTopics": "No hay temas coincidentes",
+      "videoTutorials": "Video tutoriales",
+      "videoTitlePlaceholder": "Título del video (opcional)",
+      "autoPlayTitle": "Reproducir esta guía automáticamente como presentación de video",
+      "noTopicSelected": "Ningún tema seleccionado",
+      "chooseTopic": "Elija un tema en la barra lateral o busque arriba.",
+      "stillNeedHelp": "¿Aún necesita ayuda?",
+      "needHelpBody": "¿No encuentra lo que busca? Consulte las Preguntas frecuentes, el Wiki o comuníquese con nuestro equipo de soporte.",
+      "previous": "Anterior",
+      "next": "Siguiente"
+    },
+    "faq": {
+      "searchPlaceholder": "Buscar artículos de ayuda...",
+      "categories": "Categorías",
+      "clearSearch": "Borrar búsqueda",
+      "noResults": "No se encontraron resultados",
+      "adjustSearch": "Intente ajustar los términos de búsqueda o explore las categorías a la izquierda.",
+      "stillNeedHelp": "¿Aún necesita ayuda?",
+      "needHelpBody": "¿No encuentra lo que busca? Comuníquese con nuestro equipo de soporte."
+    },
+    "forum": {
+      "newTopic": "Iniciar un tema nuevo",
+      "categoryLabel": "Categoría",
+      "discussions": "Debates",
+      "noTopics": "No se encontraron temas. ¡Inicie la conversación!",
+      "title": "Foro de la comunidad",
+      "titleLabel": "Título",
+      "titlePlaceholder": "¿De qué le gustaría hablar?",
+      "bodyPlaceholder": "Describa su tema en detalle…",
+      "searchPlaceholder": "Buscar temas…",
+      "replyPlaceholder": "Escriba una respuesta…",
+      "about": "Acerca de esta comunidad",
+      "aboutPre": "Este foro es",
+      "aboutLocal": "local y autocontenido",
+      "aboutPost": "— todas las publicaciones y respuestas se almacenan de forma privada en este dispositivo (localStorage). Sin servidores externos, cuentas ni intercambio de datos.",
+      "fPrivate": "Privado y sin conexión",
+      "fClients": "Para clientes y el equipo de OpenRx",
+      "fShare": "Comparta preguntas, consejos e ideas de funciones"
     }
   }
 }

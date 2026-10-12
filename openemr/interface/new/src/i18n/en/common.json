@@ -4331,8 +4331,49 @@
     "wiki": {
       "searchPlaceholder": "Search wiki...",
       "contents": "Contents",
-      "relatedLinks": "Related Links",
-      "support": "Need more help? Email"
+      "relatedLinks": "Related Links"
+    },
+    "howto": {
+      "subtitle": "Step-by-step instructions for every OpenRx feature",
+      "searchPlaceholder": "Search how-to guides...",
+      "noTopics": "No matching topics",
+      "videoTutorials": "Video Tutorials",
+      "videoTitlePlaceholder": "Video title (optional)",
+      "autoPlayTitle": "Auto-play this guide as a video presentation",
+      "noTopicSelected": "No topic selected",
+      "chooseTopic": "Choose a topic from the sidebar or search above.",
+      "stillNeedHelp": "Still need help?",
+      "needHelpBody": "Can't find what you're looking for? Check the FAQ, Wiki, or contact our support team.",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "faq": {
+      "searchPlaceholder": "Search help articles...",
+      "categories": "Categories",
+      "clearSearch": "Clear Search",
+      "noResults": "No results found",
+      "adjustSearch": "Try adjusting your search terms or browse the categories on the left.",
+      "stillNeedHelp": "Still need help?",
+      "needHelpBody": "Can't find what you're looking for? Reach out to our support team."
+    },
+    "forum": {
+      "newTopic": "Start a New Topic",
+      "categoryLabel": "Category",
+      "discussions": "Discussions",
+      "noTopics": "No topics found. Start the conversation!",
+      "title": "Community Forum",
+      "titleLabel": "Title",
+      "titlePlaceholder": "What would you like to discuss?",
+      "bodyPlaceholder": "Describe your topic in detail…",
+      "searchPlaceholder": "Search topics…",
+      "replyPlaceholder": "Write a reply…",
+      "about": "About this Community",
+      "aboutPre": "This forum is",
+      "aboutLocal": "local and self-contained",
+      "aboutPost": "— all posts and replies are stored privately on this device (localStorage). No external servers, accounts, or data sharing.",
+      "fPrivate": "Private & offline",
+      "fClients": "For clients & the OpenRx team",
+      "fShare": "Share questions, tips & feature ideas"
     }
   }
 }

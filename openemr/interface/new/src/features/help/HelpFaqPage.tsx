@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 interface FaqItem {
@@ -221,6 +222,7 @@ const quickLinks = [
 ];
 
 export default function HelpFaqPage() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(faqData[0].id);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -321,7 +323,7 @@ export default function HelpFaqPage() {
             <input
               type="text"
               className="form-control border-start-0 ps-0"
-              placeholder="Search help articles..."
+              placeholder={t('help.faq.searchPlaceholder')}
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -354,7 +356,7 @@ export default function HelpFaqPage() {
           <div className="card shadow-sm border-0 sticky-top" style={{ top: '1rem' }}>
             <div className="card-header bg-transparent border-bottom">
               <h6 className="mb-0">
-                <i className="bi bi-folder me-2"></i>Categories
+                <i className="bi bi-folder me-2"></i>{t('help.faq.categories')}
               </h6>
             </div>
             <div className="list-group list-group-flush">
@@ -438,15 +440,15 @@ export default function HelpFaqPage() {
             <div className="card shadow-sm border-0">
               <div className="card-body text-center py-5">
                 <i className="bi bi-search text-muted" style={{ fontSize: '3rem' }}></i>
-                <h5 className="mt-3">No results found</h5>
+                <h5 className="mt-3">{t('help.faq.noResults')}</h5>
                 <p className="text-muted mb-3">
-                  Try adjusting your search terms or browse the categories on the left.
+                  {t('help.faq.adjustSearch')}
                 </p>
                 <button
                   className="btn btn-outline-primary"
                   onClick={() => setSearch('')}
                 >
-                  <i className="bi bi-arrow-counterclockwise me-1"></i>Clear Search
+                  <i className="bi bi-arrow-counterclockwise me-1"></i>{t('help.faq.clearSearch')}
                 </button>
               </div>
             </div>
@@ -493,9 +495,9 @@ export default function HelpFaqPage() {
           >
             <div className="card-body text-center py-4">
               <i className="bi bi-headset" style={{ fontSize: '2rem' }}></i>
-              <h5 className="mt-2 mb-1">Still need help?</h5>
+              <h5 className="mt-2 mb-1">{t('help.faq.stillNeedHelp')}</h5>
               <p className="mb-3 opacity-75 small">
-                Can't find what you're looking for? Reach out to our support team.
+                {t('help.faq.needHelpBody')}
               </p>
               <div className="d-flex justify-content-center gap-2 flex-wrap">
                 <a href="mailto:support@openemr.local" className="btn btn-light btn-sm">

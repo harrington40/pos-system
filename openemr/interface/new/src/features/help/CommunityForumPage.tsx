@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 
 interface ForumPost {
@@ -110,6 +111,7 @@ function loadThreads(): ForumThread[] {
 }
 
 export default function CommunityForumPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [threads, setThreads] = useState<ForumThread[]>(loadThreads);
   const [category, setCategory] = useState('all');
@@ -218,7 +220,7 @@ export default function CommunityForumPage() {
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '7rem', transform: 'rotate(12deg) translate(20px,-10px)' }}><i className="bi bi-people-fill"></i></div>
         <div className="position-relative d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-people-fill me-2"></i>Community Forum</h2>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-people-fill me-2"></i>{t('help.forum.title')}</h2>
             <p className="mb-0 text-white text-opacity-75 small">A private, self-contained space for clients and the OpenRx team to connect.</p>
           </div>
           <button className="btn btn-light rounded-pill fw-semibold" onClick={() => setShowCompose(!showCompose)}>
@@ -253,22 +255,22 @@ export default function CommunityForumPage() {
       {showCompose && (
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
           <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-pencil-square me-2 text-primary"></i>Start a New Topic</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-pencil-square me-2 text-primary"></i>{t('help.forum.newTopic')}</h6>
           </div>
           <div className="card-body">
             <div className="row g-2 mb-2">
               <div className="col-md-4">
-                <label className="form-label small">Category</label>
+                <label className="form-label small">{t('help.forum.categoryLabel')}</label>
                 <select className="form-select form-select-sm" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
                   {CATEGORIES.filter(c => c.id !== 'all').map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                 </select>
               </div>
               <div className="col-md-8">
-                <label className="form-label small">Title</label>
-                <input className="form-control form-control-sm" placeholder="What would you like to discuss?" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                <label className="form-label small">{t('help.forum.titleLabel')}</label>
+                <input className="form-control form-control-sm" placeholder={t('help.forum.titlePlaceholder')} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
               </div>
             </div>
-            <textarea className="form-control" rows={4} placeholder="Describe your topic in detail…" value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
+            <textarea className="form-control" rows={4} placeholder={t('help.forum.bodyPlaceholder')} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
             <button className="btn btn-primary rounded-pill px-4 mt-2" onClick={createThread} disabled={!form.title.trim() || !form.body.trim()}>
               <i className="bi bi-send me-1"></i>Post Topic
             </button>
@@ -291,7 +293,7 @@ export default function CommunityForumPage() {
             <div className="ms-auto" style={{ minWidth: '220px' }}>
               <div className="input-group input-group-sm">
                 <span className="input-group-text bg-white border-end-0 rounded-pill-start"><i className="bi bi-search text-muted"></i></span>
-                <input className="form-control border-start-0 rounded-pill-end" placeholder="Search topics…" value={search} onChange={e => setSearch(e.target.value)} />
+                <input className="form-control border-start-0 rounded-pill-end" placeholder={t('help.forum.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
             </div>
           </div>
@@ -299,7 +301,7 @@ export default function CommunityForumPage() {
           {/* Thread list */}
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-chat-square-dots me-2 text-primary"></i>Discussions</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-chat-square-dots me-2 text-primary"></i>{t('help.forum.discussions')}</h6>
             </div>
             <div className="card-body p-0">
               {filtered.map(t => {
@@ -333,7 +335,7 @@ export default function CommunityForumPage() {
               {filtered.length === 0 && (
                 <div className="text-center text-muted py-5">
                   <i className="bi bi-chat-square-dots fs-1 d-block mb-2 opacity-25"></i>
-                  <p>No topics found. Start the conversation!</p>
+                  <p>{t('help.forum.noTopics')}</p>
                 </div>
               )}
             </div>
@@ -344,14 +346,14 @@ export default function CommunityForumPage() {
         <div className="col-lg-4">
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
             <div className="card-header text-white py-3" style={{ background: 'linear-gradient(135deg,#6f42c1,#0d6efd)', borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-info-circle me-2"></i>About this Community</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-info-circle me-2"></i>{t('help.forum.about')}</h6>
             </div>
             <div className="card-body small">
-              <p className="text-muted mb-2">This forum is <strong>local and self-contained</strong> — all posts and replies are stored privately on this device (localStorage). No external servers, accounts, or data sharing.</p>
+              <p className="text-muted mb-2">{t('help.forum.aboutPre')} <strong>{t('help.forum.aboutLocal')}</strong> {t('help.forum.aboutPost')}</p>
               <ul className="list-unstyled mb-0 text-muted">
-                <li className="mb-1"><i className="bi bi-shield-lock me-2 text-success"></i>Private & offline</li>
-                <li className="mb-1"><i className="bi bi-people me-2 text-primary"></i>For clients & the OpenRx team</li>
-                <li><i className="bi bi-lightbulb me-2 text-warning"></i>Share questions, tips & feature ideas</li>
+                <li className="mb-1"><i className="bi bi-shield-lock me-2 text-success"></i>{t('help.forum.fPrivate')}</li>
+                <li className="mb-1"><i className="bi bi-people me-2 text-primary"></i>{t('help.forum.fClients')}</li>
+                <li><i className="bi bi-lightbulb me-2 text-warning"></i>{t('help.forum.fShare')}</li>
               </ul>
             </div>
           </div>
@@ -390,7 +392,7 @@ export default function CommunityForumPage() {
                   </div>
                 ))}
                 <div className="d-flex gap-2 mt-2">
-                  <input className="form-control form-control-sm rounded-pill" placeholder="Write a reply…" value={replyBody} onChange={e => setReplyBody(e.target.value)}
+                  <input className="form-control form-control-sm rounded-pill" placeholder={t('help.forum.replyPlaceholder')} value={replyBody} onChange={e => setReplyBody(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addReply(); } }} />
                   <button className="btn btn-sm btn-primary rounded-pill" onClick={addReply} disabled={!replyBody.trim()}><i className="bi bi-send"></i></button>
                 </div>

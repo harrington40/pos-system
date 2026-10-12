@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
@@ -328,6 +329,7 @@ const HOW_TO_DATA: HowToSection[] = [
 ];
 
 export default function HowToPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -497,13 +499,13 @@ export default function HowToPage() {
             How-To Guide
           </h3>
           <p className="text-muted small mb-0">
-            Step-by-step instructions for every OpenRx feature
+            {t('help.howto.subtitle')}
           </p>
         </div>
         <input
           className="form-control form-control-sm"
           style={{ width: '280px' }}
-          placeholder="Search how-to guides..."
+          placeholder={t('help.howto.searchPlaceholder')}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -518,7 +520,7 @@ export default function HowToPage() {
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-header bg-dark text-white d-flex align-items-center gap-2 py-2">
           <i className="bi bi-camera-video fs-5"></i>
-          <h5 className="mb-0">Video Tutorials</h5>
+          <h5 className="mb-0">{t('help.howto.videoTutorials')}</h5>
           <span className="badge bg-light text-dark ms-2">{videos.length}</span>
         </div>
         <div className="card-body">
@@ -539,7 +541,7 @@ export default function HowToPage() {
                     </div>}
                   </div>
                   <div className="col-md-3">
-                    <input className="form-control form-control-sm" placeholder="Video title (optional)"
+                    <input className="form-control form-control-sm" placeholder={t('help.howto.videoTitlePlaceholder')}
                       value={videoTitle} onChange={e => setVideoTitle(e.target.value)} />
                   </div>
                   <div className="col-md-2">
@@ -637,7 +639,7 @@ export default function HowToPage() {
               {filtered.length === 0 && (
                 <div className="text-center py-4 text-muted small">
                   <i className="bi bi-search" style={{ fontSize: '1.5rem' }}></i>
-                  <p className="mt-2 mb-0">No matching topics</p>
+                  <p className="mt-2 mb-0">{t('help.howto.noTopics')}</p>
                 </div>
               )}
             </div>
@@ -662,7 +664,7 @@ export default function HowToPage() {
                 </div>
                 <div className="d-flex gap-2 ms-auto">
                   <button className="btn btn-outline-danger btn-sm" onClick={startWatchMode}
-                    title="Auto-play this guide as a video presentation">
+                    title={t('help.howto.autoPlayTitle')}>
                     <i className="bi bi-play-circle me-1"></i>Watch Guide
                   </button>
                   {current.quickLink && (
@@ -738,8 +740,8 @@ export default function HowToPage() {
             <div className="card shadow-sm border-0">
               <div className="card-body text-center py-5">
                 <i className="bi bi-journal-x text-muted" style={{ fontSize: '3rem' }}></i>
-                <h5 className="mt-3">No topic selected</h5>
-                <p className="text-muted">Choose a topic from the sidebar or search above.</p>
+                <h5 className="mt-3">{t('help.howto.noTopicSelected')}</h5>
+                <p className="text-muted">{t('help.howto.chooseTopic')}</p>
               </div>
             </div>
           )}
@@ -795,9 +797,9 @@ export default function HowToPage() {
           >
             <div className="card-body text-center py-4">
               <i className="bi bi-headset" style={{ fontSize: '2rem' }}></i>
-              <h5 className="mt-2 mb-1">Still need help?</h5>
+              <h5 className="mt-2 mb-1">{t('help.howto.stillNeedHelp')}</h5>
               <p className="mb-3 opacity-75 small">
-                Can't find what you're looking for? Check the FAQ, Wiki, or contact our support team.
+                {t('help.howto.needHelpBody')}
               </p>
               <div className="d-flex justify-content-center gap-2 flex-wrap">
                 <NavLink to="/help" className="btn btn-light btn-sm">
@@ -865,7 +867,7 @@ export default function HowToPage() {
               <button onClick={prevWatchStep} style={{
                 background: 'rgba(255,255,255,0.12)', border: 'none', color: 'white',
                 width: '44px', height: '44px', borderRadius: '50%', cursor: 'pointer', fontSize: '1.2rem',
-              }} title="Previous">⏮</button>
+              }} title={t('help.howto.previous')}>⏮</button>
               <button onClick={() => setWatchPlaying(!watchPlaying)} style={{
                 background: '#0d6efd', border: 'none', color: 'white',
                 width: '56px', height: '56px', borderRadius: '50%', cursor: 'pointer', fontSize: '1.5rem',
@@ -875,7 +877,7 @@ export default function HowToPage() {
               <button onClick={nextWatchStep} style={{
                 background: 'rgba(255,255,255,0.12)', border: 'none', color: 'white',
                 width: '44px', height: '44px', borderRadius: '50%', cursor: 'pointer', fontSize: '1.2rem',
-              }} title="Next">⏭</button>
+              }} title={t('help.howto.next')}>⏭</button>
               <select value={watchSpeed} onChange={e => setWatchSpeed(Number(e.target.value))} style={{
                 background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
                 color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem',
