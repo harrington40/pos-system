@@ -18,8 +18,16 @@ export class License {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    /** The license key (e.g. OPENRX-B6B0B-28C001-1A2B3C4D-9E8F7A6B) */
-    @Column({ length: 30, unique: true })
+    /**
+     * The license key (e.g. OPENRX-B6B0B-28C001-1A2B3C4D-9E8F7A6B).
+     *
+     * 37 characters in the current fixed-width format, so the column must be
+     * wider than that. It was varchar(30) to suit the earlier format, which
+     * made activation fail with ER_DATA_TOO_LONG and a 500 out of
+     * POST /api/license/activate. The table is not covered by a migration or by
+     * synchronize, so an existing database has to be widened by hand.
+     */
+    @Column({ length: 64, unique: true })
     licenseKey!: string;
 
     /** Subscription tier */

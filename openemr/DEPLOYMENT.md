@@ -112,6 +112,47 @@ START_KAFKA=no bash interface/new/dev-start.sh   # skip Kafka (in-memory event b
 - Do **not** ship source maps to production (enforced in `tsconfig.build.json` and the
   Vite config).
 
+## Database schema notes
+
+The `licenses` table is **not** created by a migration and TypeORM runs with
+`synchronize` off, so it has to exist before the app starts and its columns have
+to match `License` in `backend/src/license/license.entity.ts`:
+
+- `licenseKey` must be **`varchar(64)`** (or any width ≥ 37). Keys are 37
+  characters in the current fixed-width format
+  (`OPENRX-T-tttttttt-DD-NNNNNNNN-CCCCCCCC`). A database left over from the
+  earlier format has `varchar(30)`, and activation then fails with
+  `ER_DATA_TOO_LONG` surfaced as a 500 from `POST /api/license/activate`:
+  ```sql
+  ALTER TABLE licenses MODIFY licenseKey varchar(64) NOT NULL;
+  ```
+- `status` is `varchar(20)` and holds `active`, `expired`, `revoked` or
+  `superseded` (activating a key retires any other active row).
+
+### Issuing a licence key
+
+Generation needs the signing secret, so run it where `LICENSE_SECRET_CURRENT`
+lives (or use `POST /api/license/generate`, which requires an admin JWT):
+
+```bash
+ssh dev@94.250.201.58 'cd /home/dev/openrx/backend && set -a && . ./.env && set +a && \
+  node -e "require(\"reflect-metadata\");const {LicenseService}=require(\"./dist/license/license.service.js\");\
+  console.log(new LicenseService({}).generateBatch(\"professional\",12,1).join(\"\n\"))"'
+```
+
+Activate through the Licence page, or directly (the endpoint is public so an
+unlicensed install can be rescued):
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"key":"OPENRX-...","customerName":"Your Clinic"}' \
+  https://openrx.transtechologies.com/api/license/activate
+```
+
+The term runs from activation, not from when the key was minted, and the tier
+sets the seat count (`basic` 5, `professional` 25, `enterprise` 100), which
+`createUser`, `approveUser` and reactivating a user all enforce.
+
 ## Verifying a deploy
 
 ```bash
