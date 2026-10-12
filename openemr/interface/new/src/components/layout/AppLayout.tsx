@@ -12,9 +12,16 @@ export default function AppLayout() {
     refetchInterval: 3600000, // refresh every hour
   });
 
-  const daysRemaining = licenseStatus?.daysRemaining ?? 999;
-  const isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
-  const isExpired = daysRemaining <= 0 && !licenseStatus?.valid;
+  // A missing licence is not a healthy licence. With nothing active the API
+  // answers { valid: false } and omits daysRemaining, and the previous
+  // `?? 999` fallback read that as "999 days left" — so a revoked or
+  // never-licensed install showed no banner at all and looked licensed.
+  const licensed = licenseStatus?.valid === true;
+  const daysRemaining = licensed ? (licenseStatus?.daysRemaining ?? 0) : 0;
+  const isExpiringSoon = licensed && daysRemaining > 0 && daysRemaining <= 7;
+  // Only complain once the status is actually known, so a slow or failed request
+  // cannot flash a red banner on every page load.
+  const isExpired = licenseStatus !== undefined && !licensed;
 
   return (
     <div className="d-flex vh-100">
@@ -42,14 +49,14 @@ export default function AppLayout() {
               <i className={`bi ${isExpired ? 'bi-exclamation-triangle-fill' : 'bi-clock-fill'} fs-5`}></i>
               <span>
                 {isExpired
-                  ? 'Your license has expired. Please renew to restore full access.'
+                  ? 'Your license is not active. Activate a license to restore full access.'
                   : `Your free trial period will be expiring in ${daysRemaining} day${daysRemaining > 1 ? 's' : ''}. Please activate a license to continue using OpenRx without interruption.`
                 }
               </span>
             </div>
             <NavLink to="/license" className="btn btn-light btn-sm fw-semibold" style={{ whiteSpace: 'nowrap' }}>
               <i className="bi bi-key me-1"></i>
-              {isExpired ? 'Renew License' : 'Activate License'}
+              Activate License
             </NavLink>
           </div>
         )}
