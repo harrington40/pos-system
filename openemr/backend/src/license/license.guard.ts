@@ -29,6 +29,8 @@ export class LicenseGuard implements CanActivate {
     private readonly EXEMPT_PATHS = [
         '/api/license/activate',
         '/api/license/status',
+        // Marketing copy belongs to the pricing page, not to entitlement.
+        '/api/license/promotion',
         '/api/license/generate',
         '/api/license/revoke',
         '/api/license/verify-passphrase',

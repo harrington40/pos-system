@@ -55,6 +55,15 @@ export class LicenseController {
     }
 
     /**
+     * The current sales promotion for the pricing page, or null.
+     * Public, for the same reason as status: the pricing page is public.
+     */
+    @Get('promotion')
+    promotion() {
+        return { promotion: this.licenseService.getPromotion() };
+    }
+
+    /**
      * Generate license keys (admin only).
      */
     @Post('generate')

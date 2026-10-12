@@ -11,6 +11,17 @@ interface LicenseStatus {
   maxUsers?: number;
 }
 
+/** Shape served by GET /license/promotion. */
+interface Promotion {
+  label: string;
+  percentOff: number;
+  tiers: string[];
+  cycle: 'both' | 'monthly' | 'yearly';
+  endsAt: string | null;
+  code: string | null;
+  note: string | null;
+}
+
 const TIER_INFO: Record<string, { label: string; color: string; icon: string }> = {
   basic: { label: 'Basic', color: '#0d6efd', icon: 'bi-star' },
   professional: { label: 'Professional', color: '#6f42c1', icon: 'bi-gem' },
@@ -54,6 +65,25 @@ export default function LicensePage() {
     queryKey: ['license-status'],
     queryFn: async () => { const r = await nestClient.get('/license/status'); return r.data; },
   });
+
+  // Promotions are server config (LICENSE_PROMOTION), so one can be started or
+  // stopped without shipping a new frontend. A failure here must never affect
+  // the page: no promotion simply means the published prices.
+  const { data: promotionResponse } = useQuery<{ promotion: Promotion | null }>({
+    queryKey: ['license-promotion'],
+    queryFn: async () => { const r = await nestClient.get('/license/promotion'); return r.data; },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const promotion = promotionResponse?.promotion ?? null;
+
+  /** Does the current promotion cover this tier at the selected billing cycle? */
+  const promotionApplies = (tier: string) =>
+    !!promotion &&
+    promotion.tiers.includes(tier) &&
+    (promotion.cycle === 'both' || promotion.cycle === billingCycle);
+  const discountedPrice = (price: number) =>
+    Math.round(price * (1 - (promotion?.percentOff ?? 0) / 100));
 
   const activateMutation = useMutation({
     mutationFn: async () => {
@@ -205,12 +235,35 @@ export default function LicensePage() {
           </div>
         </div>
 
+        {promotion && (
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 px-3 py-2"
+            style={{ background: 'linear-gradient(90deg, #198754, #0f5132)', color: 'white', borderRadius: '12px' }}>
+            <div className="d-flex align-items-center gap-2">
+              <i className="bi bi-tag-fill fs-4"></i>
+              <div>
+                <div className="fw-bold">{promotion.label} — {promotion.percentOff}% off</div>
+                <div className="small" style={{ opacity: 0.9 }}>
+                  {promotion.note || 'Applied to the eligible plans below.'}
+                  {promotion.endsAt ? ` Offer ends ${formatDate(promotion.endsAt)}.` : ''}
+                </div>
+              </div>
+            </div>
+            {promotion.code && (
+              <span className="badge bg-light text-dark" style={{ fontSize: '0.8rem', letterSpacing: '1px' }}>
+                Code: {promotion.code}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="row g-3">
           {PLANS.map((plan) => {
             const price = billingCycle === 'yearly'
               ? Math.round(parseInt(plan.price) * 12 * 0.8)
               : parseInt(plan.price);
             const isActive = status?.tier === plan.tier;
+            const onPromo = promotionApplies(plan.tier);
+            const promoPrice = discountedPrice(price);
             return (
               <div className="col-md-4" key={plan.tier}>
                 <div className="card h-100 shadow-sm" style={{
@@ -238,8 +291,23 @@ export default function LicensePage() {
                       <h5 className="mt-2 mb-0 fw-bold">{TIER_INFO[plan.tier]?.label || plan.tier}</h5>
                     </div>
                     <div className="text-center mb-3">
-                      <span className="display-5 fw-bold">${price}</span>
-                      <span className="text-muted">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                      {onPromo ? (
+                        <>
+                          <div>
+                            <span className="text-muted text-decoration-line-through me-2">${price}</span>
+                            <span className="display-5 fw-bold text-success">${promoPrice}</span>
+                            <span className="text-muted">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                          </div>
+                          <span className="badge bg-success mt-2">
+                            {promotion!.label} · save {promotion!.percentOff}%
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="display-5 fw-bold">${price}</span>
+                          <span className="text-muted">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                        </>
+                      )}
                     </div>
                     <div className="text-center mb-3">
                       <span className="badge bg-light text-dark">Up to {plan.users} users</span>

@@ -202,6 +202,33 @@ back silently and reactivating is a deliberate act. Endpoints:
 `POST /api/license/revoke`, `POST /api/license/unrevoke`,
 `GET /api/license/revoked`.
 
+### Running a promotion
+
+The plans page can advertise a discount without a frontend release: the promotion
+is server config. Set `LICENSE_PROMOTION` (JSON) in `backend/.env` and restart
+PM2.
+
+```bash
+LICENSE_PROMOTION='{"label":"Launch offer","percentOff":25,"tiers":["professional","enterprise"],"cycle":"both","endsAt":"2026-12-31","code":"OPENRX25","note":"25% off your first year"}'
+```
+
+| Field | Meaning |
+|---|---|
+| `label` | Banner headline. Defaults to `Special offer`. |
+| `percentOff` | 1–99. Required; anything else means no promotion. |
+| `tiers` | Plans it covers. Omit for all three. |
+| `cycle` | `both` (default), `monthly` or `yearly`. |
+| `endsAt` | ISO date. Once it passes, the promotion disappears on its own. |
+| `code` | Optional code, shown on the banner. |
+| `note` | Optional supporting line. |
+
+Served by `GET /api/license/promotion` — public, and exempt from licence
+enforcement so the pricing page works on an unlicensed install. Malformed config
+is logged and ignored rather than thrown, because a marketing string must never
+be able to break the pricing page. The discount is **display only**: keys encode a
+tier and a duration, so what a customer actually pays is settled wherever the
+order is taken.
+
 ## Verifying a deploy
 
 ```bash

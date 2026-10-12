@@ -8,9 +8,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
 import * as crypto from 'crypto';
 import { License, LicenseTier } from './license.entity';
-// Seat counts live with the key format so the CLI, the tests and the server all
-// read the same table.
-import { TIER_MAX_USERS } from './license-key';
+// Tier names and seat counts live with the key format so the CLI, the tests and
+// the server all read the same table.
+import { TIER_CODES, TIER_MAX_USERS } from './license-key';
+
+/** A sales promotion, as configured by LICENSE_PROMOTION. */
+export interface LicensePromotion {
+    label: string;
+    percentOff: number;
+    tiers: LicenseTier[];
+    cycle: 'both' | 'monthly' | 'yearly';
+    /** ISO date; the promotion stops being offered once it passes. */
+    endsAt: string | null;
+    code: string | null;
+    note: string | null;
+}
 
 /**
  * Local license generation and validation.
@@ -480,6 +492,86 @@ export class LicenseService implements OnModuleInit {
     async getUserLimit(): Promise<number | null> {
         const license = await this.getActiveLicense();
         return license ? license.maxUsers : null;
+    }
+
+    /**
+     * The sales promotion to show on the pricing page, or null for none.
+     *
+     * Read from LICENSE_PROMOTION as JSON so a promotion can be started or
+     * stopped by editing the environment and restarting, with no rebuild:
+     *
+     *   LICENSE_PROMOTION={"label":"Launch offer","percentOff":25,
+     *     "tiers":["professional","enterprise"],"cycle":"both",
+     *     "endsAt":"2026-12-31","code":"OPENRX25",
+     *     "note":"25% off your first year"}
+     *
+     * Everything about this is best-effort. A malformed value is logged and
+     * ignored rather than thrown, because a marketing string must never be able
+     * to break the pricing page or, worse, activation. An endsAt in the past
+     * simply returns null, so a promotion stops on its own without anyone
+     * remembering to remove it.
+     *
+     * This only changes what is displayed. It grants no discount to a key: keys
+     * encode a tier and a duration, so what a customer actually pays is settled
+     * wherever the order is taken.
+     */
+    getPromotion(): LicensePromotion | null {
+        const raw = (process.env.LICENSE_PROMOTION || '').trim();
+        if (!raw) return null;
+
+        let parsed: Partial<LicensePromotion>;
+        try {
+            parsed = JSON.parse(raw) as Partial<LicensePromotion>;
+        } catch {
+            this.logger.warn(
+                'LICENSE_PROMOTION is not valid JSON; no promotion will be shown',
+            );
+            return null;
+        }
+
+        const percentOff = Number(parsed.percentOff);
+        if (!Number.isFinite(percentOff) || percentOff < 1 || percentOff > 99) {
+            this.logger.warn(
+                'LICENSE_PROMOTION ignored: percentOff must be between 1 and 99',
+            );
+            return null;
+        }
+
+        const tiers = Array.isArray(parsed.tiers) && parsed.tiers.length > 0
+            ? parsed.tiers.filter((t) => !!TIER_CODES[t as LicenseTier])
+            : (Object.keys(TIER_CODES) as LicenseTier[]);
+        if (tiers.length === 0) {
+            this.logger.warn(
+                'LICENSE_PROMOTION ignored: no recognised tier in "tiers"',
+            );
+            return null;
+        }
+
+        let endsAt: string | null = null;
+        if (parsed.endsAt) {
+            const end = new Date(String(parsed.endsAt));
+            if (isNaN(end.getTime())) {
+                this.logger.warn(
+                    'LICENSE_PROMOTION ignored: endsAt is not a valid date',
+                );
+                return null;
+            }
+            if (end.getTime() < Date.now()) return null;
+            endsAt = end.toISOString();
+        }
+
+        return {
+            label: parsed.label ? String(parsed.label) : 'Special offer',
+            percentOff,
+            tiers,
+            cycle:
+                parsed.cycle === 'monthly' || parsed.cycle === 'yearly'
+                    ? parsed.cycle
+                    : 'both',
+            endsAt,
+            code: parsed.code ? String(parsed.code) : null,
+            note: parsed.note ? String(parsed.note) : null,
+        };
     }
 
     // ── Revocation ────────────────────────────────────────────
