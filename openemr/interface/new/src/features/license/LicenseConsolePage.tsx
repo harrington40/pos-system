@@ -46,9 +46,12 @@ async function consoleApi(
     body?: unknown,
 ): Promise<AdminPayload> {
     const token = getConsoleToken();
-    const response = await fetch(
-        `${import.meta.env.VITE_API_URL ?? 'http://localhost:3002/api'}${path}`,
-        {
+    // Relative base, exactly like nestClient (src/api/nest-client.ts): the SPA is
+    // served from the same origin as the API. The old absolute
+    // 'http://localhost:3002/api' fallback pointed at the *visitor's* own machine,
+    // which is why the console opened but every request in it failed to fetch.
+    const base = import.meta.env.VITE_API_URL ?? '/api';
+    const response = await fetch(`${base}${path}`, {
             method,
             headers: {
                 'Content-Type': 'application/json',
