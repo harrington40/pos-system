@@ -182,11 +182,12 @@ export default function LicensePage() {
               <div className="mb-2">
                 <label className="form-label small fw-semibold">Username</label>
                 <input className="form-control" value={consoleUser} autoComplete="off"
-                  onChange={(e) => setConsoleUser(e.target.value)} />
+                  name="openrx-console-user" onChange={(e) => setConsoleUser(e.target.value)} />
               </div>
               <div className="mb-3">
                 <label className="form-label small fw-semibold">Password</label>
                 <input className="form-control" type="password" value={consolePass}
+                  name="openrx-console-pass" autoComplete="new-password" spellCheck={false}
                   onChange={(e) => setConsolePass(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') void submitConsoleLogin(); }} />
               </div>
