@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
@@ -10,6 +11,7 @@ const CONSULT_OPTIONS = [
 ];
 
 export default function BookAppointmentPage() {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     fname: '',
     lname: '',
@@ -74,10 +76,10 @@ export default function BookAppointmentPage() {
             <div className="text-white pe-lg-4">
               <div className="d-inline-flex align-items-center gap-2 bg-white bg-opacity-10 border border-white border-opacity-25 rounded-pill px-3 py-2 mb-4">
                 <i className="bi bi-calendar2-check"></i>
-                <span className="small fw-semibold">OpenRx Online Booking</span>
+                <span className="small fw-semibold">{t('booking.badge')}</span>
               </div>
               <h1 className="display-5 fw-bold mb-3" style={{ lineHeight: 1.15 }}>
-                Book your visit in <span style={{ color: '#7ff5df' }}>minutes</span>, not hours.
+                {t('booking.headline1')} <span style={{ color: '#7ff5df' }}>{t('booking.headlineMinutes')}</span>{t('booking.headline2')}
               </h1>
               <p className="text-white text-opacity-75 mb-4" style={{ fontSize: '1.05rem' }}>
                 Request an appointment from anywhere — WhatsApp, Facebook, X, or the link we share.
@@ -101,12 +103,12 @@ export default function BookAppointmentPage() {
                   <i className="bi bi-camera-video-fill fs-4 text-white text-opacity-75"></i>
                 </div>
                 <p className="small text-white text-opacity-75 mb-3">
-                  See your doctor without leaving home — no travel, no waiting room.
+                  {t('booking.videoBlurb')}
                 </p>
                 <div className="d-flex flex-wrap gap-2 mb-3">
-                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-house-door me-1"></i>From home</span>
-                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-shield-lock me-1"></i>Private & secure</span>
-                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-phone me-1"></i>Phone or laptop</span>
+                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-house-door me-1"></i>{t('booking.fromHome')}</span>
+                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-shield-lock me-1"></i>{t('booking.privateSecure')}</span>
+                  <span className="badge rounded-pill bg-white bg-opacity-25 fw-normal"><i className="bi bi-phone me-1"></i>{t('booking.phoneOrLaptop')}</span>
                 </div>
                 <button
                   type="button"
@@ -116,16 +118,16 @@ export default function BookAppointmentPage() {
                     document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   }}
                 >
-                  <i className="bi bi-camera-video-fill me-1 text-primary"></i> Start a video visit
+                  <i className="bi bi-camera-video-fill me-1 text-primary"></i> {t('booking.startVideo')}
                 </button>
                 </div>
               )}
 
               <div className="d-flex flex-column gap-3 mb-4">
                 {[
-                  { icon: 'bi-pencil-square', title: '1 · Request a slot', desc: 'Tell us your name, phone, and preferred date.' },
-                  { icon: 'bi-check2-circle', title: '2 · We confirm', desc: 'Our registrar verifies and schedules you with a provider.' },
-                  { icon: 'bi-heart-pulse', title: '3 · Choose how you are seen', desc: 'Walk in to the clinic, or join by secure video from anywhere.' },
+                  { icon: 'bi-pencil-square', title: t('booking.steps.s1Title'), desc: t('booking.steps.s1Desc') },
+                  { icon: 'bi-check2-circle', title: t('booking.steps.s2Title'), desc: t('booking.steps.s2Desc') },
+                  { icon: 'bi-heart-pulse', title: t('booking.steps.s3Title'), desc: t('booking.steps.s3Desc') },
                 ].map(s => (
                   <div key={s.title} className="d-flex gap-3 align-items-start">
                     <div className="rounded-circle bg-white bg-opacity-10 border border-white border-opacity-25 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '46px', height: '46px' }}>
@@ -141,14 +143,14 @@ export default function BookAppointmentPage() {
 
               <div className="d-flex flex-wrap gap-3 small">
                 <span className="d-inline-flex align-items-center gap-1"><i className="bi bi-shield-lock"></i> Private & secure</span>
-                <span className="d-inline-flex align-items-center gap-1"><i className="bi bi-lightning-charge"></i> Fast confirmation</span>
-                <span className="d-inline-flex align-items-center gap-1"><i className="bi bi-whatsapp"></i> WhatsApp friendly</span>
+                <span className="d-inline-flex align-items-center gap-1"><i className="bi bi-lightning-charge"></i> {t('booking.fastConfirmation')}</span>
+                <span className="d-inline-flex align-items-center gap-1"><i className="bi bi-whatsapp"></i> {t('booking.whatsappFriendly')}</span>
               </div>
 
               <div className="mt-4 p-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-25">
-                <div className="fw-semibold mb-1"><i className="bi bi-headset me-2"></i>Need help?</div>
+                <div className="fw-semibold mb-1"><i className="bi bi-headset me-2"></i>{t('booking.needHelp')}</div>
                 <div className="small text-white text-opacity-75">
-                  WhatsApp / call us, or email <span className="text-white fw-semibold">dev@transtechologies.com</span>
+                  {t('booking.contactLine')} <span className="text-white fw-semibold">dev@transtechologies.com</span>
                 </div>
               </div>
             </div>
@@ -165,7 +167,7 @@ export default function BookAppointmentPage() {
                     </div>
                     <h4 className="fw-bold">Request received</h4>
                     <p className="text-muted small mb-1">Booking reference <span className="badge bg-primary rounded-pill">#{confirmed.id}</span></p>
-                    <p className="text-muted small mb-4">We will contact you on WhatsApp or phone to confirm your appointment.</p>
+                    <p className="text-muted small mb-4">{t('booking.confirmBlurb')}</p>
                     {confirmed.consultation_type === 'video' && confirmed.video_room && (
                       <div
                         className="text-start small mb-4 p-3 rounded-4 text-white"
@@ -204,8 +206,8 @@ export default function BookAppointmentPage() {
                   </div>
                 ) : (
                   <>
-                    <h4 className="fw-bold mb-1 text-center"><i className="bi bi-calendar-plus me-2 text-primary"></i>Book an Appointment</h4>
-                    <p className="text-muted small text-center mb-4">Fill in your details — confirmation takes minutes.</p>
+                    <h4 className="fw-bold mb-1 text-center"><i className="bi bi-calendar-plus me-2 text-primary"></i>{t('booking.formTitle')}</h4>
+                    <p className="text-muted small text-center mb-4">{t('booking.formSubtitle')}</p>
 
                     {error && <div className="alert alert-danger py-2 small"><i className="bi bi-exclamation-triangle me-1"></i>{error}</div>}
 
@@ -214,8 +216,8 @@ export default function BookAppointmentPage() {
                         {videoEnabled && (
                         <div className="col-12">
                           <div className="d-flex align-items-center justify-content-between">
-                            <label className="form-label small fw-semibold mb-1">Consultation type</label>
-                            <span className="small text-primary-emphasis fw-semibold mb-1"><i className="bi bi-stars me-1"></i>Video now available</span>
+                            <label className="form-label small fw-semibold mb-1">{t('booking.consultationType')}</label>
+                            <span className="small text-primary-emphasis fw-semibold mb-1"><i className="bi bi-stars me-1"></i>{t('booking.videoAvailable')}</span>
                           </div>
                           <div className="row g-2">
                             {CONSULT_OPTIONS.map(o => {
@@ -237,7 +239,7 @@ export default function BookAppointmentPage() {
                                   >
                                     {isVideo && (
                                       <span className="vc-gradient badge rounded-pill position-absolute top-0 end-0 m-2 text-white fw-semibold">
-                                        <i className="bi bi-stars me-1"></i>{active ? 'Selected' : 'Popular'}
+                                        <i className="bi bi-stars me-1"></i>{active ? t('booking.selected') : t('booking.popular')}
                                       </span>
                                     )}
                                     <div
@@ -256,7 +258,7 @@ export default function BookAppointmentPage() {
                                       {o.label}
                                       {active && <i className="bi bi-check-circle-fill small"></i>}
                                     </div>
-                                    <div className={`small ${active ? 'text-white-50' : 'text-muted'}`}>{o.desc}</div>
+                                    <div className={`small ${active ? 'text-white-50' : 'text-muted'}`}>{t('booking.types.' + o.value, { defaultValue: o.label })} — {t('booking.types.' + o.value + 'Desc', { defaultValue: o.desc })}</div>
                                   </button>
                                 </div>
                               );
@@ -276,49 +278,49 @@ export default function BookAppointmentPage() {
                         </div>
                         )}
                         <div className="col-md-6">
-                          <label className="form-label small fw-semibold">First name *</label>
+                          <label className="form-label small fw-semibold">{t('booking.firstName')}</label>
                           <div className="input-group">
                             <span className="input-group-text bg-light border-end-0"><i className="bi bi-person"></i></span>
                             <input className="form-control border-start-0" value={form.fname} onChange={e => update('fname', e.target.value)} required />
                           </div>
                         </div>
                         <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Last name *</label>
+                          <label className="form-label small fw-semibold">{t('booking.lastName')}</label>
                           <div className="input-group">
                             <span className="input-group-text bg-light border-end-0"><i className="bi bi-person"></i></span>
                             <input className="form-control border-start-0" value={form.lname} onChange={e => update('lname', e.target.value)} required />
                           </div>
                         </div>
                         <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Phone / WhatsApp *</label>
+                          <label className="form-label small fw-semibold">{t('booking.phone')}</label>
                           <div className="input-group">
                             <span className="input-group-text bg-light border-end-0"><i className="bi bi-whatsapp text-success"></i></span>
-                            <input className="form-control border-start-0" type="tel" placeholder="0770 123 456" value={form.phone_contact} onChange={e => update('phone_contact', e.target.value)} required />
+                            <input className="form-control border-start-0" type="tel" placeholder={t('booking.phonePlaceholder')} value={form.phone_contact} onChange={e => update('phone_contact', e.target.value)} required />
                           </div>
                         </div>
                         <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Email (optional)</label>
+                          <label className="form-label small fw-semibold">{t('booking.email')}</label>
                           <div className="input-group">
                             <span className="input-group-text bg-light border-end-0"><i className="bi bi-envelope"></i></span>
                             <input className="form-control border-start-0" type="email" value={form.email} onChange={e => update('email', e.target.value)} />
                           </div>
                         </div>
                         <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Preferred date *</label>
+                          <label className="form-label small fw-semibold">{t('booking.preferredDate')}</label>
                           <div className="input-group">
                             <span className="input-group-text bg-light border-end-0"><i className="bi bi-calendar3"></i></span>
                             <input className="form-control border-start-0" type="date" value={form.preferred_date} onChange={e => update('preferred_date', e.target.value)} required min={new Date().toISOString().split('T')[0]} />
                           </div>
                         </div>
                         <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Preferred time</label>
+                          <label className="form-label small fw-semibold">{t('booking.preferredTime')}</label>
                           <div className="input-group">
                             <span className="input-group-text bg-light border-end-0"><i className="bi bi-clock"></i></span>
                             <input className="form-control border-start-0" type="time" value={form.preferred_time} onChange={e => update('preferred_time', e.target.value)} />
                           </div>
                         </div>
                         <div className="col-12">
-                          <label className="form-label small fw-semibold">Reason for visit</label>
+                          <label className="form-label small fw-semibold">{t('booking.reason')}</label>
                           <div className="d-flex flex-wrap gap-2 mb-2">
                             {REASONS.map(r => (
                               <button
@@ -327,11 +329,11 @@ export default function BookAppointmentPage() {
                                 className={`btn btn-sm rounded-pill ${form.reason === r ? 'btn-primary' : 'btn-outline-secondary'}`}
                                 onClick={() => update('reason', r)}
                               >
-                                {r}
+                                {t('booking.reasons.' + r.toLowerCase().replace(/[^a-z]/g, ''), { defaultValue: r })}
                               </button>
                             ))}
                           </div>
-                          <textarea className="form-control" rows={2} placeholder="Anything else we should know…" value={form.reason === 'Other' ? '' : form.reason} onChange={e => update('reason', e.target.value)} />
+                          <textarea className="form-control" rows={2} placeholder={t('booking.reasonPlaceholder')} value={form.reason === 'Other' ? '' : form.reason} onChange={e => update('reason', e.target.value)} />
                         </div>
                       </div>
                       <button
@@ -345,7 +347,7 @@ export default function BookAppointmentPage() {
                         ) : (
                           <i className={`bi ${submitType === 'video' ? 'bi-camera-video-fill' : 'bi-send'} me-2`}></i>
                         )}
-                        {submitType === 'video' ? 'Request Video Consultation' : 'Request Appointment'}
+                        {submitType === 'video' ? t('booking.requestVideo') : t('booking.requestAppointment')}
                       </button>
                       <p className="text-muted text-center small mt-3 mb-0">
                         <i className="bi bi-shield-lock me-1"></i>Your details are used only to schedule your visit.

@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import { formatVital, formatBP, formatVitalUnit } from '../../utils/vitalsClassify';
 
 export default function PatientPortalDashboard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const raw = localStorage.getItem('portal_patient');
   const patient = raw ? JSON.parse(raw) : null;
@@ -56,12 +58,12 @@ export default function PatientPortalDashboard() {
       `}</style>
       <nav className="navbar navbar-expand-lg navbar-dark shadow-sm px-4 position-relative" style={{ background: 'linear-gradient(90deg, #0d6efd, #00c9a7)', zIndex: 1 }}>
         <div className="container-fluid">
-          <a className="navbar-brand" href="#"><i className="bi bi-heart-pulse me-2"></i>Patient Portal</a>
+          <a className="navbar-brand" href="#"><i className="bi bi-heart-pulse me-2"></i>{t('portal.login.title')}</a>
           <div className="d-flex align-items-center gap-3">
             <span className="text-white small">Welcome, {patient.name}</span>
-            <button className="btn btn-outline-light btn-sm" onClick={() => navigate('/portal/message')}><i className="bi bi-chat-dots me-1"></i>Message</button>
-            <button className="btn btn-outline-light btn-sm" onClick={() => navigate('/portal/payment')}><i className="bi bi-credit-card me-1"></i>Pay</button>
-            <button className="btn btn-outline-light btn-sm" onClick={() => navigate('/portal/records')}><i className="bi bi-download me-1"></i>Records</button>
+            <button className="btn btn-outline-light btn-sm" onClick={() => navigate('/portal/message')}><i className="bi bi-chat-dots me-1"></i>{t('portal.dashboard.navMessage')}</button>
+            <button className="btn btn-outline-light btn-sm" onClick={() => navigate('/portal/payment')}><i className="bi bi-credit-card me-1"></i>{t('portal.dashboard.navPay')}</button>
+            <button className="btn btn-outline-light btn-sm" onClick={() => navigate('/portal/records')}><i className="bi bi-download me-1"></i>{t('portal.dashboard.navRecords')}</button>
             <button className="btn btn-outline-light btn-sm" onClick={handleLogout}><i className="bi bi-box-arrow-right"></i></button>
           </div>
         </div>
@@ -70,12 +72,12 @@ export default function PatientPortalDashboard() {
       <div className="container py-4">
         <div className="row g-3 mb-4">
           {[
-            { label: 'Appointments', count: appointments.length, icon: 'bi-calendar-event', color: 'primary', path: '/portal/appointments' },
-            { label: 'Medications', count: medications.filter((m:any) => m.active).length, icon: 'bi-capsule', color: 'success', path: '/portal/medications' },
-            { label: 'Lab Results', count: procedures.length, icon: 'bi-flask', color: 'info', path: '/portal/labs' },
-            { label: 'Allergies', count: allergies.length, icon: 'bi-exclamation-triangle', color: 'warning', path: '/portal/allergies' },
-            { label: 'Diagnoses', count: conditions.length, icon: 'bi-clipboard2-pulse', color: 'danger', path: '/portal/conditions' },
-            { label: 'Vital Readings', count: vitals.length, icon: 'bi-heart-pulse', color: 'secondary', path: '/portal/vitals' },
+            { label: t('portal.dashboard.appointments'), count: appointments.length, icon: 'bi-calendar-event', color: 'primary', path: '/portal/appointments' },
+            { label: t('portal.dashboard.medications'), count: medications.filter((m:any) => m.active).length, icon: 'bi-capsule', color: 'success', path: '/portal/medications' },
+            { label: t('portal.dashboard.labResults'), count: procedures.length, icon: 'bi-flask', color: 'info', path: '/portal/labs' },
+            { label: t('portal.dashboard.allergies'), count: allergies.length, icon: 'bi-exclamation-triangle', color: 'warning', path: '/portal/allergies' },
+            { label: t('portal.dashboard.diagnoses'), count: conditions.length, icon: 'bi-clipboard2-pulse', color: 'danger', path: '/portal/conditions' },
+            { label: t('portal.dashboard.vitals'), count: vitals.length, icon: 'bi-heart-pulse', color: 'secondary', path: '/portal/vitals' },
           ].map(card => (
             <div className="col-md-2" key={card.label}>
               <div className={`card shadow-sm border-0 h-100 text-bg-${card.color} bg-gradient`} style={{cursor:'pointer'}} onClick={() => navigate(card.path)}>
@@ -87,28 +89,28 @@ export default function PatientPortalDashboard() {
 
         <div className="row g-3">
           <div className="col-md-6">
-            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-calendar-event me-2"></i>Upcoming Appointments</h6></div>
-              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>Date</th><th>Time</th><th>Title</th><th>Status</th></tr></thead>
+            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-calendar-event me-2"></i>{t('portal.dashboard.upcoming')}</h6></div>
+              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('portal.dashboard.cols.date')}</th><th>{t('portal.dashboard.cols.time')}</th><th>{t('portal.dashboard.cols.title')}</th><th>{t('portal.dashboard.cols.status')}</th></tr></thead>
                 <tbody>{appointments.slice(0, 5).map((a:any) => <tr key={a.pc_eid}><td>{a.pc_eventDate}</td><td>{a.pc_startTime}</td><td>{a.pc_title}</td><td><span className="badge bg-info">{a.pc_apptstatus || 'Scheduled'}</span></td></tr>)}
-                  {!appointments.length && <tr><td colSpan={4} className="text-muted text-center py-3">No appointments</td></tr>}</tbody></table></div></div>
+                  {!appointments.length && <tr><td colSpan={4} className="text-muted text-center py-3">{t('portal.dashboard.noAppointments')}</td></tr>}</tbody></table></div></div>
           </div>
           <div className="col-md-6">
-            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-capsule me-2"></i>Current Medications</h6></div>
-              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>Drug</th><th>Dosage</th><th>Route</th><th>Start</th></tr></thead>
+            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-capsule me-2"></i>{t('portal.dashboard.currentMeds')}</h6></div>
+              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('portal.dashboard.cols.drug')}</th><th>{t('portal.dashboard.cols.dosage')}</th><th>{t('portal.dashboard.cols.route')}</th><th>{t('portal.dashboard.cols.start')}</th></tr></thead>
                 <tbody>{medications.filter((m:any)=>m.active).slice(0,5).map((m:any) => <tr key={m.id}><td><strong>{m.drug}</strong></td><td>{m.dosage||'—'}</td><td>{m.route||'—'}</td><td>{m.start_date||'—'}</td></tr>)}
-                  {!medications.length && <tr><td colSpan={4} className="text-muted text-center py-3">No medications</td></tr>}</tbody></table></div></div>
+                  {!medications.length && <tr><td colSpan={4} className="text-muted text-center py-3">{t('portal.dashboard.noMedications')}</td></tr>}</tbody></table></div></div>
           </div>
           <div className="col-md-6">
-            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-heart-pulse me-2"></i>Recent Vitals</h6></div>
-              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>Date</th><th>BP</th><th>Pulse</th><th>Weight</th><th>BMI</th></tr></thead>
+            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-heart-pulse me-2"></i>{t('portal.dashboard.recentVitals')}</h6></div>
+              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('portal.dashboard.cols.date')}</th><th>{t('portal.dashboard.cols.bp')}</th><th>{t('portal.dashboard.cols.pulse')}</th><th>{t('portal.dashboard.cols.weight')}</th><th>{t('portal.dashboard.cols.bmi')}</th></tr></thead>
                 <tbody>{vitals.slice(0,5).map((v:any) => <tr key={v.id}><td>{v.date}</td><td>{formatBP(v.bps, v.bpd)}</td><td>{formatVital(v.pulse)}</td><td>{formatVitalUnit(v.weight, 1, ' kg')}</td><td>{formatVital(v.BMI, 1)}</td></tr>)}
-                  {!vitals.length && <tr><td colSpan={5} className="text-muted text-center py-3">No vitals</td></tr>}</tbody></table></div></div>
+                  {!vitals.length && <tr><td colSpan={5} className="text-muted text-center py-3">{t('portal.dashboard.noVitals')}</td></tr>}</tbody></table></div></div>
           </div>
           <div className="col-md-6">
-            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-exclamation-triangle me-2"></i>Allergies</h6></div>
-              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>Allergen</th><th>Reaction</th></tr></thead>
+            <div className="card shadow-sm"><div className="card-header"><h6 className="mb-0"><i className="bi bi-exclamation-triangle me-2"></i>{t('portal.dashboard.allergies')}</h6></div>
+              <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('portal.dashboard.cols.allergen')}</th><th>{t('portal.dashboard.cols.reaction')}</th></tr></thead>
                 <tbody>{allergies.slice(0,5).map((a:any) => <tr key={a.id}><td><strong>{a.allergen || a.title}</strong></td><td>{a.reaction || '—'}</td></tr>)}
-                  {!allergies.length && <tr><td colSpan={2} className="text-muted text-center py-3">No known allergies</td></tr>}</tbody></table></div></div>
+                  {!allergies.length && <tr><td colSpan={2} className="text-muted text-center py-3">{t('portal.dashboard.noAllergies')}</td></tr>}</tbody></table></div></div>
           </div>
         </div>
       </div>

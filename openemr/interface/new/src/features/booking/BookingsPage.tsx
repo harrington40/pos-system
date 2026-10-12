@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import { patientChartPath } from '../../utils/patientChart';
@@ -27,6 +28,7 @@ interface BookingRow {
 }
 
 export default function BookingsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [toast, setToast] = useState('');
 
@@ -62,7 +64,7 @@ export default function BookingsPage() {
   const declined = (bookings || []).filter((b) => b.status === 'declined');
 
   const copyLink = () => {
-    navigator.clipboard?.writeText(BOOKING_URL).then(() => setToast('Booking link copied'));
+    navigator.clipboard?.writeText(BOOKING_URL).then(() => setToast(t('booking.linkCopied')));
   };
 
   const statusBadge = (s: string) =>
@@ -77,13 +79,13 @@ export default function BookingsPage() {
       <td>{b.reason || '—'}</td>
       <td>
         {b.consultation_type === 'video' ? (
-          <span className="vc-gradient badge rounded-pill text-white fw-semibold"><span className="vc-live-dot me-1"></span>Video</span>
+          <span className="vc-gradient badge rounded-pill text-white fw-semibold"><span className="vc-live-dot me-1"></span>{t('booking.videoTag')}</span>
         ) : (
-          <span className="badge rounded-pill bg-light text-dark border">In person</span>
+          <span className="badge rounded-pill bg-light text-dark border">{t('booking.inPersonTag')}</span>
         )}
       </td>
       <td><span className="badge rounded-pill text-capitalize">{b.source || 'social'}</span></td>
-      <td><span className={`badge rounded-pill ${statusBadge(b.status)}`}>{b.status}</span></td>
+      <td><span className={`badge rounded-pill ${statusBadge(b.status)}`}>{t('booking.status.' + b.status, { defaultValue: b.status })}</span></td>
       <td className="text-nowrap">
         {b.consultation_type === 'video' && b.video_room && (
           <a className="vc-gradient btn btn-sm rounded-pill text-white fw-semibold me-1 border-0" target="_blank" rel="noreferrer"
@@ -123,13 +125,13 @@ export default function BookingsPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #198754 60%, #00c9a7 100%)' }}>
         <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <h3 className="mb-1 fw-bold"><i className="bi bi-qr-code me-2"></i>Bookings & Social Links</h3>
+            <h3 className="mb-1 fw-bold"><i className="bi bi-qr-code me-2"></i>{t('booking.listTitle')}</h3>
             <p className="mb-0 text-white text-opacity-75 small">
-              {pending.length} pending · {approved.length} approved · {declined.length} declined
+              {t('booking.summary', { pending: pending.length, approved: approved.length, declined: declined.length })}
             </p>
           </div>
           <button className="btn btn-light btn-sm rounded-pill" onClick={() => window.open(BOOKING_PATH, '_blank')}>
-            <i className="bi bi-box-arrow-up-right me-1"></i>Open Booking Page
+            <i className="bi bi-box-arrow-up-right me-1"></i>{t('booking.openBooking')}
           </button>
         </div>
       </div>
@@ -141,21 +143,21 @@ export default function BookingsPage() {
             <div className="col-md-4 text-center">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(BOOKING_URL)}`}
-                alt="Booking QR code"
+                alt={t('booking.qrAlt')}
                 className="img-fluid border rounded-3"
                 style={{ maxWidth: '180px' }}
               />
-              <div className="small text-muted mt-1">Scan to book</div>
+              <div className="small text-muted mt-1">{t('booking.scanToBook')}</div>
             </div>
             <div className="col-md-8">
-              <h6 className="fw-bold"><i className="bi bi-share me-2"></i>Share the booking link</h6>
+              <h6 className="fw-bold"><i className="bi bi-share me-2"></i>{t('booking.shareLink')}</h6>
               <div className="input-group mb-3">
                 <input className="form-control form-control-sm" readOnly value={BOOKING_URL} />
                 <button className="btn btn-outline-primary btn-sm" onClick={copyLink}><i className="bi bi-clipboard"></i></button>
               </div>
               <div className="d-flex flex-wrap gap-2">
                 <a className="btn btn-success btn-sm rounded-pill" target="_blank" rel="noreferrer"
-                  href={`https://wa.me/?text=${encodeURIComponent(`Book your appointment with us — in person or by video: ${BOOKING_URL}`)}`}>
+                  href={`https://wa.me/?text=${encodeURIComponent(t('booking.waText', { url: BOOKING_URL }))}`}>
                   <i className="bi bi-whatsapp me-1"></i>WhatsApp
                 </a>
                 <a className="btn btn-primary btn-sm rounded-pill" target="_blank" rel="noreferrer"
@@ -163,7 +165,7 @@ export default function BookingsPage() {
                   <i className="bi bi-facebook me-1"></i>Facebook
                 </a>
                 <a className="btn btn-dark btn-sm rounded-pill" target="_blank" rel="noreferrer"
-                  href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(BOOKING_URL)}&text=${encodeURIComponent('Book your appointment')}`}>
+                  href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(BOOKING_URL)}&text=${encodeURIComponent(t('booking.tweetText'))}`}>
                   <i className="bi bi-twitter-x me-1"></i>X / Twitter
                 </a>
               </div>
@@ -181,12 +183,12 @@ export default function BookingsPage() {
               <table className="table table-hover small mb-0">
                 <thead className="table-light sticky-top">
                   <tr>
-                    <th>Ref</th><th>Patient</th><th>Phone</th><th>Preferred</th><th>Reason</th><th>Type</th><th>Source</th><th>Status</th><th>Action</th>
+                    <th>{t('booking.cols.ref')}</th><th>{t('booking.cols.patient')}</th><th>{t('booking.cols.phone')}</th><th>{t('booking.cols.preferred')}</th><th>{t('booking.cols.reason')}</th><th>{t('booking.cols.type')}</th><th>{t('booking.cols.source')}</th><th>{t('booking.cols.status')}</th><th>{t('booking.cols.action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bookings.length === 0 ? (
-                    <tr><td colSpan={9} className="text-center text-muted py-4">No booking requests yet.</td></tr>
+                    <tr><td colSpan={9} className="text-center text-muted py-4">{t('booking.empty')}</td></tr>
                   ) : (
                     [...pending, ...approved, ...declined].map(renderRow)
                   )}

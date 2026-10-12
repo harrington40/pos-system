@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import { formatPatientName } from '../../utils/patientName';
@@ -45,6 +46,7 @@ function Barcode({ seed, width = 140 }: { seed: string; width?: number }) {
 
 export default function LabResultFormPage() {
   const { pid: urlPid } = useParams<{ pid: string }>();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [patientSearch, setPatientSearch] = useState('');
@@ -92,9 +94,9 @@ export default function LabResultFormPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lab-catalog'] });
-      setToast('Normal value saved');
+      setToast(t('labform.toast.normalSaved'));
     },
-    onError: (e: any) => setToast(e?.response?.data?.message || 'Could not save the normal value'),
+    onError: (e: any) => setToast(e?.response?.data?.message || t('labform.toast.normalFailed')),
   });
 
   const { data: patients = [] } = useQuery({
@@ -266,10 +268,10 @@ export default function LabResultFormPage() {
     },
     onSuccess: (d: any) => {
       qc.invalidateQueries({ queryKey: ['lab-reports', selectedPid] });
-      setToast(d?.labNo ? `Saved ${d.labNo}` : 'Report saved');
+      setToast(d?.labNo ? t('labform.toast.reportSaved', { labNo: d.labNo }) : t('labform.toast.reportSavedPlain'));
       if (!reportId && d?.id) setReportId(d.id);
     },
-    onError: (e: any) => setToast(e?.response?.data?.message || 'Save failed'),
+    onError: (e: any) => setToast(e?.response?.data?.message || t('labform.toast.saveFailed')),
   });
 
   const openReport = async (id: number) => {
@@ -289,35 +291,38 @@ export default function LabResultFormPage() {
       setValues(val);
       setComments(cm);
       setTab('form');
-    } catch (e: any) { setToast('Could not load report'); }
+    } catch (e: any) { setToast(t('labform.toast.loadFailed')); }
   };
 
-  const renderInput = (t: any) => {
-    if (t.result_type === 'POSITIVE_NEGATIVE') {
+  const renderInput = (test: any) => {
+    if (test.result_type === 'POSITIVE_NEGATIVE') {
       return (
-        <select className="form-select form-select-sm" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })}>
+        <select className="form-select form-select-sm" value={values[test.id] || ''} onChange={e => setValues({ ...values, [test.id]: e.target.value })}>
           <option value="">—</option>
-          <option>Negative</option><option>Positive</option><option>Non-Reactive</option><option>Reactive</option>
+          <option value="Negative">{t('labs.value.negative')}</option>
+          <option value="Positive">{t('labs.value.positive')}</option>
+          <option value="Non-Reactive">{t('labs.value.nonReactive')}</option>
+          <option value="Reactive">{t('labs.value.reactive')}</option>
         </select>
       );
     }
-    if (t.result_type === 'BLOOD_GROUP') {
+    if (test.result_type === 'BLOOD_GROUP') {
       return (
-        <select className="form-select form-select-sm" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })}>
+        <select className="form-select form-select-sm" value={values[test.id] || ''} onChange={e => setValues({ ...values, [test.id]: e.target.value })}>
           <option value="">—</option>
           {BLOOD_GROUPS.map(g => <option key={g}>{g}</option>)}
         </select>
       );
     }
-    if (t.result_type === 'SELECT' && t.options) {
+    if (test.result_type === 'SELECT' && test.options) {
       return (
-        <select className="form-select form-select-sm" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })}>
+        <select className="form-select form-select-sm" value={values[test.id] || ''} onChange={e => setValues({ ...values, [test.id]: e.target.value })}>
           <option value="">—</option>
-          {String(t.options).split(',').map(o => <option key={o}>{o}</option>)}
+          {String(test.options).split(',').map(o => <option key={o}>{o}</option>)}
         </select>
       );
     }
-    return <input className="form-control form-control-sm" type={t.result_type === 'NUMERIC' ? 'number' : 'text'} step="any" value={values[t.id] || ''} onChange={e => setValues({ ...values, [t.id]: e.target.value })} />;
+    return <input className="form-control form-control-sm" type={test.result_type === 'NUMERIC' ? 'number' : 'text'} step="any" value={values[test.id] || ''} onChange={e => setValues({ ...values, [test.id]: e.target.value })} />;
   };
 
   return (
@@ -330,16 +335,16 @@ export default function LabResultFormPage() {
       )}
 
       <div className="rounded-4 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #198754 60%, #00c9a7 100%)' }}>
-        <h3 className="mb-1 fw-bold"><i className="bi bi-droplet-half me-2"></i>Patient Laboratory Result Form</h3>
-        <p className="mb-0 text-white text-opacity-75 small">MA JUAH MEMORIAL CLINIC · DELIVERING QUALITY MEDICAL SERVICES</p>
+        <h3 className="mb-1 fw-bold"><i className="bi bi-droplet-half me-2"></i>{t('labform.title')}</h3>
+        <p className="mb-0 text-white text-opacity-75 small">{t('labform.orgHeader')}</p>
       </div>
 
       {/* Patient selector */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
         <div className="card-body">
-          <label className="form-label small fw-semibold">Select patient</label>
+          <label className="form-label small fw-semibold">{t('labform.selectPatient')}</label>
           <div className="position-relative">
-            <input className="form-control" placeholder="Search patient name…" value={patientSearch} onChange={e => setPatientSearch(e.target.value)} />
+            <input className="form-control" placeholder={t('labform.searchPatient')} value={patientSearch} onChange={e => setPatientSearch(e.target.value)} />
             {patientSearch.trim().length >= 2 && patients.length > 0 && (
               <div className="list-group position-absolute w-100 shadow" style={{ zIndex: 10, maxHeight: '260px', overflowY: 'auto' }}>
                 {patients.map((p: any) => (
@@ -352,11 +357,11 @@ export default function LabResultFormPage() {
           </div>
           {patient && (
             <div className="row g-2 mt-3">
-              <div className="col-md-3"><small className="text-muted">Name</small><div className="fw-semibold">{formatPatientName(patient)}</div></div>
-              <div className="col-md-2"><small className="text-muted">Age</small><div>{patient.DOB ? String(patient.DOB).slice(0, 10) : '—'}</div></div>
-              <div className="col-md-2"><small className="text-muted">Sex</small><div>{patient.sex || '—'}</div></div>
-              <div className="col-md-2"><small className="text-muted">Reg #</small><div>{patient.public_id || `#${patient.pid}`}</div></div>
-              <div className="col-md-3"><small className="text-muted">Lab No</small><input className="form-control form-control-sm" placeholder="Auto" value={labNo} onChange={e => setLabNo(e.target.value)} /></div>
+              <div className="col-md-3"><small className="text-muted">{t('labform.name')}</small><div className="fw-semibold">{formatPatientName(patient)}</div></div>
+              <div className="col-md-2"><small className="text-muted">{t('labform.age')}</small><div>{patient.DOB ? String(patient.DOB).slice(0, 10) : '—'}</div></div>
+              <div className="col-md-2"><small className="text-muted">{t('labform.sex')}</small><div>{patient.sex || '—'}</div></div>
+              <div className="col-md-2"><small className="text-muted">{t('labform.regNo')}</small><div>{patient.public_id || `#${patient.pid}`}</div></div>
+              <div className="col-md-3"><small className="text-muted">{t('labform.labNo')}</small><input className="form-control form-control-sm" placeholder={t('labform.auto')} value={labNo} onChange={e => setLabNo(e.target.value)} /></div>
             </div>
           )}
           {patient && (
@@ -365,7 +370,7 @@ export default function LabResultFormPage() {
                 <Barcode seed={labNo || patient.public_id || `#${patient.pid}`} />
                 <div className="small text-muted text-center" style={{ fontSize: '0.7rem' }}>{labNo || patient.public_id || `#${patient.pid}`}</div>
               </div>
-              <div className="small text-muted"><i className="bi bi-upc-scan me-1"></i>Specimen / Lab No barcode</div>
+              <div className="small text-muted"><i className="bi bi-upc-scan me-1"></i>{t('labform.barcodeCaption')}</div>
             </div>
           )}
         </div>
@@ -373,8 +378,8 @@ export default function LabResultFormPage() {
 
       {/* Tabs */}
       <ul className="nav nav-pills gap-2 mb-3">
-        <li className="nav-item"><button className={`nav-link ${tab === 'form' ? 'active' : ''}`} onClick={() => setTab('form')}><i className="bi bi-pencil-square me-1"></i>Result Entry</button></li>
-        <li className="nav-item"><button className={`nav-link ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}><i className="bi bi-clock-history me-1"></i>Lab History</button></li>
+        <li className="nav-item"><button className={`nav-link ${tab === 'form' ? 'active' : ''}`} onClick={() => setTab('form')}><i className="bi bi-pencil-square me-1"></i>{t('labform.tabResultEntry')}</button></li>
+        <li className="nav-item"><button className={`nav-link ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}><i className="bi bi-clock-history me-1"></i>{t('labform.tabHistory')}</button></li>
       </ul>
 
       {tab === 'form' ? (
@@ -382,32 +387,32 @@ export default function LabResultFormPage() {
           <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
             <span className="small text-muted">
               <i className="bi bi-folder2-open me-1"></i>
-              {catFolders.length} section{catFolders.length === 1 ? '' : 's'} · {openFolders} open
-              <span className="ms-2">{visibleTests.length} tests shown</span>
+              {t('labform.sectionsSummary', { count: catFolders.length, open: openFolders })}
+              <span className="ms-2">{t('labform.testsShown', { count: visibleTests.length })}</span>
             </span>
             <div className="d-flex align-items-center gap-2 flex-wrap">
               <button type="button" className="btn btn-sm btn-outline-secondary rounded-pill"
                 onClick={() => setAllFolders(true)} disabled={!catFolders.length}>
-                <i className="bi bi-arrows-expand me-1"></i>Expand all
+                <i className="bi bi-arrows-expand me-1"></i>{t('labform.expandAll')}
               </button>
               <button type="button" className="btn btn-sm btn-outline-secondary rounded-pill"
                 onClick={() => setAllFolders(false)} disabled={!catFolders.length}>
-                <i className="bi bi-arrows-collapse me-1"></i>Collapse all
+                <i className="bi bi-arrows-collapse me-1"></i>{t('labform.collapseAll')}
               </button>
               {isAdmin && (
                 <button
                   type="button"
                   className={`btn btn-sm rounded-pill ${editRanges ? 'btn-primary' : 'btn-outline-secondary'}`}
                   onClick={() => { setEditRanges(v => !v); setRangeDraft({}); }}
-                  title="Correct the normal-value / threshold ranges stored for each test"
+                  title={t('labform.editRangesTitle')}
                 >
                   <i className="bi bi-sliders me-1"></i>
-                  {editRanges ? 'Done editing normal values' : 'Edit normal values'}
+                  {editRanges ? t('labform.doneEditingRanges') : t('labform.editRanges')}
                 </button>
               )}
               <div className="form-check form-switch mb-0">
                 <input className="form-check-input" type="checkbox" id="showAll" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
-                <label className="form-check-label small" htmlFor="showAll">Show All Tests</label>
+                <label className="form-check-label small" htmlFor="showAll">{t('labform.showAllTests')}</label>
               </div>
             </div>
           </div>
@@ -417,12 +422,12 @@ export default function LabResultFormPage() {
             <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
             <input
               className="form-control"
-              placeholder="Find a test (name, code, unit or normal value)…"
+              placeholder={t('labform.testSearchPlaceholder')}
               value={testSearch}
               onChange={e => setTestSearch(e.target.value)}
             />
             {testSearch && (
-              <button className="btn btn-outline-secondary" type="button" onClick={() => setTestSearch('')} title="Clear">
+              <button className="btn btn-outline-secondary" type="button" onClick={() => setTestSearch('')} title={t('labform.clear')}>
                 <i className="bi bi-x-lg"></i>
               </button>
             )}
@@ -430,18 +435,16 @@ export default function LabResultFormPage() {
 
           <p className="text-muted mb-3" style={{ fontSize: '0.78rem' }}>
             <i className="bi bi-info-circle me-1"></i>
-            Results are recorded under the laboratory sections — Haematology, Clinical Chemistry, Serology, Microbiology,
-            Malaria / Parasitology, Immunohaematology, Immunology / Allergy and Urine Chemistry. Tests ordered from the
-            laboratory request form that are not on this form are not recorded here.
+            {t('labform.infoParagraph')}
           </p>
 
           {!selectedPid ? (
-            <div className="text-center text-muted py-5"><i className="bi bi-person-search fs-1 d-block mb-2"></i>Select a patient to begin result entry.</div>
+            <div className="text-center text-muted py-5"><i className="bi bi-person-search fs-1 d-block mb-2"></i>{t('labform.selectToBegin')}</div>
           ) : catFolders.length === 0 ? (
             <div className="text-center text-muted py-5">
               <i className="bi bi-folder2 fs-1 d-block mb-2"></i>
-              {needles.length ? 'No test matches that search.' : 'No tests are selected for this patient yet.'}
-              {!needles.length && !showAll && <div className="small mt-2">Turn on “Show All Tests” to pick any test from the catalog.</div>}
+              {needles.length ? t('labform.noTestMatch') : t('labform.noTestsSelected')}
+              {!needles.length && !showAll && <div className="small mt-2">{t('labform.turnOnShowAll')}</div>}
             </div>
           ) : catFolders.map(folder => {
             const { cat, groups, total, selected, open, matched } = folder;
@@ -459,17 +462,17 @@ export default function LabResultFormPage() {
                   <i className="bi bi-folder-fill" style={{ color: selected ? '#ffc107' : '#c8ced6' }}></i>
                   <span className="mb-0 fw-bold small text-uppercase flex-grow-1">{cat}</span>
                   {selected > 0 && (
-                    <span className="badge rounded-pill bg-primary" style={{ fontSize: '0.62rem' }}>{selected} selected</span>
+                    <span className="badge rounded-pill bg-primary" style={{ fontSize: '0.62rem' }}>{t('labform.nSelected', { count: selected })}</span>
                   )}
                   <span className="badge rounded-pill bg-light text-dark border" style={{ fontSize: '0.62rem' }}>
-                    {needles.length ? `${matched} match` : total}
+                    {needles.length ? t('labform.nMatch', { count: matched }) : total}
                   </span>
                 </button>
                 {!open && picked.length > 0 && (
                   <div className="px-3 pb-2 text-muted" style={{ fontSize: '0.7rem' }}>
                     <i className="bi bi-check2-circle me-1"></i>
                     {picked.slice(0, 4).map((i) => i.label).join(', ')}
-                    {picked.length > 4 ? ` +${picked.length - 4} more` : ''}
+                    {picked.length > 4 ? ` ${t('labs.moreTests', { count: picked.length - 4 })}` : ''}
                   </div>
                 )}
                 {open && (
@@ -477,7 +480,7 @@ export default function LabResultFormPage() {
                   <div className="table-responsive">
                     <table className="table table-sm table-hover mb-0 align-middle">
                       <thead className="table-light">
-                        <tr><th style={{ width: 40 }}></th><th>Test Request</th><th>Results</th><th>Unit</th><th>Normal Value</th><th>Flag</th><th>Comments</th></tr>
+                        <tr><th style={{ width: 40 }}></th><th>{t('labs.testRequest')}</th><th>{t('labform.thResults')}</th><th>{t('labs.unitLabel')}</th><th>{t('labs.normalValueLabel')}</th><th>{t('labs.flagLabel')}</th><th>{t('labs.commentsLabel')}</th></tr>
                       </thead>
                       <tbody>
                         {groups.map((g, gi) => (
@@ -487,39 +490,39 @@ export default function LabResultFormPage() {
                                 <td colSpan={7} className="fw-bold small text-uppercase py-1" style={{ letterSpacing: '0.03em' }}>{g.subsection}</td>
                               </tr>
                             )}
-                            {g.items.map(({ t, label }) => (
-                          <tr key={t.id} className={selectedTests[t.id] ? '' : 'opacity-50'}>
-                            <td><input type="checkbox" className="form-check-input" checked={!!selectedTests[t.id]} onChange={e => setSelectedTests({ ...selectedTests, [t.id]: e.target.checked })} /></td>
+                            {g.items.map(({ t: test, label }) => (
+                          <tr key={test.id} className={selectedTests[test.id] ? '' : 'opacity-50'}>
+                            <td><input type="checkbox" className="form-check-input" checked={!!selectedTests[test.id]} onChange={e => setSelectedTests({ ...selectedTests, [test.id]: e.target.checked })} /></td>
                             <td className="fw-semibold">{label}</td>
-                            <td style={{ minWidth: 140 }}>{renderInput(t)}</td>
-                            <td>{t.unit || '—'}</td>
+                            <td style={{ minWidth: 140 }}>{renderInput(test)}</td>
+                            <td>{test.unit || '—'}</td>
                             <td>
                               {editRanges ? (() => {
-                                const d = draftFor(t);
+                                const d = draftFor(test);
                                 const setD = (patch: Partial<typeof d>) =>
-                                  setRangeDraft({ ...rangeDraft, [t.id]: { ...d, ...patch } });
+                                  setRangeDraft({ ...rangeDraft, [test.id]: { ...d, ...patch } });
                                 return (
                                   <div className="d-flex align-items-center gap-1" style={{ minWidth: 210 }}>
-                                    <input className="form-control form-control-sm" style={{ width: 52 }} placeholder="min"
+                                    <input className="form-control form-control-sm" style={{ width: 52 }} placeholder={t('labform.min')}
                                       value={d.min} onChange={e => setD({ min: e.target.value })} />
                                     <span className="text-muted small">–</span>
-                                    <input className="form-control form-control-sm" style={{ width: 52 }} placeholder="max"
+                                    <input className="form-control form-control-sm" style={{ width: 52 }} placeholder={t('labform.max')}
                                       value={d.max} onChange={e => setD({ max: e.target.value })} />
-                                    <input className="form-control form-control-sm" style={{ width: 92 }} placeholder="text"
-                                      title="Printed normal value (overrides min–max in the display)"
+                                    <input className="form-control form-control-sm" style={{ width: 92 }} placeholder={t('labform.text')}
+                                      title={t('labform.printedNormalTitle')}
                                       value={d.text} onChange={e => setD({ text: e.target.value })} />
                                     <button type="button" className="btn btn-sm btn-outline-success py-0 px-1"
                                       disabled={saveRange.isPending}
-                                      title="Save this normal value"
-                                      onClick={() => saveRange.mutate(t)}>
+                                      title={t('labform.saveNormalTitle')}
+                                      onClick={() => saveRange.mutate(test)}>
                                       <i className="bi bi-check-lg"></i>
                                     </button>
                                   </div>
                                 );
-                              })() : refText(t)}
+                              })() : refText(test)}
                             </td>
-                            <td>{values[t.id] ? <span className={`badge ${flagBadge(flagForTest(t, values[t.id]))}`}>{flagForTest(t, values[t.id])}</span> : '—'}</td>
-                            <td><input className="form-control form-control-sm" value={comments[t.id] || ''} onChange={e => setComments({ ...comments, [t.id]: e.target.value })} /></td>
+                            <td>{values[test.id] ? <span className={`badge ${flagBadge(flagForTest(test, values[test.id]))}`}>{flagForTest(test, values[test.id])}</span> : '—'}</td>
+                            <td><input className="form-control form-control-sm" value={comments[test.id] || ''} onChange={e => setComments({ ...comments, [test.id]: e.target.value })} /></td>
                           </tr>
                             ))}
                           </Fragment>
@@ -537,14 +540,14 @@ export default function LabResultFormPage() {
             <div className="d-flex gap-2 justify-content-end mt-3 flex-wrap">
               <button className="btn btn-outline-secondary rounded-pill"
                 onClick={() => { setAllFolders(true); setTestSearch(''); setTimeout(() => window.print(), 150); }}
-                title="Prints every section, so collapsed folders are opened first">
-                <i className="bi bi-printer me-1"></i>Print
+                title={t('labform.printTitle')}>
+                <i className="bi bi-printer me-1"></i>{t('labform.print')}
               </button>
               <button className="btn btn-primary rounded-pill px-4" disabled={saveReport.isPending} onClick={() => saveReport.mutate(false)}>
-                <i className="bi bi-save me-1"></i>Save Draft
+                <i className="bi bi-save me-1"></i>{t('labform.saveDraft')}
               </button>
               <button className="btn btn-success rounded-pill px-4" disabled={saveReport.isPending} onClick={() => saveReport.mutate(true)}>
-                <i className="bi bi-check2-circle me-1"></i>Save & Verify
+                <i className="bi bi-check2-circle me-1"></i>{t('labform.saveVerify')}
               </button>
             </div>
           )}
@@ -553,11 +556,11 @@ export default function LabResultFormPage() {
         <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
           <div className="card-body p-0">
             {!reports || reports.length === 0 ? (
-              <div className="text-center text-muted py-5">No laboratory reports for this patient.</div>
+              <div className="text-center text-muted py-5">{t('labform.noReports')}</div>
             ) : (
               <div className="table-responsive">
                 <table className="table table-hover small mb-0 align-middle">
-                  <thead className="table-light"><tr><th>Date</th><th>Lab No</th><th>Tests</th><th>Status</th><th>Technician</th><th>Actions</th></tr></thead>
+                  <thead className="table-light"><tr><th>{t('labform.thDate')}</th><th>{t('labform.thLabNo')}</th><th>{t('labform.thTests')}</th><th>{t('labform.thStatus')}</th><th>{t('labform.thTechnician')}</th><th>{t('labform.thActions')}</th></tr></thead>
                   <tbody>
                     {(reports as any[]).map((r: any) => (
                       <tr key={r.id}>
@@ -567,7 +570,7 @@ export default function LabResultFormPage() {
                         <td><span className={`badge ${r.status === 'VERIFIED' ? 'bg-success' : 'bg-secondary'}`}>{r.status}</span></td>
                         <td>{r.technician_name || '—'}</td>
                         <td>
-                          <button className="btn btn-outline-primary btn-sm rounded-pill me-1" onClick={() => openReport(r.id)}><i className="bi bi-pencil"></i> View/Edit</button>
+                          <button className="btn btn-outline-primary btn-sm rounded-pill me-1" onClick={() => openReport(r.id)}><i className="bi bi-pencil"></i> {t('labform.viewEdit')}</button>
                           <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => { setReportId(r.id); setTab('form'); openReport(r.id).then(() => window.print()); }}><i className="bi bi-printer"></i></button>
                         </td>
                       </tr>
@@ -591,8 +594,8 @@ export default function LabResultFormPage() {
         `}</style>
         <div style={{ padding: '20px', fontFamily: 'Georgia, serif' }}>
           <div className="text-center mb-2">
-            <h3 className="mb-0 fw-bold">MA JUAH MEMORIAL CLINIC</h3>
-            <div className="text-uppercase small">Delivering Quality Medical Services</div>
+            <h3 className="mb-0 fw-bold">{t('labform.clinicName')}</h3>
+            <div className="text-uppercase small">{t('labform.clinicTagline')}</div>
             <div className="d-inline-block mt-2">
               <Barcode seed={labNo || patient?.public_id || `#${patient?.pid || '—'}`} />
               <div className="small" style={{ letterSpacing: 2 }}>{labNo || patient?.public_id || `#${patient?.pid || '—'}`}</div>
@@ -600,13 +603,13 @@ export default function LabResultFormPage() {
           </div>
           <table className="table table-bordered table-sm mb-3">
             <tbody>
-              <tr><th>Patient's Name:</th><td>{patient ? formatPatientName(patient) : '—'}</td><th>Sex:</th><td>{patient?.sex || '—'}</td></tr>
-              <tr><th>Reg #:</th><td>{patient?.public_id || `#${patient?.pid || '—'}`}</td><th>Date:</th><td>{new Date().toLocaleDateString()}</td></tr>
-              <tr><th>Lab No:</th><td>{labNo || 'Auto'}</td><th>Age:</th><td>{patient?.DOB ? String(patient.DOB).slice(0, 10) : '—'}</td></tr>
+              <tr><th>{t('labform.patientsName')}</th><td>{patient ? formatPatientName(patient) : '—'}</td><th>{t('labform.sexColon')}</th><td>{patient?.sex || '—'}</td></tr>
+              <tr><th>{t('labform.regColon')}</th><td>{patient?.public_id || `#${patient?.pid || '—'}`}</td><th>{t('labform.dateColon')}</th><td>{new Date().toLocaleDateString()}</td></tr>
+              <tr><th>{t('labform.labNoColon')}</th><td>{labNo || t('labform.auto')}</td><th>{t('labform.ageColon')}</th><td>{patient?.DOB ? String(patient.DOB).slice(0, 10) : '—'}</td></tr>
             </tbody>
           </table>
           <table className="table table-bordered table-sm">
-            <thead><tr><th>Test Request</th><th>Results</th><th>Normal Value</th></tr></thead>
+            <thead><tr><th>{t('labs.testRequest')}</th><th>{t('labform.thResults')}</th><th>{t('labs.normalValueLabel')}</th></tr></thead>
             <tbody>
               {visibleTests.map((t: any) => (
                 <tr key={t.id}>
@@ -618,9 +621,9 @@ export default function LabResultFormPage() {
             </tbody>
           </table>
           <div className="d-flex justify-content-between mt-4">
-            <div>Lab Technician's Name: {user?.displayName || '________________'}</div>
-            <div>Signature: ______________________</div>
-            <div>Date: {new Date().toLocaleDateString()}</div>
+            <div>{t('labform.techName')} {user?.displayName || '________________'}</div>
+            <div>{t('labform.signature')} ______________________</div>
+            <div>{t('labform.dateColon')} {new Date().toLocaleDateString()}</div>
           </div>
         </div>
       </div>

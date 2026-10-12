@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
@@ -14,6 +15,7 @@ interface ChatMsg {
 }
 
 export default function PatientMessagePage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const raw = localStorage.getItem('portal_patient');
@@ -81,7 +83,7 @@ export default function PatientMessagePage() {
     <div className="min-vh-100 bg-light">
       <nav className="navbar navbar-dark bg-primary shadow-sm px-4">
         <div className="container-fluid">
-          <a className="navbar-brand" href="#"><i className="bi bi-heart-pulse me-2"></i>Patient Portal</a>
+          <a className="navbar-brand" href="#"><i className="bi bi-heart-pulse me-2"></i>{t('portal.login.title')}</a>
           <div className="d-flex align-items-center gap-3">
             <span className="text-white small">Welcome, {patient.name}</span>
             <button className="btn btn-outline-light btn-sm" onClick={() => navigate('/portal/dashboard')}>
@@ -98,8 +100,8 @@ export default function PatientMessagePage() {
               <i className="bi bi-chat-dots text-primary"></i>
             </div>
             <div>
-              <h5 className="mb-0 fw-bold">Message Your Provider</h5>
-              <small className="text-muted">Your care team will reply here</small>
+              <h5 className="mb-0 fw-bold">{t('portal.message.title')}</h5>
+              <small className="text-muted">{t('portal.message.hint')}</small>
             </div>
           </div>
 
@@ -108,12 +110,12 @@ export default function PatientMessagePage() {
             {isLoading ? (
               <div className="text-center text-muted py-5">
                 <div className="spinner-border text-primary mb-2"></div>
-                <p>Loading conversation...</p>
+                <p>{t('portal.message.loading')}</p>
               </div>
             ) : !messages.length ? (
               <div className="text-center text-muted py-5">
                 <i className="bi bi-chat-left-text fs-1 d-block mb-2 opacity-25"></i>
-                <p>No messages yet. Start a conversation with your provider.</p>
+                <p>{t('portal.message.empty')}</p>
               </div>
             ) : null}
             {messages.map((m: ChatMsg) => {
@@ -138,7 +140,7 @@ export default function PatientMessagePage() {
                       <div style={{ whiteSpace: 'pre-wrap' }}>{m.body}</div>
                     </div>
                     <small className={`text-muted ${isPatient ? 'text-end' : ''}`} style={{ fontSize: '0.7rem' }}>
-                      {isPatient ? 'You' : 'Care Team'} · {fmtTime(m.date)}
+                      {isPatient ? t('patientChat.you') : t('portal.message.careTeam')} · {fmtTime(m.date)}
                     </small>
                   </div>
                   {isPatient && (
@@ -168,7 +170,7 @@ export default function PatientMessagePage() {
                     handleSend();
                   }
                 }}
-                placeholder="Type your message here..."
+                placeholder={t('portal.message.placeholder')}
               />
               <button
                 className="btn btn-primary align-self-end d-flex align-items-center"

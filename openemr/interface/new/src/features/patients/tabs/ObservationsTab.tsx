@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../../api/nest-client';
 
 interface FieldDef {
@@ -167,6 +168,7 @@ interface Props {
 }
 
 export default function ObservationsTab({ patientId, patientName, readOnly = false }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedForm, setSelectedForm] = useState<string>('vitals_advanced');
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -255,8 +257,8 @@ export default function ObservationsTab({ patientId, patientName, readOnly = fal
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
           <div className="d-flex justify-content-between align-items-center">
-            <h6 className="mb-0 fw-bold"><i className="bi bi-journal-check me-2 text-primary"></i>Clinical Observations — {patientName}</h6>
-            {saved && <span className="badge bg-success rounded-pill"><i className="bi bi-check-lg me-1"></i>Observation Saved</span>}
+            <h6 className="mb-0 fw-bold"><i className="bi bi-journal-check me-2 text-primary"></i>{t('patients.tabs.observations.title', { name: patientName })}</h6>
+            {saved && <span className="badge bg-success rounded-pill"><i className="bi bi-check-lg me-1"></i>{t('patients.tabs.observations.savedBadge')}</span>}
           </div>
         </div>
         <div className="card-body py-2">
@@ -265,16 +267,16 @@ export default function ObservationsTab({ patientId, patientName, readOnly = fal
             {categories.map(cat => (
               <button key={cat} className={`btn btn-sm rounded-pill ${activeCategory === cat ? 'btn-primary' : 'btn-outline-secondary'}`}
                 onClick={() => { setActiveCategory(cat); setSelectedForm(FORM_TEMPLATES.find(f => f.category === cat)?.id || ''); }}>
-                {cat}
+                {t(`patients.tabs.observations.categories.${cat}`, cat)}
               </button>
             ))}
           </div>
           {/* Form templates */}
           <div className="d-flex gap-1 flex-wrap">
-            {filteredTemplates.map(t => (
-              <button key={t.id} className={`btn btn-sm rounded-pill ${selectedForm === t.id ? 'btn-success' : 'btn-outline-success'}`}
-                onClick={() => { setSelectedForm(t.id); setFormData({}); }}>
-                <i className={`bi ${t.icon} me-1`}></i>{t.label}
+            {filteredTemplates.map(tpl => (
+              <button key={tpl.id} className={`btn btn-sm rounded-pill ${selectedForm === tpl.id ? 'btn-success' : 'btn-outline-success'}`}
+                onClick={() => { setSelectedForm(tpl.id); setFormData({}); }}>
+                <i className={`bi ${tpl.icon} me-1`}></i>{t(`patients.tabs.observations.templates.${tpl.id}`, tpl.label)}
               </button>
             ))}
           </div>
@@ -287,14 +289,14 @@ export default function ObservationsTab({ patientId, patientName, readOnly = fal
           <div className="card-header text-white py-3" style={{
             background: 'linear-gradient(135deg, #198754, #0dcaf0)', borderRadius: '16px 16px 0 0',
           }}>
-            <h6 className="mb-0 fw-bold"><i className={`bi ${currentTemplate.icon} me-2`}></i>{currentTemplate.label}</h6>
+            <h6 className="mb-0 fw-bold"><i className={`bi ${currentTemplate.icon} me-2`}></i>{t(`patients.tabs.observations.templates.${currentTemplate.id}`, currentTemplate.label)}</h6>
           </div>
           <div className="card-body bg-light">
             <div className="row g-2">
               {currentTemplate.fields.map(field => (
                 <div key={field.key} className={field.type === 'textarea' ? 'col-12' : 'col-md-4 col-sm-6'}>
                   <label className="form-label small fw-semibold">
-                    {field.label} {field.required && <span className="text-danger">*</span>}
+                    {t(`patients.tabs.observations.fields.${field.key}`, field.label)} {field.required && <span className="text-danger">*</span>}
                   </label>
                   {renderField(field)}
                 </div>
@@ -305,12 +307,12 @@ export default function ObservationsTab({ patientId, patientName, readOnly = fal
                 <button className="btn btn-success rounded-pill px-4" onClick={handleSubmit}
                   disabled={saveObservation.isPending}>
                   {saveObservation.isPending ? (
-                    <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</>
+                    <><span className="spinner-border spinner-border-sm me-1"></span>{t('patients.common.saving')}</>
                   ) : (
-                    <><i className="bi bi-check-lg me-1"></i>Save Observation</>
+                    <><i className="bi bi-check-lg me-1"></i>{t('patients.tabs.observations.save')}</>
                   )}
                 </button>
-                <button className="btn btn-outline-secondary rounded-pill" onClick={() => setFormData({})}>Clear Form</button>
+                <button className="btn btn-outline-secondary rounded-pill" onClick={() => setFormData({})}>{t('patients.tabs.observations.clear')}</button>
               </div>
             )}
           </div>
@@ -321,7 +323,7 @@ export default function ObservationsTab({ patientId, patientName, readOnly = fal
       <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
           <h6 className="mb-0 fw-bold">
-            <i className="bi bi-clock-history me-2 text-info"></i>Observation History ({observations.length})
+            <i className="bi bi-clock-history me-2 text-info"></i>{t('patients.tabs.observations.history', { count: observations.length })}
           </h6>
         </div>
         <div className="card-body p-0" style={{ maxHeight: '400px', overflow: 'auto' }}>
@@ -330,7 +332,7 @@ export default function ObservationsTab({ patientId, patientName, readOnly = fal
           ) : observations.length === 0 ? (
             <div className="text-center text-muted py-4">
               <i className="bi bi-inbox fs-2 d-block mb-1 opacity-25"></i>
-              <small>No observations recorded yet</small>
+              <small>{t('patients.tabs.observations.none')}</small>
             </div>
           ) : (
             observations.map((obs: any, i: number) => (
@@ -349,7 +351,7 @@ export default function ObservationsTab({ patientId, patientName, readOnly = fal
                     </div>
                   ))}
                   {Object.keys(obs.fields || obs.data || {}).length > 8 && (
-                    <div className="col-12"><small className="text-muted">+ more fields...</small></div>
+                    <div className="col-12"><small className="text-muted">{t('patients.tabs.observations.moreFields')}</small></div>
                   )}
                 </div>
               </div>

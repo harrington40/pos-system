@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../../api/nest-client';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function QuickAssign({ patientId, currentProviderId, currentProviderName }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showAll, setShowAll] = useState(false);
   const [justAssignedId, setJustAssignedId] = useState<string | null>(null);
@@ -62,11 +64,11 @@ export default function QuickAssign({ patientId, currentProviderId, currentProvi
     return (
       <div className="card mb-3">
         <div className="card-header py-2">
-          <h6 className="mb-0"><i className="bi bi-person-check me-2"></i>Quick Assign</h6>
+          <h6 className="mb-0"><i className="bi bi-person-check me-2"></i>{t('patients.quickAssign.title')}</h6>
         </div>
         <div className="card-body text-center py-2">
           <div className="spinner-border spinner-border-sm text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
+            <span className="visually-hidden">{t('patients.quickAssign.loading')}</span>
           </div>
         </div>
       </div>
@@ -78,17 +80,17 @@ export default function QuickAssign({ patientId, currentProviderId, currentProvi
       <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
         <h6 className="mb-0">
           <i className="bi bi-person-check me-2"></i>
-          Quick Assign {availableProviders.length > 0 ? '— Available Today' : ''}
+          {t('patients.quickAssign.title')} {availableProviders.length > 0 ? t('patients.quickAssign.availableToday') : ''}
         </h6>
         <span className="badge bg-light text-primary">
-          {availableProviders.length > 0 ? `${availableProviders.length} available` : 'Manual'}
+          {availableProviders.length > 0 ? t('patients.quickAssign.availableCount', { count: availableProviders.length }) : t('patients.quickAssign.manual')}
         </span>
       </div>
       <div className="card-body p-2">
         {currentProviderId && currentProviderName && (
           <div className="alert alert-success py-2 mb-2 small">
             <i className="bi bi-check-circle me-1"></i>
-            Currently assigned to: <strong>{currentProviderName}</strong>
+            {t('patients.quickAssign.currentlyAssigned')} <strong>{currentProviderName}</strong>
           </div>
         )}
 
@@ -96,10 +98,10 @@ export default function QuickAssign({ patientId, currentProviderId, currentProvi
           <div className="text-center py-2">
             <div className="text-muted small mb-2">
               <i className="bi bi-calendar-x me-1"></i>
-              No providers with office hours scheduled today
+              {t('patients.quickAssign.noProvidersToday')}
             </div>
             <button className="btn btn-outline-primary btn-sm" onClick={() => setShowAll(true)}>
-              <i className="bi bi-list-ul me-1"></i>Show All Providers (Manual Assign)
+              <i className="bi bi-list-ul me-1"></i>{t('patients.quickAssign.showAll')}
             </button>
           </div>
         )}
@@ -109,7 +111,7 @@ export default function QuickAssign({ patientId, currentProviderId, currentProvi
             {showAll && availableProviders.length === 0 && (
               <div className="text-muted small px-2 py-1 bg-warning bg-opacity-10 rounded mb-1">
                 <i className="bi bi-info-circle me-1"></i>
-                Manual assignment mode — showing all active providers
+                {t('patients.quickAssign.manualMode')}
               </div>
             )}
             {providers.map((p: any) => {
@@ -132,7 +134,7 @@ export default function QuickAssign({ patientId, currentProviderId, currentProvi
                       <div className="fw-semibold small">
                         {p.title ? `${p.title} ` : ''}{p.fname} {p.lname}
                         {!isScheduled && (
-                          <span className="badge bg-secondary ms-1" style={{ fontSize: '0.65rem' }}>Manual</span>
+                          <span className="badge bg-secondary ms-1" style={{ fontSize: '0.65rem' }}>{t('patients.quickAssign.manualBadge')}</span>
                         )}
                       </div>
                       <div className="text-muted" style={{ fontSize: '0.75rem' }}>
@@ -141,7 +143,7 @@ export default function QuickAssign({ patientId, currentProviderId, currentProvi
                           <span> · {p.first_available?.substring(0, 5)}–{p.last_available?.substring(0, 5)}</span>
                         )}
                         {p.appointment_count > 0 && (
-                          <span> · {p.appointment_count} appt{p.appointment_count !== 1 ? 's' : ''}</span>
+                          <span> · {t('patients.quickAssign.apptCount', { count: p.appointment_count })}</span>
                         )}
                       </div>
                     </div>
@@ -152,11 +154,11 @@ export default function QuickAssign({ patientId, currentProviderId, currentProvi
                     disabled={isAssigned || assignMutation.isPending}
                   >
                     {isAssigned ? (
-                      <><i className="bi bi-check2 me-1"></i>Assigned</>
+                      <><i className="bi bi-check2 me-1"></i>{t('patients.quickAssign.assigned')}</>
                     ) : assignMutation.isPending ? (
-                      <><span className="spinner-border spinner-border-sm me-1"></span>Assigning...</>
+                      <><span className="spinner-border spinner-border-sm me-1"></span>{t('patients.quickAssign.assigning')}</>
                     ) : (
-                      <><i className="bi bi-person-plus me-1"></i>Assign</>
+                      <><i className="bi bi-person-plus me-1"></i>{t('patients.quickAssign.assign')}</>
                     )}
                   </button>
                 </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import RecentApprovalsPanel from '../../components/shared/RecentApprovalsPanel';
@@ -21,12 +22,12 @@ interface ApgarSet {
   respiration: string;
 }
 
-const APGAR_FIELDS: { key: keyof ApgarSet; label: string; icon: string }[] = [
-  { key: 'appearance', label: 'Appearance (Color)', icon: 'bi-palette' },
-  { key: 'pulse', label: 'Pulse (Heart Rate)', icon: 'bi-heart-pulse' },
-  { key: 'grimace', label: 'Grimace (Reflex)', icon: 'bi-emoji-expressionless' },
-  { key: 'activity', label: 'Activity (Tone)', icon: 'bi-person-arms-up' },
-  { key: 'respiration', label: 'Respiration', icon: 'bi-lungs' },
+const APGAR_FIELDS: { key: keyof ApgarSet; labelKey: string; icon: string }[] = [
+  { key: 'appearance', labelKey: 'appearance', icon: 'bi-palette' },
+  { key: 'pulse', labelKey: 'pulse', icon: 'bi-heart-pulse' },
+  { key: 'grimace', labelKey: 'grimace', icon: 'bi-emoji-expressionless' },
+  { key: 'activity', labelKey: 'activity', icon: 'bi-person-arms-up' },
+  { key: 'respiration', labelKey: 'respiration', icon: 'bi-lungs' },
 ];
 
 const APGAR_DEFAULT: ApgarSet = {
@@ -56,6 +57,7 @@ function LiveClock({ timezone, label }: { timezone: string; label: string }) {
 function ApgarColumn({
   title, set, onChange,
 }: { title: string; set: ApgarSet; onChange: (next: ApgarSet) => void }) {
+  const { t } = useTranslation();
   const total = apgarSum(set);
   const interp = interpretApgar(total);
   return (
@@ -65,16 +67,16 @@ function ApgarColumn({
         {APGAR_FIELDS.map((f) => (
           <div className="mb-2" key={f.key}>
             <label className="form-label small mb-0">
-              <i className={`${f.icon} me-1`}></i>{f.label}
+              <i className={`${f.icon} me-1`}></i>{t(`midwife.apgar.${f.labelKey}`)}
             </label>
             <select
               className="form-select form-select-sm"
               value={set[f.key]}
               onChange={(e) => onChange({ ...set, [f.key]: e.target.value })}
             >
-              <option value="0">0 — Absent</option>
-              <option value="1">1 — Weak / Some</option>
-              <option value="2">2 — Strong / Active</option>
+              <option value="0">{t('midwife.apgar.absent')}</option>
+              <option value="1">{t('midwife.apgar.weakSome')}</option>
+              <option value="2">{t('midwife.apgar.strongActive')}</option>
             </select>
           </div>
         ))}
@@ -86,7 +88,7 @@ function ApgarColumn({
           </div>
           <div>
             <div className="fw-bold small" style={{ color: interp.color }}>{interp.interpretation}</div>
-            <div className="text-muted" style={{ fontSize: '0.7rem' }}>{title} total</div>
+            <div className="text-muted" style={{ fontSize: '0.7rem' }}>{t('midwife.apgar.columnTotal', { title })}</div>
           </div>
         </div>
       </div>
@@ -95,6 +97,7 @@ function ApgarColumn({
 }
 
 export default function MidwifeDashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -171,16 +174,16 @@ export default function MidwifeDashboardPage() {
       // rather than reporting a save that did not happen.
       if (saved.duplicate) {
         setSaveNote({
-          text: `Already on the chart — "${saved.summary}" was recorded a few minutes ago, so no duplicate was added.`,
+          text: t('midwife.note.duplicate', { summary: saved.summary }),
           ok: true,
         });
         return;
       }
-      setSaveNote({ text: `Saved to chart — ${saved.summary || 'recorded'}`, ok: true });
+      setSaveNote({ text: t('midwife.note.saved', { summary: saved.summary || t('midwife.note.recorded') }), ok: true });
     },
     onError: (err: any) => {
       setSaveNote({
-        text: err?.response?.data?.message || 'Could not save to the chart.',
+        text: err?.response?.data?.message || t('midwife.note.saveFailed'),
         ok: false,
       });
     },
@@ -190,17 +193,17 @@ export default function MidwifeDashboardPage() {
     mutationFn: async (id: number) => nestClient.delete(`/midwife/assessments/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['midwife-assessments', selectedPatient?.pid] });
-      setSaveNote({ text: 'Record removed.', ok: true });
+      setSaveNote({ text: t('midwife.note.removed'), ok: true });
     },
     onError: (err: any) => {
-      setSaveNote({ text: err?.response?.data?.message || 'Could not remove the record.', ok: false });
+      setSaveNote({ text: err?.response?.data?.message || t('midwife.note.removeFailed'), ok: false });
     },
   });
 
   /** Guards every save: nothing is filed without a patient selected. */
   const saveToChart = (body: Record<string, any>) => {
     if (!selectedPatient) {
-      setSaveNote({ text: 'Select a patient first — the result is filed in their chart.', ok: false });
+      setSaveNote({ text: t('midwife.note.selectFirst'), ok: false });
       return;
     }
     saveAssessment.mutate(body);
@@ -320,16 +323,16 @@ export default function MidwifeDashboardPage() {
           <div>
             <h2 className="mb-1 fw-bold">
               <i className="bi bi-heart-fill me-2"></i>
-              Midwife Dashboard
+              {t('midwife.title')}
             </h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              Welcome, {user?.displayName || 'Midwife'} — Maternal Care & Delivery Management
+              {t('midwife.welcome', { name: user?.displayName || t('midwife.roleFallback') })}
             </p>
           </div>
           <div className="d-flex align-items-center gap-2">
-            <LiveClock timezone="Africa/Monrovia" label="Monrovia" />
+            <LiveClock timezone="Africa/Monrovia" label={t('midwife.clockMonrovia')} />
             <div className="vr opacity-50"></div>
-            <LiveClock timezone="America/New_York" label="Florida (US)" />
+            <LiveClock timezone="America/New_York" label={t('midwife.clockFlorida')} />
           </div>
         </div>
       </div>
@@ -340,12 +343,12 @@ export default function MidwifeDashboardPage() {
           <div className="row g-2 align-items-end">
             <div className="col-md-5">
               <label className="form-label small fw-semibold mb-1">
-                <i className="bi bi-person-badge me-1"></i>Patient
+                <i className="bi bi-person-badge me-1"></i>{t('midwife.patientLabel')}
               </label>
               <input
                 type="text"
                 className="form-control form-control-sm"
-                placeholder="Search by name, chart number or phone…"
+                placeholder={t('midwife.patientSearchPlaceholder')}
                 value={patientSearch}
                 onChange={(e) => setPatientSearch(e.target.value)}
               />
@@ -355,17 +358,17 @@ export default function MidwifeDashboardPage() {
                 <div className="alert alert-success py-2 mb-0 d-flex align-items-center gap-2">
                   <i className="bi bi-check-circle-fill"></i>
                   <span className="small">
-                    Recording against <strong>{selectedPatient.fname} {selectedPatient.lname}</strong>
-                    <span className="text-muted"> · pid {selectedPatient.pid}</span>
+                    {t('midwife.recordingAgainst', { name: `${selectedPatient.fname} ${selectedPatient.lname}` })}
+                    <span className="text-muted"> {t('midwife.pidSuffix', { pid: selectedPatient.pid })}</span>
                   </span>
                   <button className="btn btn-sm btn-outline-secondary rounded-pill ms-auto"
                     onClick={() => { setSelectedPatient(null); setPatientSearch(''); setSaveNote(null); }}>
-                    Change
+                    {t('midwife.change')}
                   </button>
                 </div>
               ) : (
                 <div className="text-muted small">
-                  No patient selected — pick one to file the risk score, EDD and APGAR in their chart.
+                  {t('midwife.noPatientSelected')}
                 </div>
               )}
             </div>
@@ -374,7 +377,7 @@ export default function MidwifeDashboardPage() {
           {!selectedPatient && patientSearch.trim().length >= 2 && (
             <div className="mt-2 border rounded-3" style={{ maxHeight: '220px', overflowY: 'auto' }}>
               {searchResults.length === 0 ? (
-                <div className="text-muted small p-2">No patients match “{patientSearch}”.</div>
+                <div className="text-muted small p-2">{t('midwife.noMatches', { query: patientSearch })}</div>
               ) : (
                 searchResults.map((p: any) => (
                   <button
@@ -389,7 +392,7 @@ export default function MidwifeDashboardPage() {
                   >
                     <span className="fw-semibold small">{p.lname}, {p.fname}</span>
                     <span className="text-muted small ms-2">
-                      {p.DOB ? `DOB ${String(p.DOB).slice(0, 10)}` : ''}
+                      {p.DOB ? t('midwife.dobPrefix', { date: String(p.DOB).slice(0, 10) }) : ''}
                       {p.public_id ? ` · ${p.public_id}` : ''}
                     </span>
                   </button>
@@ -402,7 +405,7 @@ export default function MidwifeDashboardPage() {
             <div className={`alert ${saveNote.ok ? 'alert-success' : 'alert-danger'} py-2 mt-2 mb-0 small d-flex align-items-center gap-2`}>
               <i className={`bi ${saveNote.ok ? 'bi-check-circle' : 'bi-exclamation-triangle'}`}></i>
               <span className="flex-grow-1">{saveNote.text}</span>
-              <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => setSaveNote(null)}>Dismiss</button>
+              <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => setSaveNote(null)}>{t('midwife.dismiss')}</button>
             </div>
           )}
         </div>
@@ -418,7 +421,7 @@ export default function MidwifeDashboardPage() {
                 <i className="bi bi-people-fill fs-5" style={{ color: '#e83e8c' }}></i>
               </div>
               <div className="flex-grow-1">
-                <div className="text-muted small">Maternal Patients</div>
+                <div className="text-muted small">{t('midwife.kpiMaternal')}</div>
                 <div className="fw-bold fs-5">{maternalCount}</div>
               </div>
               {/* The count alone was a dead end — this makes it actionable. */}
@@ -431,9 +434,9 @@ export default function MidwifeDashboardPage() {
                     const p = maternalPatients.find((m: any) => String(m.id) === e.target.value);
                     if (p) { setSelectedPatient({ pid: p.pid, id: p.id, fname: p.fname, lname: p.lname }); setSaveNote(null); }
                   }}
-                  title="Record an assessment for one of these patients"
+                  title={t('midwife.recordAssessmentTitle')}
                 >
-                  <option value="">Select…</option>
+                  <option value="">{t('midwife.selectOption')}</option>
                   {maternalPatients.map((p: any) => (
                     <option key={p.id} value={p.id}>{p.lname}, {p.fname}</option>
                   ))}
@@ -450,7 +453,7 @@ export default function MidwifeDashboardPage() {
                 <i className="bi bi-hourglass-split fs-5" style={{ color: '#fd7e14' }}></i>
               </div>
               <div>
-                <div className="text-muted small">Active Labor</div>
+                <div className="text-muted small">{t('midwife.kpiActiveLabor')}</div>
                 <div className="fw-bold fs-5">{activeLabor}</div>
               </div>
             </div>
@@ -464,7 +467,7 @@ export default function MidwifeDashboardPage() {
                 <i className="bi bi-check-circle fs-5" style={{ color: '#198754' }}></i>
               </div>
               <div>
-                <div className="text-muted small">Deliveries This Month</div>
+                <div className="text-muted small">{t('midwife.kpiDeliveries')}</div>
                 <div className="fw-bold fs-5">{monthlyDeliveries}</div>
               </div>
             </div>
@@ -480,48 +483,47 @@ export default function MidwifeDashboardPage() {
             <div className="card-header bg-white py-3 rounded-top-4">
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-calendar-check me-2" style={{ color: '#e83e8c' }}></i>
-                EDD Calculator — Naegele's Rule
+                {t('midwife.eddTitle')}
               </h6>
             </div>
             <div className="card-body">
               <div className="row g-2 align-items-end">
                 <div className="col-md-6">
-                  <label className="form-label small fw-semibold">Last Menstrual Period (LMP)</label>
+                  <label className="form-label small fw-semibold">{t('midwife.lmp')}</label>
                   <input type="date" className="form-control" value={lmpInput}
                     onChange={e => setLmpInput(e.target.value)} />
                 </div>
                 <div className="col-md-3">
-                  <label className="form-label small fw-semibold">Cycle length (days)</label>
+                  <label className="form-label small fw-semibold">{t('midwife.cycleLength')}</label>
                   <input type="number" min="20" max="45" className="form-control" value={cycleLength}
                     onChange={e => setCycleLength(e.target.value)} />
                 </div>
                 <div className="col-md-3">
                   <button className="btn btn-pink w-100" style={{ backgroundColor: '#e83e8c', color: '#fff' }}
                     onClick={handleEddCalc}>
-                    <i className="bi bi-calculator me-1"></i>Calculate
+                    <i className="bi bi-calculator me-1"></i>{t('midwife.calculate')}
                   </button>
                 </div>
                 <div className="col-md-3"></div>
               </div>
               <div className="form-text">
-                Naegele&apos;s rule assumes a 28-day cycle. A longer cycle ovulates later, so the due
-                date moves out by the difference.
+                {t('midwife.naegeleHelp')}
               </div>
               {eddResult && (
                 <div className="mt-3 p-3 rounded-3" style={{ backgroundColor: '#f8f9fa' }}>
                   <div className="row text-center">
                     <div className="col-4">
-                      <div className="text-muted small">Estimated Due Date</div>
+                      <div className="text-muted small">{t('midwife.estimatedDueDate')}</div>
                       <div className="fw-bold fs-5" style={{ color: '#e83e8c' }}>{eddResult.edd}</div>
                     </div>
                     <div className="col-4">
-                      <div className="text-muted small">Gestational Age</div>
+                      <div className="text-muted small">{t('midwife.gestationalAge')}</div>
                       <div className="fw-bold fs-5">{eddResult.gestationWeeks}w {eddResult.gestationDays}d</div>
                     </div>
                     <div className="col-4">
-                      <div className="text-muted small">Trimester</div>
+                      <div className="text-muted small">{t('midwife.trimester')}</div>
                       <div className="fw-bold fs-5">
-                        {eddResult.gestationWeeks < 13 ? '1st' : eddResult.gestationWeeks < 27 ? '2nd' : '3rd'}
+                        {eddResult.gestationWeeks < 13 ? t('midwife.tri1') : eddResult.gestationWeeks < 27 ? t('midwife.tri2') : t('midwife.tri3')}
                       </div>
                     </div>
                   </div>
@@ -529,10 +531,10 @@ export default function MidwifeDashboardPage() {
                     <button className="btn btn-sm rounded-pill text-white"
                       style={{ backgroundColor: '#e83e8c' }}
                       disabled={!selectedPatient || saveAssessment.isPending}
-                      title={selectedPatient ? 'File this EDD in the patient chart' : 'Select a patient first'}
+                      title={selectedPatient ? t('midwife.fileEddTitle') : t('midwife.selectPatientFirst')}
                       onClick={() => saveToChart({ kind: 'edd', lmp: lmpInput, cycleLengthDays: Number(cycleLength) })}>
                       <i className="bi bi-folder-plus me-1"></i>
-                      {saveAssessment.isPending ? 'Saving…' : 'Save EDD to chart'}
+                      {saveAssessment.isPending ? t('midwife.saving') : t('midwife.saveEdd')}
                     </button>
                   </div>
                 </div>
@@ -545,38 +547,38 @@ export default function MidwifeDashboardPage() {
             <div className="card-header bg-white py-3 rounded-top-4">
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-shield-exclamation me-2" style={{ color: '#fd7e14' }}></i>
-                Pregnancy Risk Assessment (PARs Algorithm)
+                {t('midwife.riskTitle')}
               </h6>
             </div>
             <div className="card-body">
               <div className="row g-2">
                 <div className="col-4">
-                  <label className="form-label small fw-semibold">Age</label>
+                  <label className="form-label small fw-semibold">{t('midwife.age')}</label>
                   <input type="number" className="form-control form-control-sm" value={riskForm.age}
                     onChange={e => setRiskForm(p => ({ ...p, age: e.target.value }))} />
                 </div>
                 <div className="col-4">
-                  <label className="form-label small fw-semibold">Parity</label>
+                  <label className="form-label small fw-semibold">{t('midwife.parity')}</label>
                   <input type="number" className="form-control form-control-sm" value={riskForm.parity}
                     onChange={e => setRiskForm(p => ({ ...p, parity: e.target.value }))} />
                 </div>
                 <div className="col-4">
-                  <label className="form-label small fw-semibold">Gest. Weeks</label>
+                  <label className="form-label small fw-semibold">{t('midwife.gestWeeks')}</label>
                   <input type="number" className="form-control form-control-sm" value={riskForm.gestationWeeks}
                     onChange={e => setRiskForm(p => ({ ...p, gestationWeeks: e.target.value }))} />
                 </div>
                 <div className="col-4">
-                  <label className="form-label small fw-semibold">BP Systolic</label>
+                  <label className="form-label small fw-semibold">{t('midwife.bpSystolic')}</label>
                   <input type="number" className="form-control form-control-sm" value={riskForm.bpSystolic}
                     onChange={e => setRiskForm(p => ({ ...p, bpSystolic: e.target.value }))} />
                 </div>
                 <div className="col-4">
-                  <label className="form-label small fw-semibold">BP Diastolic</label>
+                  <label className="form-label small fw-semibold">{t('midwife.bpDiastolic')}</label>
                   <input type="number" className="form-control form-control-sm" value={riskForm.bpDiastolic}
                     onChange={e => setRiskForm(p => ({ ...p, bpDiastolic: e.target.value }))} />
                 </div>
                 <div className="col-4">
-                  <label className="form-label small fw-semibold">Hb (g/dL)</label>
+                  <label className="form-label small fw-semibold">{t('midwife.hb')}</label>
                   <input type="number" step="0.1" className="form-control form-control-sm" value={riskForm.hemoglobin}
                     onChange={e => setRiskForm(p => ({ ...p, hemoglobin: e.target.value }))} />
                 </div>
@@ -584,19 +586,19 @@ export default function MidwifeDashboardPage() {
                   <div className="form-check mt-4">
                     <input className="form-check-input" type="checkbox" checked={riskForm.hasDiabetes}
                       onChange={e => setRiskForm(p => ({ ...p, hasDiabetes: e.target.checked }))} id="chkDiabetes" />
-                    <label className="form-check-label small" htmlFor="chkDiabetes">Gestational Diabetes</label>
+                    <label className="form-check-label small" htmlFor="chkDiabetes">{t('midwife.gestationalDiabetes')}</label>
                   </div>
                 </div>
                 <div className="col-6">
                   <div className="form-check mt-4">
                     <input className="form-check-input" type="checkbox" checked={riskForm.hasPreeclampsia}
                       onChange={e => setRiskForm(p => ({ ...p, hasPreeclampsia: e.target.checked }))} id="chkPreeclampsia" />
-                    <label className="form-check-label small" htmlFor="chkPreeclampsia">Pre-eclampsia</label>
+                    <label className="form-check-label small" htmlFor="chkPreeclampsia">{t('midwife.preeclampsia')}</label>
                   </div>
                 </div>
               </div>
               <button className="btn btn-warning btn-sm mt-3" onClick={handleRiskCalc}>
-                <i className="bi bi-calculator me-1"></i>Assess Risk
+                <i className="bi bi-calculator me-1"></i>{t('midwife.assessRisk')}
               </button>
               {riskResult && (
                 <div className="mt-3 p-3 rounded-3 d-flex align-items-center gap-3"
@@ -608,7 +610,7 @@ export default function MidwifeDashboardPage() {
                   <div className="flex-grow-1">
                     <div className="fw-bold" style={{ color: riskResult.color }}>{riskResult.label}</div>
                     <div className="text-muted small">
-                      PARs Score: {riskResult.score} of {riskResult.maxScore}
+                      {t('midwife.parsScore', { score: riskResult.score, max: riskResult.maxScore })}
                     </div>
                     {/* Shows the score against the scale, so 5 of 27 does not look
                         the same as 5 of 10. */}
@@ -624,7 +626,7 @@ export default function MidwifeDashboardPage() {
                   </div>
                   <button className="btn btn-sm btn-outline-danger rounded-pill"
                     disabled={!selectedPatient || saveAssessment.isPending}
-                    title={selectedPatient ? 'File this score in the patient chart' : 'Select a patient first'}
+                    title={selectedPatient ? t('midwife.fileScoreTitle') : t('midwife.selectPatientFirst')}
                     onClick={() => saveToChart({
                       kind: 'risk',
                       risk: {
@@ -639,7 +641,7 @@ export default function MidwifeDashboardPage() {
                       },
                     })}>
                     <i className="bi bi-folder-plus me-1"></i>
-                    {saveAssessment.isPending ? 'Saving…' : 'Save to chart'}
+                    {saveAssessment.isPending ? t('midwife.saving') : t('midwife.saveToChart')}
                   </button>
                 </div>
               )}
@@ -648,7 +650,7 @@ export default function MidwifeDashboardPage() {
                    number with no attribution and cannot check it against the
                    notes. */
                 <div className="mt-3 pt-3 border-top">
-                  <div className="text-muted small fw-semibold mb-2">Score breakdown</div>
+                  <div className="text-muted small fw-semibold mb-2">{t('midwife.scoreBreakdown')}</div>
                   <ul className="list-unstyled mb-0 small">
                     {riskResult.factors.map(f => (
                       <li key={f.label} className="d-flex justify-content-between align-items-start gap-3 py-1">
@@ -664,7 +666,7 @@ export default function MidwifeDashboardPage() {
               )}
               {riskResult && riskResult.factors.length === 0 && (
                 <div className="mt-3 pt-3 border-top text-muted small">
-                  No risk factors recorded — every input is within normal limits.
+                  {t('midwife.noRiskFactors')}
                 </div>
               )}
             </div>
@@ -678,26 +680,25 @@ export default function MidwifeDashboardPage() {
             <div className="card-header bg-white py-3 rounded-top-4">
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-clipboard2-pulse me-2" style={{ color: '#0dcaf0' }}></i>
-                APGAR Score — Newborn Assessment
+                {t('midwife.apgarTitle')}
               </h6>
             </div>
             <div className="card-body">
               <p className="text-muted small">
-                Documented twice after birth — record both. The 5-minute score carries the
-                interpretation that goes on the chart.
+                {t('midwife.apgarHelp')}
               </p>
               <div className="row g-3">
-                <ApgarColumn title="At 1 minute" set={apgar1} onChange={setApgar1} />
-                <ApgarColumn title="At 5 minutes" set={apgar5} onChange={setApgar5} />
+                <ApgarColumn title={t('midwife.at1Minute')} set={apgar1} onChange={setApgar1} />
+                <ApgarColumn title={t('midwife.at5Minutes')} set={apgar5} onChange={setApgar5} />
               </div>
               <div className="d-flex align-items-center gap-2 mt-3">
                 <span className="badge rounded-pill" style={{ backgroundColor: apgarInterpretation.color }}>
                   {apgarInterpretation.interpretation}
                 </span>
-                <span className="text-muted small">from the 5-minute score ({apgar5Total})</span>
+                <span className="text-muted small">{t('midwife.fromFiveMinute', { score: apgar5Total })}</span>
                 <button className="btn btn-sm btn-outline-info rounded-pill ms-auto"
                   disabled={!selectedPatient || saveAssessment.isPending}
-                  title={selectedPatient ? 'File both APGAR scores in the patient chart' : 'Select a patient first'}
+                  title={selectedPatient ? t('midwife.fileApgarTitle') : t('midwife.selectPatientFirst')}
                   onClick={() => saveToChart({
                     kind: 'apgar',
                     apgar: {
@@ -714,7 +715,7 @@ export default function MidwifeDashboardPage() {
                     },
                   })}>
                   <i className="bi bi-folder-plus me-1"></i>
-                  {saveAssessment.isPending ? 'Saving…' : `Save APGAR (1min ${apgar1Total} / 5min ${apgar5Total})`}
+                  {saveAssessment.isPending ? t('midwife.saving') : t('midwife.saveApgar', { one: apgar1Total, five: apgar5Total })}
                 </button>
               </div>
               {/* What to do next, based on the minute the score was taken. A
@@ -722,11 +723,11 @@ export default function MidwifeDashboardPage() {
                   reassessment, and that is easy to miss once saved. */}
               <div className="mt-2 small">
                 <div className="text-muted">
-                  <span className="fw-semibold">At 1 min:</span>{' '}
+                  <span className="fw-semibold">{t('midwife.at1Short')}</span>{' '}
                   {apgarGuidance(apgar1Total, 1)}
                 </div>
                 <div className="text-muted">
-                  <span className="fw-semibold">At 5 min:</span>{' '}
+                  <span className="fw-semibold">{t('midwife.at5Short')}</span>{' '}
                   {apgarGuidance(apgar5Total, 5)}
                 </div>
               </div>
@@ -738,17 +739,17 @@ export default function MidwifeDashboardPage() {
             <div className="card-header bg-white py-3 rounded-top-4 d-flex justify-content-between align-items-center">
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-clipboard-heart me-2" style={{ color: '#e83e8c' }}></i>
-                Deliveries This Month
+                {t('midwife.kpiDeliveries')}
               </h6>
               <span className="badge rounded-pill" style={{ backgroundColor: '#e83e8c' }}>
-                {deliveries.length} scheduled
+                {t('midwife.scheduledCount', { count: deliveries.length })}
               </span>
             </div>
             <div className="card-body p-0">
               {deliveries.length === 0 ? (
                 <div className="text-center py-4 text-muted small">
                   <i className="bi bi-calendar-x fs-3 d-block mb-2"></i>
-                  No deliveries scheduled this month
+                  {t('midwife.noDeliveries')}
                 </div>
               ) : (
                 <div className="list-group list-group-flush" style={{ maxHeight: '320px', overflowY: 'auto' }}>
@@ -762,7 +763,7 @@ export default function MidwifeDashboardPage() {
                           d.pc_apptstatus === 'Pending' ? 'bg-secondary' :
                           d.pc_apptstatus === 'Scheduled' ? 'bg-info' : 'bg-secondary'
                         }`}>
-                          {d.pc_apptstatus || 'Scheduled'}
+                          {d.pc_apptstatus || t('midwife.statusScheduled')}
                         </span>
                       </div>
                       <div className="d-flex justify-content-between text-muted" style={{ fontSize: '0.75rem' }}>
@@ -784,7 +785,7 @@ export default function MidwifeDashboardPage() {
           <div className="card-header bg-white py-3 rounded-top-4 d-flex justify-content-between align-items-center">
             <h6 className="mb-0 fw-bold">
               <i className="bi bi-archive me-2" style={{ color: '#6f42c1' }}></i>
-              Recorded for {selectedPatient.fname} {selectedPatient.lname}
+              {t('midwife.recordedFor', { name: `${selectedPatient.fname} ${selectedPatient.lname}` })}
             </h6>
             <span className="badge bg-secondary rounded-pill">{assessments.length}</span>
           </div>
@@ -792,14 +793,14 @@ export default function MidwifeDashboardPage() {
             {assessments.length === 0 ? (
               <div className="text-center py-4 text-muted small">
                 <i className="bi bi-inbox fs-3 d-block mb-2"></i>
-                Nothing recorded for this patient yet.
+                {t('midwife.nothingRecorded')}
               </div>
             ) : (
               <div className="table-responsive">
                 <table className="table table-sm table-hover mb-0" style={{ fontSize: '0.8rem' }}>
                   <thead className="table-light">
                     <tr>
-                      <th>When</th><th>Type</th><th>Result</th><th>By</th><th></th>
+                      <th>{t('midwife.thWhen')}</th><th>{t('midwife.thType')}</th><th>{t('midwife.thResult')}</th><th>{t('midwife.thBy')}</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -824,7 +825,7 @@ export default function MidwifeDashboardPage() {
                         <td className="text-muted">{a.author_name || '—'}</td>
                         <td className="text-end">
                           <button className="btn btn-sm btn-outline-danger rounded-pill"
-                            title="Remove this record"
+                            title={t('midwife.removeRecord')}
                             disabled={deleteAssessment.isPending}
                             onClick={() => deleteAssessment.mutate(a.id)}>
                             <i className="bi bi-trash"></i>

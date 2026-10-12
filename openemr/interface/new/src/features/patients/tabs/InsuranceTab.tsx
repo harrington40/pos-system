@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { Insurance } from '../../../types/insurance';
 
 interface Props {
@@ -5,12 +6,13 @@ interface Props {
 }
 
 export default function InsuranceTab({ insurance }: Props) {
+  const { t } = useTranslation();
   if (insurance.length === 0) {
     return (
       <div className="card">
         <div className="card-body text-center text-muted p-4">
           <i className="bi bi-shield-check" style={{ fontSize: '2rem' }}></i>
-          <p className="mt-2 mb-0">No insurance records found for this patient.</p>
+          <p className="mt-2 mb-0">{t('patients.tabs.insurance.none')}</p>
         </div>
       </div>
     );
@@ -21,7 +23,7 @@ export default function InsuranceTab({ insurance }: Props) {
       <div className="card-header">
         <h5 className="mb-0">
           <i className="bi bi-shield-check me-2"></i>
-          Insurance Information
+          {t('patients.tabs.insurance.title')}
         </h5>
       </div>
       <div className="card-body p-0">
@@ -29,13 +31,13 @@ export default function InsuranceTab({ insurance }: Props) {
           <table className="table table-hover mb-0">
             <thead className="table-light">
               <tr>
-                <th>Type</th>
-                <th>Plan Name</th>
-                <th>Policy #</th>
-                <th>Group #</th>
-                <th>Subscriber</th>
-                <th>Copay</th>
-                <th>Status</th>
+                <th>{t('patients.tabs.insurance.thType')}</th>
+                <th>{t('patients.tabs.insurance.thPlan')}</th>
+                <th>{t('patients.tabs.insurance.thPolicy')}</th>
+                <th>{t('patients.tabs.insurance.thGroup')}</th>
+                <th>{t('patients.tabs.insurance.thSubscriber')}</th>
+                <th>{t('patients.tabs.insurance.thCopay')}</th>
+                <th>{t('patients.tabs.insurance.thStatus')}</th>
               </tr>
             </thead>
             <tbody>

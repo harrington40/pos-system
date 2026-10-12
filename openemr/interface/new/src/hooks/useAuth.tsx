@@ -16,6 +16,8 @@ interface AuthUser {
   can_view_charts?: boolean;
   can_edit_charges?: boolean;
   token?: string;
+  /** Saved UI language preference (e.g. 'en' | 'es'). */
+  language?: string;
 }
 
 interface AuthContextValue {

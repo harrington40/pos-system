@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
 export default function EyeExamPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [pid, setPid] = useState('');
   const [form, setForm] = useState({
@@ -26,47 +28,47 @@ export default function EyeExamPage() {
 
   return (
     <div>
-      <h3 className="mb-4"><i className="bi bi-eye me-2"></i>Eye Examination (Ophthalmology)</h3>
+      <h3 className="mb-4"><i className="bi bi-eye me-2"></i>{t('eyeExam.title')}</h3>
 
       <div className="card shadow-sm mb-4">
         <div className="card-body">
           <div className="row g-2 mb-3">
-            <div className="col-md-3"><label className="form-label small">Patient ID</label><input className="form-control form-control-sm" value={pid} onChange={e => setPid(e.target.value)} /></div>
+            <div className="col-md-3"><label className="form-label small">{t('eyeExam.patientId')}</label><input className="form-control form-control-sm" value={pid} onChange={e => setPid(e.target.value)} /></div>
           </div>
 
-          <h6 className="text-muted text-uppercase small">Visual Acuity</h6>
+          <h6 className="text-muted text-uppercase small">{t('eyeExam.visualAcuity')}</h6>
           <div className="row g-2 mb-3">
-            <div className="col-md-3"><label className="form-label small">OD (Right)</label><input className="form-control form-control-sm" placeholder="20/20" value={form.visual_acuity_od} onChange={e => setForm({...form, visual_acuity_od: e.target.value})} /></div>
-            <div className="col-md-3"><label className="form-label small">OS (Left)</label><input className="form-control form-control-sm" placeholder="20/20" value={form.visual_acuity_os} onChange={e => setForm({...form, visual_acuity_os: e.target.value})} /></div>
+            <div className="col-md-3"><label className="form-label small">{t('eyeExam.odRight')}</label><input className="form-control form-control-sm" placeholder={t('eyeExam.acuityPlaceholder')} value={form.visual_acuity_od} onChange={e => setForm({...form, visual_acuity_od: e.target.value})} /></div>
+            <div className="col-md-3"><label className="form-label small">{t('eyeExam.osLeft')}</label><input className="form-control form-control-sm" placeholder={t('eyeExam.acuityPlaceholder')} value={form.visual_acuity_os} onChange={e => setForm({...form, visual_acuity_os: e.target.value})} /></div>
           </div>
 
-          <h6 className="text-muted text-uppercase small">Intraocular Pressure (mmHg)</h6>
+          <h6 className="text-muted text-uppercase small">{t('eyeExam.iop')}</h6>
           <div className="row g-2 mb-3">
-            <div className="col-md-3"><label className="form-label small">OD</label><input className="form-control form-control-sm" type="number" value={form.iop_od} onChange={e => setForm({...form, iop_od: e.target.value})} /></div>
-            <div className="col-md-3"><label className="form-label small">OS</label><input className="form-control form-control-sm" type="number" value={form.iop_os} onChange={e => setForm({...form, iop_os: e.target.value})} /></div>
+            <div className="col-md-3"><label className="form-label small">{t('eyeExam.od')}</label><input className="form-control form-control-sm" type="number" value={form.iop_od} onChange={e => setForm({...form, iop_od: e.target.value})} /></div>
+            <div className="col-md-3"><label className="form-label small">{t('eyeExam.os')}</label><input className="form-control form-control-sm" type="number" value={form.iop_os} onChange={e => setForm({...form, iop_os: e.target.value})} /></div>
           </div>
 
-          <h6 className="text-muted text-uppercase small">Refraction</h6>
+          <h6 className="text-muted text-uppercase small">{t('eyeExam.refraction')}</h6>
           <div className="row g-2 mb-3">
-            <div className="col-md-3"><label className="form-label small">OD</label><input className="form-control form-control-sm" placeholder="-1.00 DS" value={form.refraction_od} onChange={e => setForm({...form, refraction_od: e.target.value})} /></div>
-            <div className="col-md-3"><label className="form-label small">OS</label><input className="form-control form-control-sm" placeholder="-0.50 DS" value={form.refraction_os} onChange={e => setForm({...form, refraction_os: e.target.value})} /></div>
+            <div className="col-md-3"><label className="form-label small">{t('eyeExam.od')}</label><input className="form-control form-control-sm" placeholder={t('eyeExam.refractionOdPlaceholder')} value={form.refraction_od} onChange={e => setForm({...form, refraction_od: e.target.value})} /></div>
+            <div className="col-md-3"><label className="form-label small">{t('eyeExam.os')}</label><input className="form-control form-control-sm" placeholder={t('eyeExam.refractionOsPlaceholder')} value={form.refraction_os} onChange={e => setForm({...form, refraction_os: e.target.value})} /></div>
           </div>
 
-          <h6 className="text-muted text-uppercase small">Examination</h6>
+          <h6 className="text-muted text-uppercase small">{t('eyeExam.examination')}</h6>
           <div className="row g-2 mb-3">
-            <div className="col-md-6"><label className="form-label small">Anterior Segment</label><textarea className="form-control form-control-sm" rows={2} value={form.anterior_segment} onChange={e => setForm({...form, anterior_segment: e.target.value})} placeholder="Cornea clear, anterior chamber deep..." /></div>
-            <div className="col-md-6"><label className="form-label small">Posterior Segment</label><textarea className="form-control form-control-sm" rows={2} value={form.posterior_segment} onChange={e => setForm({...form, posterior_segment: e.target.value})} placeholder="Optic nerve pink, macula flat..." /></div>
+            <div className="col-md-6"><label className="form-label small">{t('eyeExam.anteriorSegment')}</label><textarea className="form-control form-control-sm" rows={2} value={form.anterior_segment} onChange={e => setForm({...form, anterior_segment: e.target.value})} placeholder={t('eyeExam.anteriorPlaceholder')} /></div>
+            <div className="col-md-6"><label className="form-label small">{t('eyeExam.posteriorSegment')}</label><textarea className="form-control form-control-sm" rows={2} value={form.posterior_segment} onChange={e => setForm({...form, posterior_segment: e.target.value})} placeholder={t('eyeExam.posteriorPlaceholder')} /></div>
           </div>
 
           <div className="row g-2 mb-3">
-            <div className="col-md-6"><label className="form-label small">Diagnosis</label><input className="form-control form-control-sm" value={form.diagnosis} onChange={e => setForm({...form, diagnosis: e.target.value})} /></div>
-            <div className="col-md-6"><label className="form-label small">Plan</label><input className="form-control form-control-sm" value={form.plan} onChange={e => setForm({...form, plan: e.target.value})} /></div>
+            <div className="col-md-6"><label className="form-label small">{t('eyeExam.diagnosis')}</label><input className="form-control form-control-sm" value={form.diagnosis} onChange={e => setForm({...form, diagnosis: e.target.value})} /></div>
+            <div className="col-md-6"><label className="form-label small">{t('eyeExam.plan')}</label><input className="form-control form-control-sm" value={form.plan} onChange={e => setForm({...form, plan: e.target.value})} /></div>
           </div>
 
           <button className="btn btn-primary" onClick={() => saveExam.mutate(form)} disabled={saveExam.isPending || !pid}>
-            {saveExam.isPending ? 'Saving...' : 'Save Eye Exam'}
+            {saveExam.isPending ? t('eyeExam.saving') : t('eyeExam.saveExam')}
           </button>
-          {saveExam.isSuccess && <span className="text-success ms-2"><i className="bi bi-check-circle"></i> Saved</span>}
+          {saveExam.isSuccess && <span className="text-success ms-2"><i className="bi bi-check-circle"></i> {t('eyeExam.saved')}</span>}
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAppointments, deleteAppointment } from '../../api/endpoints/appointments';
 import type { Appointment } from '../../types/appointment';
@@ -22,8 +23,8 @@ function formatDate(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
-function formatDisplayDate(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+function formatDisplayDate(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function isToday(d: Date): boolean {
@@ -51,6 +52,12 @@ function getCategoryStyle(catid?: number) {
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7 AM to 7 PM
 
 export default function AppointmentCalendarPage() {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language?.startsWith('es') ? 'es-ES' : 'en-US';
+  /** Appointment status codes are posted to the API as English values, so the
+   *  code stays the value and only the label is translated. */
+  const statusLabel = (status: string | undefined) =>
+    status ? t(`appointments.status.${status}`, { defaultValue: status }) : t('appointments.status.Scheduled');
   const queryClient = useQueryClient();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const now = new Date();
@@ -144,17 +151,17 @@ export default function AppointmentCalendarPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{background:'linear-gradient(135deg, #0d6efd 0%, #0dcaf0 50%, #6610f2 100%)'}}>
         <div className="d-flex justify-content-between align-items-start">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-calendar-event me-2"></i>Appointments</h2>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-calendar-event me-2"></i>{t('appointments.calendar.title')}</h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              {formatDisplayDate(weekDates[0])} — {formatDisplayDate(weekDates[6])} · {appointments.length} appointments
+              {t('appointments.calendar.summary', { from: formatDisplayDate(weekDates[0], locale), to: formatDisplayDate(weekDates[6], locale), count: appointments.length })}
             </p>
           </div>
           <div className="d-flex gap-2">
-            <button className="btn btn-light btn-sm rounded-pill" onClick={goToToday}>Today</button>
+            <button className="btn btn-light btn-sm rounded-pill" onClick={goToToday}>{t('appointments.calendar.today')}</button>
             <button className="btn btn-outline-light btn-sm rounded-pill" onClick={() => navigateWeek(-1)}><i className="bi bi-chevron-left"></i></button>
             <button className="btn btn-outline-light btn-sm rounded-pill" onClick={() => navigateWeek(1)}><i className="bi bi-chevron-right"></i></button>
             <button className="btn btn-light btn-sm rounded-pill" onClick={() => { setSelectedDate(formatDate(new Date())); setShowCreateModal(true); }}>
-              <i className="bi bi-plus-lg me-1"></i>New
+              <i className="bi bi-plus-lg me-1"></i>{t('appointments.calendar.new')}
             </button>
           </div>
         </div>
@@ -163,7 +170,7 @@ export default function AppointmentCalendarPage() {
       {/* Week header */}
       <div className="mb-3">
         <strong>
-          {formatDisplayDate(weekDates[0])} — {formatDisplayDate(weekDates[6])}
+          {formatDisplayDate(weekDates[0], locale)} — {formatDisplayDate(weekDates[6], locale)}
         </strong>
       </div>
 
@@ -171,7 +178,7 @@ export default function AppointmentCalendarPage() {
       {isLoading ? (
         <div className="text-center p-5">
           <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
+            <span className="visually-hidden">{t('common.loading')}</span>
           </div>
         </div>
       ) : (
@@ -181,13 +188,13 @@ export default function AppointmentCalendarPage() {
               <table className="table table-bordered mb-0">
                 <thead className="table-light">
                   <tr>
-                    <th style={{ width: '80px' }}>Time</th>
+                    <th style={{ width: '80px' }}>{t('appointments.calendar.time')}</th>
                     {weekDates.map((date) => (
                       <th
                         key={date.toISOString()}
                         className={isToday(date) ? 'table-primary' : ''}
                       >
-                        <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                        <div>{date.toLocaleDateString(locale, { weekday: 'short' })}</div>
                         <div className={isToday(date) ? 'fw-bold' : ''}>
                           {date.getDate()}
                         </div>
@@ -199,7 +206,7 @@ export default function AppointmentCalendarPage() {
                   {HOURS.map((hour) => (
                     <tr key={hour}>
                       <td className="text-muted small align-top" style={{ whiteSpace: 'nowrap' }}>
-                        {hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                        {new Date(2020, 0, 1, hour).toLocaleTimeString(locale, { hour: 'numeric' })}
                       </td>
                       {weekDates.map((date) => {
                         const dateStr = formatDate(date);
@@ -225,10 +232,10 @@ export default function AppointmentCalendarPage() {
                                 <div className="d-flex justify-content-between align-items-start" style={getCategoryStyle(apt.pc_catid)}>
                                   <div className="small p-1 rounded">
                                     <strong>
-                                      {apt.fname ? formatPatientNameLastFirst(apt) : `Pt #${apt.pc_pid}`}
+                                      {apt.fname ? formatPatientNameLastFirst(apt) : t('appointments.calendar.patientFallback', { pid: apt.pc_pid })}
                                     </strong>
                                     <br />
-                                    <span>{apt.pc_title || 'Appointment'}</span>
+                                    <span>{apt.pc_title || t('appointments.calendar.titleFallback')}</span>
                                     {apt.patient_public_id && <><br /><small className="text-muted">{apt.patient_public_id}</small></>}
                                     <br />
                                     <small>
@@ -238,14 +245,14 @@ export default function AppointmentCalendarPage() {
                                   </div>
                                   <div className="d-flex flex-column align-items-end gap-1">
                                     <span className={`badge ${getStatusBadge(apt.pc_apptstatus)}`}>
-                                      {apt.pc_apptstatus || 'Scheduled'}
+                                      {statusLabel(apt.pc_apptstatus)}
                                     </span>
                                     {apt.pc_pid && (
                                       <button
                                         className="btn btn-outline-danger btn-sm py-0 px-1"
-                                        title="Delete"
+                                        title={t('common.delete')}
                                         onClick={() => {
-                                          if (confirm('Delete this appointment?')) {
+                                          if (confirm(t('appointments.calendar.confirmDelete'))) {
                                             deleteMutation.mutate({
                                               pid: String(apt.pc_pid),
                                               eid: apt.pc_eid,

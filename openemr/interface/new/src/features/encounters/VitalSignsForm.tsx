@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { VitalSign } from '../../types/encounter';
 import { formatVital, formatBP } from '../../utils/vitalsClassify';
 
@@ -8,15 +9,16 @@ interface Props {
 }
 
 export default function VitalSignsForm({ vitals }: Props) {
+  const { t } = useTranslation();
   if (vitals.length === 0) {
     return (
       <div className="card">
         <div className="card-header">
-          <h5 className="mb-0">Vital Signs</h5>
+          <h5 className="mb-0">{t('encounters.vitalSigns.title')}</h5>
         </div>
         <div className="card-body text-center text-muted p-4">
           <i className="bi bi-heart-pulse" style={{ fontSize: '2rem' }}></i>
-          <p className="mt-2 mb-0">No vital signs recorded for this encounter.</p>
+          <p className="mt-2 mb-0">{t('encounters.vitalSigns.none')}</p>
         </div>
       </div>
     );
@@ -26,26 +28,26 @@ export default function VitalSignsForm({ vitals }: Props) {
   const latest = vitals[vitals.length - 1];
 
   const vitalFields: { label: string; value: string | undefined; unit: string }[] = [
-    { label: 'Blood Pressure', value: formatBP(latest.BP_systolic, latest.BP_diastolic), unit: 'mmHg' },
-    { label: 'Heart Rate', value: formatVital(latest.pulse), unit: 'bpm' },
-    { label: 'Temperature', value: formatVital(latest.temperature, 1), unit: '°F/°C' },
-    { label: 'Respiration', value: formatVital(latest.respiration), unit: '/min' },
-    { label: 'O2 Saturation', value: formatVital(latest.oxygen_saturation), unit: '%' },
-    { label: 'Weight', value: formatVital(latest.weight, 1), unit: 'lbs/kg' },
-    { label: 'Height', value: formatVital(latest.height, 1), unit: 'in/cm' },
-    { label: 'BMI', value: formatVital(latest.BMI, 1), unit: 'kg/m²' },
-    { label: 'Waist Circumference', value: formatVital(latest.waist_circumference, 1), unit: 'in/cm' },
-    { label: 'Head Circumference', value: formatVital(latest.head_circumference, 1), unit: 'in/cm' },
+    { label: t('encounters.vitalSigns.bp'), value: formatBP(latest.BP_systolic, latest.BP_diastolic), unit: 'mmHg' },
+    { label: t('encounters.vitalSigns.hr'), value: formatVital(latest.pulse), unit: 'bpm' },
+    { label: t('encounters.vitalSigns.temperature'), value: formatVital(latest.temperature, 1), unit: '°F/°C' },
+    { label: t('encounters.vitalSigns.respiration'), value: formatVital(latest.respiration), unit: '/min' },
+    { label: t('encounters.vitalSigns.spo2'), value: formatVital(latest.oxygen_saturation), unit: '%' },
+    { label: t('encounters.vitalSigns.weight'), value: formatVital(latest.weight, 1), unit: 'lbs/kg' },
+    { label: t('encounters.vitalSigns.height'), value: formatVital(latest.height, 1), unit: 'in/cm' },
+    { label: t('encounters.vitalSigns.bmi'), value: formatVital(latest.BMI, 1), unit: 'kg/m²' },
+    { label: t('encounters.vitalSigns.waist'), value: formatVital(latest.waist_circumference, 1), unit: 'in/cm' },
+    { label: t('encounters.vitalSigns.head'), value: formatVital(latest.head_circumference, 1), unit: 'in/cm' },
   ];
 
   return (
     <div className="card">
       <div className="card-header">
-        <h5 className="mb-0">Vital Signs</h5>
+        <h5 className="mb-0">{t('encounters.vitalSigns.title')}</h5>
       </div>
       <div className="card-body">
         <div className="text-muted small mb-3">
-          Recorded: {latest.date || 'Unknown'}
+          {t('encounters.vitalSigns.recorded')} {latest.date || t('encounters.vitalSigns.unknownDate')}
         </div>
         <div className="row">
           {vitalFields.map((field) => (

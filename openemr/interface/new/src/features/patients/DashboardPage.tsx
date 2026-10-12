@@ -1,11 +1,13 @@
 import { useAuth } from '../../hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../api/nest-client';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
 import { chartPatientId } from '../../utils/patientChart';
 
 export default function DashboardPage() {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const today = new Date().toISOString().split('T')[0];
@@ -41,14 +43,14 @@ export default function DashboardPage() {
   const totalEncounters = financialStats?.encounterCount || 0;
 
   const quickActions = [
-    { label: 'New Patient', icon: 'bi-person-plus', color: '#198754', bg: '#19875415', path: '/patients' },
-    { label: 'Schedule', icon: 'bi-calendar-plus', color: '#0d6efd', bg: '#0d6efd15', path: '/appointments' },
-    { label: 'Patient Flow', icon: 'bi-kanban', color: '#0dcaf0', bg: '#0dcaf015', path: '/appointments/flow' },
-    { label: 'Messages', icon: 'bi-chat-dots', color: '#fd7e14', bg: '#fd7e1415', path: '/messages' },
-    { label: 'Reports', icon: 'bi-graph-up', color: '#6f42c1', bg: '#6f42c115', path: '/reports' },
-    { label: 'Drug Info', icon: 'bi-capsule', color: '#dc3545', bg: '#dc354515', path: '/drug-info' },
-    { label: 'Providers', icon: 'bi-people', color: '#0d6efd', bg: '#0d6efd15', path: '/providers' },
-    { label: 'Billing', icon: 'bi-cash-stack', color: '#C8102E', bg: '#C8102E15', path: '/billing' },
+    { label: t('patients.dashboard.qaNewPatient'), icon: 'bi-person-plus', color: '#198754', bg: '#19875415', path: '/patients' },
+    { label: t('patients.dashboard.qaSchedule'), icon: 'bi-calendar-plus', color: '#0d6efd', bg: '#0d6efd15', path: '/appointments' },
+    { label: t('patients.dashboard.qaPatientFlow'), icon: 'bi-kanban', color: '#0dcaf0', bg: '#0dcaf015', path: '/appointments/flow' },
+    { label: t('patients.dashboard.qaMessages'), icon: 'bi-chat-dots', color: '#fd7e14', bg: '#fd7e1415', path: '/messages' },
+    { label: t('patients.dashboard.qaReports'), icon: 'bi-graph-up', color: '#6f42c1', bg: '#6f42c115', path: '/reports' },
+    { label: t('patients.dashboard.qaDrugInfo'), icon: 'bi-capsule', color: '#dc3545', bg: '#dc354515', path: '/drug-info' },
+    { label: t('patients.dashboard.qaProviders'), icon: 'bi-people', color: '#0d6efd', bg: '#0d6efd15', path: '/providers' },
+    { label: t('patients.dashboard.qaBilling'), icon: 'bi-cash-stack', color: '#C8102E', bg: '#C8102E15', path: '/billing' },
   ];
 
   return (
@@ -56,14 +58,14 @@ export default function DashboardPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{background:'linear-gradient(135deg, #0d6efd 0%, #6610f2 40%, #C8102E 100%)'}}>
         <div className="d-flex justify-content-between align-items-start">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-speedometer2 me-2"></i>Clinic Overview</h2>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-speedometer2 me-2"></i>{t('patients.dashboard.title')}</h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {new Date().toLocaleDateString(i18n.language?.startsWith('es') ? 'es-ES' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
           <div className="text-end">
-            <div className="text-white text-opacity-75 small">Welcome back</div>
-            <div className="fw-bold">{user?.displayName || 'Admin'}</div>
+            <div className="text-white text-opacity-75 small">{t('patients.dashboard.welcomeBack')}</div>
+            <div className="fw-bold">{user?.displayName || t('patients.dashboard.admin')}</div>
           </div>
         </div>
       </div>
@@ -71,12 +73,12 @@ export default function DashboardPage() {
       {/* Main Stats */}
       <div className="row g-3 mb-4">
         {[
-          {v:totalPatients,l:'Total Patients',c:'#0d6efd',i:'bi-people',path:'/patients',sub:patientStats?.bySex?.filter((s:any)=>s.sex).map((s:any)=>`${s.sex}:${s.count}`).join(' · ')},
-          {v:appointments.length,l:"Today's Appts",c:'#198754',i:'bi-calendar-check',path:'/appointments',sub:`${checkedIn} checked in`},
-          {v:newMsgs,l:'New Messages',c:'#fd7e14',i:'bi-envelope-exclamation',path:'/messages',sub:`${messages.length} total`},
-          {v:pendingPatients.length,l:'Pending Approval',c:'#dc3545',i:'bi-hourglass-split',path:'/registrar-dashboard',sub:'Registrar queue'},
-          {v:totalEncounters,l:'Encounters',c:'#6f42c1',i:'bi-clipboard-pulse',path:'/reports',sub:'Total recorded'},
-          {v:8,l:'Quick Actions',c:'#0dcaf0',i:'bi-lightning-charge',path:'',sub:'Available'},
+          {v:totalPatients,l:t('patients.dashboard.statTotalPatients'),c:'#0d6efd',i:'bi-people',path:'/patients',sub:patientStats?.bySex?.filter((s:any)=>s.sex).map((s:any)=>`${s.sex}:${s.count}`).join(' · ')},
+          {v:appointments.length,l:t('patients.dashboard.statTodayAppts'),c:'#198754',i:'bi-calendar-check',path:'/appointments',sub:t('patients.dashboard.checkedIn',{count:checkedIn})},
+          {v:newMsgs,l:t('patients.dashboard.statNewMessages'),c:'#fd7e14',i:'bi-envelope-exclamation',path:'/messages',sub:t('patients.dashboard.totalCount',{count:messages.length})},
+          {v:pendingPatients.length,l:t('patients.dashboard.statPendingApproval'),c:'#dc3545',i:'bi-hourglass-split',path:'/registrar-dashboard',sub:t('patients.dashboard.registrarQueue')},
+          {v:totalEncounters,l:t('patients.dashboard.statEncounters'),c:'#6f42c1',i:'bi-clipboard-pulse',path:'/reports',sub:t('patients.dashboard.totalRecorded')},
+          {v:8,l:t('patients.dashboard.statQuickActions'),c:'#0dcaf0',i:'bi-lightning-charge',path:'',sub:t('patients.dashboard.available')},
         ].map((s,i)=>(
           <div className="col-md-2 col-sm-4" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{borderRadius:'16px',cursor:s.path?'pointer':'default'}}
@@ -100,19 +102,19 @@ export default function DashboardPage() {
         <div className="col-lg-7">
           <div className="card border-0 shadow-sm" style={{borderRadius:'16px'}}>
             <div className="card-header bg-white d-flex justify-content-between py-3" style={{borderRadius:'16px 16px 0 0'}}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-calendar-event me-2 text-primary"></i>Today's Schedule</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-calendar-event me-2 text-primary"></i>{t('patients.dashboard.todaysSchedule')}</h6>
               <span className="badge bg-primary rounded-pill">{appointments.length}</span>
             </div>
             <div className="card-body p-0">
               {appointments.length>0?(
                 <table className="table table-hover mb-0 small">
-                  <thead className="table-light"><tr><th>Time</th><th>Patient</th><th>Title</th><th>Status</th></tr></thead>
+                  <thead className="table-light"><tr><th>{t('patients.dashboard.thTime')}</th><th>{t('patients.dashboard.thPatient')}</th><th>{t('patients.dashboard.thTitle')}</th><th>{t('patients.dashboard.thStatus')}</th></tr></thead>
                   <tbody>{appointments.map((a:any)=>(
                     <tr key={a.pc_eid}><td>{a.pc_startTime?.substring(0,5)||'—'}</td><td>#{a.pc_pid}</td><td>{a.pc_title||'—'}</td>
                       <td><span className={`badge rounded-pill ${a.pc_apptstatus==='Checked In'?'bg-info':a.pc_apptstatus==='Checkout'?'bg-success':'bg-secondary'}`}>{a.pc_apptstatus||'Scheduled'}</span></td></tr>
                   ))}</tbody>
                 </table>
-              ):<div className="text-center text-muted py-4"><i className="bi bi-calendar-x fs-3 d-block mb-2 opacity-50"></i>No appointments today</div>}
+              ):<div className="text-center text-muted py-4"><i className="bi bi-calendar-x fs-3 d-block mb-2 opacity-50"></i>{t('patients.dashboard.noAppointments')}</div>}
             </div>
           </div>
         </div>
@@ -122,20 +124,20 @@ export default function DashboardPage() {
           {/* Inventory Summary */}
           <div className="card border-0 shadow-sm mb-3" style={{borderRadius:'16px'}}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{borderRadius:'16px 16px 0 0'}}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-boxes me-2 text-primary"></i>Inventory</h6>
-              <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={()=>navigate('/inventory')}>View Inventory</button>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-boxes me-2 text-primary"></i>{t('patients.dashboard.inventory')}</h6>
+              <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={()=>navigate('/inventory')}>{t('patients.dashboard.viewInventory')}</button>
             </div>
             <div className="card-body py-2">
               <div className="d-flex justify-content-between py-2 border-bottom small">
-                <span className="text-muted"><i className="bi bi-exclamation-triangle text-warning me-1"></i>Low Stock</span>
+                <span className="text-muted"><i className="bi bi-exclamation-triangle text-warning me-1"></i>{t('patients.dashboard.lowStock')}</span>
                 <strong>{inventorySummary?.summary?.lowStock ?? 0}</strong>
               </div>
               <div className="d-flex justify-content-between py-2 border-bottom small">
-                <span className="text-muted"><i className="bi bi-x-circle text-danger me-1"></i>Out of Stock</span>
+                <span className="text-muted"><i className="bi bi-x-circle text-danger me-1"></i>{t('patients.dashboard.outOfStock')}</span>
                 <strong>{inventorySummary?.summary?.outOfStock ?? 0}</strong>
               </div>
               <div className="d-flex justify-content-between py-2 small">
-                <span className="text-muted"><i className="bi bi-hourglass-split text-info me-1"></i>Expiring Soon</span>
+                <span className="text-muted"><i className="bi bi-hourglass-split text-info me-1"></i>{t('patients.dashboard.expiringSoon')}</span>
                 <strong>{inventorySummary?.summary?.expiringSoon ?? 0}</strong>
               </div>
             </div>
@@ -144,7 +146,7 @@ export default function DashboardPage() {
           {/* Pending Approvals */}
           <div className="card border-0 shadow-sm mb-3" style={{borderRadius:'16px'}}>
             <div className="card-header bg-white d-flex justify-content-between py-3" style={{borderRadius:'16px 16px 0 0'}}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-hourglass-split me-2 text-danger"></i>Pending Approvals</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-hourglass-split me-2 text-danger"></i>{t('patients.dashboard.pendingApprovals')}</h6>
               <span className="badge bg-danger rounded-pill">{pendingPatients.length}</span>
             </div>
             <div className="card-body p-0">
@@ -154,18 +156,18 @@ export default function DashboardPage() {
                     <div className="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center" style={{width:'32px',height:'32px'}}>
                       <small className="fw-bold text-danger">{p.fname?.[0]}{p.lname?.[0]}</small>
                     </div>
-                    <div className="flex-grow-1"><small className="fw-semibold">{formatPatientNameLastFirst(p)}</small><br/><small className="text-muted">{p.created_by||'—'} · {p.vitals_count||0} vitals</small></div>
+                    <div className="flex-grow-1"><small className="fw-semibold">{formatPatientNameLastFirst(p)}</small><br/><small className="text-muted">{t('patients.dashboard.createdByVitals',{createdBy:p.created_by||'—',count:p.vitals_count||0})}</small></div>
                     <i className="bi bi-chevron-right text-muted small"></i>
                   </div>
                 ))
-              ):<div className="text-center text-muted py-3 small">No pending approvals</div>}
+              ):<div className="text-center text-muted py-3 small">{t('patients.dashboard.noPendingApprovals')}</div>}
             </div>
           </div>
 
           {/* Recent Messages */}
           <div className="card border-0 shadow-sm" style={{borderRadius:'16px'}}>
             <div className="card-header bg-white d-flex justify-content-between py-3" style={{borderRadius:'16px 16px 0 0'}}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-chat-dots me-2 text-warning"></i>Recent Messages</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-chat-dots me-2 text-warning"></i>{t('patients.dashboard.recentMessages')}</h6>
             </div>
             <div className="card-body p-0">
               {messages.slice(0,5).map((m:any)=>(
@@ -174,14 +176,14 @@ export default function DashboardPage() {
                   <div className="text-muted text-truncate">{m.body}</div>
                 </div>
               ))}
-              {!messages.length&&<div className="text-center text-muted py-3 small">No messages</div>}
+              {!messages.length&&<div className="text-center text-muted py-3 small">{t('patients.dashboard.noMessages')}</div>}
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions Grid */}
-      <h6 className="fw-bold mt-4 mb-3"><i className="bi bi-lightning-charge me-2 text-info"></i>Quick Actions</h6>
+      <h6 className="fw-bold mt-4 mb-3"><i className="bi bi-lightning-charge me-2 text-info"></i>{t('patients.dashboard.statQuickActions')}</h6>
       <div className="row g-2 mb-3">
         {quickActions.map(a=>(
           <div className="col-md-3 col-sm-4 col-6" key={a.label}>

@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
@@ -86,6 +87,7 @@ const ndcOf = (drug: string) =>
 // ── Component ────────────────────────────────────────────────────────
 
 export default function PharmacyPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -136,7 +138,7 @@ export default function PharmacyPage() {
     () =>
       (alertsData?.alerts || []).map((a: any): FeedItem => ({
         id: a.id,
-        title: a.drug || 'Prescription order',
+        title: a.drug || t('pharmacy.orderFallback'),
         subtitle: a.patient_name && String(a.patient_name).trim()
           ? String(a.patient_name).trim()
           : `Patient #${a.pid}`,
@@ -144,27 +146,27 @@ export default function PharmacyPage() {
         at: a.created_at,
         icon: 'bi-capsule-pill',
         tone: '#0d6efd',
-        status: a.is_read ? 'Read' : 'New',
+        status: a.is_read ? t('pharmacy.statusRead') : t('pharmacy.statusNew'),
         unread: !a.is_read,
         link: patientChartPath(a.patient_id, a.pid) || undefined,
-        linkLabel: 'Open chart',
+        linkLabel: t('pharmacy.openChart'),
         metrics: [
-          { label: 'Order type', value: 'Pharmacy', color: '#0d6efd' },
-          { label: 'Received', value: formatDateTime(a.created_at), color: '#6f42c1' },
-          { label: 'Status', value: a.is_read ? 'Read' : 'New', color: a.is_read ? '#198754' : '#dc3545' },
+          { label: t('pharmacy.metricOrderType'), value: t('pharmacy.pharmacyLabel'), color: '#0d6efd' },
+          { label: t('pharmacy.metricReceived'), value: formatDateTime(a.created_at), color: '#6f42c1' },
+          { label: t('pharmacy.metricStatus'), value: a.is_read ? t('pharmacy.statusRead') : t('pharmacy.statusNew'), color: a.is_read ? '#198754' : '#dc3545' },
         ],
         fields: [
-          ['Drug', a.drug],
-          ['Patient', a.patient_name && String(a.patient_name).trim() ? String(a.patient_name).trim() : 'Unknown'],
-          ['PID', a.pid],
-          ['Received', formatDateTime(a.created_at)],
-          ['Status', a.is_read ? 'Read' : 'New'],
+          [t('pharmacy.fieldDrug'), a.drug],
+          [t('pharmacy.fieldPatient'), a.patient_name && String(a.patient_name).trim() ? String(a.patient_name).trim() : t('pharmacy.unknownPatient')],
+          [t('pharmacy.fieldPid'), a.pid],
+          [t('pharmacy.fieldReceived'), formatDateTime(a.created_at)],
+          [t('pharmacy.fieldStatus'), a.is_read ? t('pharmacy.statusRead') : t('pharmacy.statusNew')],
         ],
         lists: a.message
-          ? [{ title: 'Order note', lines: String(a.message).split(/\r?\n/).filter(Boolean) }]
+          ? [{ title: t('pharmacy.orderNote'), lines: String(a.message).split(/\r?\n/).filter(Boolean) }]
           : undefined,
       })),
-    [alertsData],
+    [alertsData, t],
   );
 
   // Drug information / FDA lookup driven by the medication search.
@@ -193,12 +195,12 @@ export default function PharmacyPage() {
     mutationFn: (p: any) => nestClient.post('/inventory/dispense', { drug: p.drug, quantity: Number(p.quantity) || 1, patient_id: p.patient_id }),
     onSuccess: (res) => {
       alert(res.data?.dispensed
-        ? `Dispensed — ${res.data.itemName} now at ${res.data.remaining}`
-        : (res.data?.message || 'No matching inventory item'));
+        ? t('pharmacy.dispensedToast', { item: res.data.itemName, remaining: res.data.remaining })
+        : (res.data?.message || t('pharmacy.noInventoryItem')));
       qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['pharmacy-inventory'] });
     },
-    onError: (e: any) => alert(e?.response?.data?.message || 'Dispense failed'),
+    onError: (e: any) => alert(e?.response?.data?.message || t('pharmacy.dispenseFailed')),
   });
 
   // ── Smart algorithms ───────────────────────────────────────────────
@@ -283,13 +285,17 @@ export default function PharmacyPage() {
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '8rem', transform: 'rotate(10deg) translate(30px,-10px)' }}><i className="bi bi-capsule"></i></div>
         <div className="position-relative d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-capsule-pill me-2"></i>Pharmacist Workstation</h2>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-capsule-pill me-2"></i>{t('pharmacy.title')}</h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              {totalActive} active prescriptions · {pendingVerification} awaiting verification · {interactions.length} interaction flag{interactions.length !== 1 ? 's' : ''}
+              {t('pharmacy.headerStats', {
+                active: totalActive,
+                pending: pendingVerification,
+                interactions: t('pharmacy.interactionFlags', { count: interactions.length }),
+              })}
             </p>
           </div>
           <div className="d-flex gap-2">
-            <button className="btn btn-outline-light rounded-pill position-relative" title="New prescription orders"
+            <button className="btn btn-outline-light rounded-pill position-relative" title={t('pharmacy.newOrders')}
               onClick={() => document.getElementById('rx-alerts')?.scrollIntoView({ behavior: 'smooth' })}>
               <i className="bi bi-bell"></i>
               {(alertsData?.unreadCount || 0) > 0 && (
@@ -300,7 +306,7 @@ export default function PharmacyPage() {
             </button>
             <button className="btn btn-light rounded-pill" onClick={() => setShowForm(!showForm)}>
               <i className={`bi ${showForm ? 'bi-x-lg' : 'bi-plus-lg'} me-1`}></i>
-              {showForm ? 'Cancel' : 'New Prescription'}
+              {showForm ? t('common.cancel') : t('pharmacy.newPrescription')}
             </button>
           </div>
         </div>
@@ -313,18 +319,18 @@ export default function PharmacyPage() {
             <div className="col-md-5">
               <div className="input-group">
                 <span className="input-group-text bg-white border-end-0"><i className="bi bi-search text-muted"></i></span>
-                <input className="form-control form-control-sm border-start-0" placeholder="Search medication, patient…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <input className="form-control form-control-sm border-start-0" placeholder={t('pharmacy.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
             </div>
             <div className="col-md-5">
               <div className="input-group">
                 <span className="input-group-text bg-white border-end-0"><i className="bi bi-upc-scan text-primary"></i></span>
-                <input className="form-control form-control-sm border-start-0" placeholder="Scan / enter barcode or NDC…" value={scan} onChange={(e) => setScan(e.target.value)} />
+                <input className="form-control form-control-sm border-start-0" placeholder={t('pharmacy.scanPlaceholder')} value={scan} onChange={(e) => setScan(e.target.value)} />
                 {scan && <button className="btn btn-outline-secondary btn-sm" onClick={() => setScan('')}><i className="bi bi-x-lg"></i></button>}
               </div>
             </div>
             <div className="col-md-2 text-end">
-              <span className="badge bg-info rounded-pill"><i className="bi bi-upc me-1"></i>Barcode mode</span>
+              <span className="badge bg-info rounded-pill"><i className="bi bi-upc me-1"></i>{t('pharmacy.barcodeMode')}</span>
             </div>
           </div>
         </div>
@@ -356,29 +362,29 @@ export default function PharmacyPage() {
       {/* New prescription form */}
       {showForm && (
         <div className="card mb-4">
-          <div className="card-header py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-prescription2 me-2 text-primary"></i>New Prescription</h6></div>
+          <div className="card-header py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-prescription2 me-2 text-primary"></i>{t('pharmacy.newPrescription')}</h6></div>
           <div className="card-body">
             <div className="row g-2">
-              <div className="col-md-3"><label className="form-label small mb-0">Patient</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('pharmacy.patient')}</label>
                 <select className="form-select form-select-sm" value={form.pid} onChange={(e) => setForm({ ...form, pid: e.target.value })}>
-                  <option value="">Select patient…</option>
+                  <option value="">{t('pharmacy.selectPatient')}</option>
                   {patients.map((p: any) => <option key={p.pid} value={p.pid}>{formatPatientNameLastFirst(p)} (#{p.public_id || p.pid})</option>)}
                 </select>
               </div>
-              <div className="col-md-3"><label className="form-label small mb-0">Medication</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('pharmacy.medication')}</label>
                 <input className="form-control form-control-sm" list="common-drugs" value={form.drug} onChange={(e) => setForm({ ...form, drug: e.target.value })} />
                 <datalist id="common-drugs">{COMMON_DRUGS.map((d) => <option key={d.name} value={d.name} />)}</datalist>
               </div>
-              <div className="col-md-2"><label className="form-label small mb-0">Dosage</label><input className="form-control form-control-sm" value={form.dosage} onChange={(e) => setForm({ ...form, dosage: e.target.value })} placeholder="500mg" /></div>
-              <div className="col-md-2"><label className="form-label small mb-0">Frequency</label><input className="form-control form-control-sm" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} placeholder="TID" /></div>
-              <div className="col-md-2"><label className="form-label small mb-0">Quantity</label><input className="form-control form-control-sm" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="30" /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Duration</label><input className="form-control form-control-sm" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="30 days" /></div>
-              <div className="col-md-2"><label className="form-label small mb-0">Refills</label><input className="form-control form-control-sm" value={form.refills} onChange={(e) => setForm({ ...form, refills: e.target.value })} placeholder="0" /></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Pharmacy</label><input className="form-control form-control-sm" value={form.pharmacy} onChange={(e) => setForm({ ...form, pharmacy: e.target.value })} placeholder="e.g. Hospital Pharmacy" /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Notes</label><input className="form-control form-control-sm" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+              <div className="col-md-2"><label className="form-label small mb-0">{t('pharmacy.dosage')}</label><input className="form-control form-control-sm" value={form.dosage} onChange={(e) => setForm({ ...form, dosage: e.target.value })} placeholder="500mg" /></div>
+              <div className="col-md-2"><label className="form-label small mb-0">{t('pharmacy.frequency')}</label><input className="form-control form-control-sm" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} placeholder="TID" /></div>
+              <div className="col-md-2"><label className="form-label small mb-0">{t('pharmacy.quantity')}</label><input className="form-control form-control-sm" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="30" /></div>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('pharmacy.duration')}</label><input className="form-control form-control-sm" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="30 days" /></div>
+              <div className="col-md-2"><label className="form-label small mb-0">{t('pharmacy.refills')}</label><input className="form-control form-control-sm" value={form.refills} onChange={(e) => setForm({ ...form, refills: e.target.value })} placeholder="0" /></div>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('pharmacy.pharmacyLabel')}</label><input className="form-control form-control-sm" value={form.pharmacy} onChange={(e) => setForm({ ...form, pharmacy: e.target.value })} placeholder={t('pharmacy.pharmacyPlaceholder')} /></div>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('pharmacy.notes')}</label><input className="form-control form-control-sm" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
               <div className="col-md-2 d-flex align-items-end">
                 <button className="btn btn-primary btn-sm rounded-pill w-100" onClick={() => createRx.mutate(form)} disabled={!form.pid || !form.drug || createRx.isPending}>
-                  {createRx.isPending ? 'Saving…' : <><i className="bi bi-check-lg me-1"></i>Create</>}
+                  {createRx.isPending ? t('pharmacy.saving') : <><i className="bi bi-check-lg me-1"></i>{t('pharmacy.create')}</>}
                 </button>
               </div>
             </div>
@@ -391,18 +397,18 @@ export default function PharmacyPage() {
         <div className="col-lg-8">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white d-flex justify-content-between py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-capsule me-2 text-primary"></i>Medication List</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-capsule me-2 text-primary"></i>{t('pharmacy.medicationList')}</h6>
               <span className="badge bg-primary rounded-pill">{filteredRx.length} of {totalActive}</span>
             </div>
             <div className="card-body p-0">
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0 small">
                   <thead className="table-light">
-                    <tr><th>Medication</th><th>Dosage</th><th>Refills</th><th>Billing</th><th>Barcode / NDC</th><th className="text-end">Actions</th></tr>
+                    <tr><th>{t('pharmacy.medication')}</th><th>{t('pharmacy.dosage')}</th><th>{t('pharmacy.refills')}</th><th>{t('pharmacy.thBilling')}</th><th>{t('pharmacy.thBarcode')}</th><th className="text-end">{t('common.actions')}</th></tr>
                   </thead>
                   <tbody>
                     {filteredRx.length === 0 ? (
-                      <tr><td colSpan={6} className="text-center text-muted py-4">No medications found.</td></tr>
+                      <tr><td colSpan={6} className="text-center text-muted py-4">{t('pharmacy.noMedications')}</td></tr>
                     ) : groupedRx.map((g) => (
                       <Fragment key={g.name}>
                         <tr className="table-light">
@@ -424,26 +430,26 @@ export default function PharmacyPage() {
                               <td>
                                 <div className="fw-semibold">{p.drug}</div>
                                 <span className="badge bg-light text-dark border">{cat}</span>
-                                {isScanned && <span className="badge bg-warning text-dark ms-1"><i className="bi bi-upc-scan me-1"></i>Scanned</span>}
-                                {hasInteraction && <span className="badge bg-danger bg-opacity-10 text-danger ms-1" title="Potential interaction"><i className="bi bi-exclamation-triangle me-1"></i>Check</span>}
-                                {p.billing_held && <span className="badge bg-danger ms-1" title="Billing hold — clear the bill to dispense"><i className="bi bi-lock-fill me-1"></i>Billing hold</span>}
-                                {!p.billing_held && p.billed && p.billing_cleared && <span className="badge bg-success bg-opacity-10 text-success ms-1" title="Billing cleared — ready to dispense"><i className="bi bi-box-seam me-1"></i>Ready</span>}
+                                {isScanned && <span className="badge bg-warning text-dark ms-1"><i className="bi bi-upc-scan me-1"></i>{t('pharmacy.scanned')}</span>}
+                                {hasInteraction && <span className="badge bg-danger bg-opacity-10 text-danger ms-1" title={t('pharmacy.potentialInteraction')}><i className="bi bi-exclamation-triangle me-1"></i>{t('pharmacy.check')}</span>}
+                                {p.billing_held && <span className="badge bg-danger ms-1" title={t('pharmacy.billingHoldHint')}><i className="bi bi-lock-fill me-1"></i>{t('pharmacy.billingHold')}</span>}
+                                {!p.billing_held && p.billed && p.billing_cleared && <span className="badge bg-success bg-opacity-10 text-success ms-1" title={t('pharmacy.readyHint')}><i className="bi bi-box-seam me-1"></i>{t('pharmacy.ready')}</span>}
                               </td>
                               <td>{p.dosage || '—'}</td>
                               <td>{p.refills ?? 0}</td>
                               <td>
                                 {!canViewFinancials(user) ? (
-                                  <span className="badge bg-light text-muted border" title="Restricted">xxxx</span>
+                                  <span className="badge bg-light text-muted border" title={t('pharmacy.restricted')}>xxxx</span>
                                 ) : p.billing_held ? (
-                                  <span className="badge bg-danger" title={`Billing hold — $${Number(p.hold_fee_usd || p.billed_amount_usd || 0).toFixed(2)} unpaid. Clear in Billing first.`}>
+                                  <span className="badge bg-danger" title={t('pharmacy.billingHoldFee', { amount: `$${Number(p.hold_fee_usd || p.billed_amount_usd || 0).toFixed(2)}` })}>
                                     <i className="bi bi-lock-fill me-1"></i>Awaiting clearance
                                   </span>
                                 ) : !p.billed ? (
-                                  <span className="badge bg-light text-muted border" title="Awaiting billing">Pending</span>
+                                  <span className="badge bg-light text-muted border" title={t('pharmacy.pendingHint')}>{t('pharmacy.pending')}</span>
                                 ) : p.paid ? (
-                                  <span className="badge bg-success" title="Paid in full"><i className="bi bi-check-circle me-1"></i>Paid</span>
+                                  <span className="badge bg-success" title={t('pharmacy.paidHint')}><i className="bi bi-check-circle me-1"></i>{t('pharmacy.paid')}</span>
                                 ) : (
-                                  <span className="badge bg-warning text-dark" title={`$${Number(p.patient_balance_usd || 0).toFixed(2)} outstanding`}>
+                                  <span className="badge bg-warning text-dark" title={t('pharmacy.outstanding', { amount: `$${Number(p.patient_balance_usd || 0).toFixed(2)}` })}>
                                     ${Number(p.billed_amount_usd || 0).toFixed(2)} owed
                                   </span>
                                 )}
@@ -453,18 +459,18 @@ export default function PharmacyPage() {
                                 <small className="text-muted d-block" style={{ fontSize: '0.62rem' }}>{ndcOf(p.drug) || 'N/A'}</small>
                               </td>
                               <td className="text-end text-nowrap" onClick={(e) => e.stopPropagation()}>
-                                <button className={`btn btn-sm rounded-pill ${isVerified ? 'btn-success' : 'btn-outline-secondary'}`} onClick={() => setVerified((v) => ({ ...v, [p.id]: !v[p.id] }))} title="Toggle verification">
-                                  <i className={`bi ${isVerified ? 'bi-check-lg' : 'bi-shield-check'} me-1`}></i>{isVerified ? 'Verified' : 'Verify'}
+                                <button className={`btn btn-sm rounded-pill ${isVerified ? 'btn-success' : 'btn-outline-secondary'}`} onClick={() => setVerified((v) => ({ ...v, [p.id]: !v[p.id] }))} title={t('pharmacy.toggleVerification')}>
+                                  <i className={`bi ${isVerified ? 'bi-check-lg' : 'bi-shield-check'} me-1`}></i>{isVerified ? t('pharmacy.verified') : t('pharmacy.verify')}
                                 </button>
                                 <button className="btn btn-sm btn-primary rounded-pill ms-1" disabled={!!p.billing_held}
                                   onClick={() => dispense.mutate(p)}
-                                  title={p.billing_held ? 'Billing hold — clear the bill before dispensing' : 'Dispense (decrements inventory)'}>
-                                  <i className={`bi ${p.billing_held ? 'bi-lock-fill' : 'bi-box-arrow-down'} me-1`}></i>Dispense
+                                  title={p.billing_held ? t('pharmacy.dispenseHoldHint') : t('pharmacy.dispenseHint')}>
+                                  <i className={`bi ${p.billing_held ? 'bi-lock-fill' : 'bi-box-arrow-down'} me-1`}></i>{t('pharmacy.dispense')}
                                 </button>
-                                <button className="btn btn-sm btn-outline-secondary rounded-pill ms-1" onClick={(e) => { e.stopPropagation(); setPrintRx(p); }} title="Print medication label">
+                                <button className="btn btn-sm btn-outline-secondary rounded-pill ms-1" onClick={(e) => { e.stopPropagation(); setPrintRx(p); }} title={t('pharmacy.printLabel')}>
                                   <i className="bi bi-printer"></i>
                                 </button>
-                                <button className="btn btn-sm btn-outline-secondary rounded-pill ms-1" onClick={(e) => { e.stopPropagation(); const cid = chartPatientId(p.patient_id, p.patientId, p.pid); if (cid) navigate(`/patients/${cid}`); }} title="Open patient chart">
+                                <button className="btn btn-sm btn-outline-secondary rounded-pill ms-1" onClick={(e) => { e.stopPropagation(); const cid = chartPatientId(p.patient_id, p.patientId, p.pid); if (cid) navigate(`/patients/${cid}`); }} title={t('pharmacy.openChart')}>
                                   <i className="bi bi-person-badge"></i>
                                 </button>
                               </td>
@@ -482,19 +488,19 @@ export default function PharmacyPage() {
           {/* Drug information & FDA lookup (based on medication search) */}
           <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px', borderLeft: '4px solid #6f42c1' }}>
             <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold"><i className="bi bi-capsule-pill me-2" style={{ color: '#6f42c1' }}></i>Drug Information & FDA Lookup</h6>
-              <span className="badge" style={{ backgroundColor: '#6f42c1' }}>{drugInfo?.patientCount ?? 0} patients</span>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-capsule-pill me-2" style={{ color: '#6f42c1' }}></i>{t('pharmacy.drugInfoTitle')}</h6>
+              <span className="badge" style={{ backgroundColor: '#6f42c1' }}>{t('pharmacy.patients', { count: drugInfo?.patientCount ?? 0 })}</span>
             </div>
             <div className="card-body">
               {selectedDrugs.length > 0 && (
                 <div className="mb-2">
-                  <div className="small fw-semibold text-muted mb-1">Selected medications ({selectedDrugs.length})</div>
+                  <div className="small fw-semibold text-muted mb-1">{t('pharmacy.selectedMedications', { count: selectedDrugs.length })}</div>
                   <div className="d-flex flex-wrap gap-1">
                     {selectedDrugs.map((d) => <span key={d} className="badge bg-primary rounded-pill">{d}</span>)}
                   </div>
                   {selectedInteractions.length > 0 && (
                     <div className="mt-2">
-                      <div className="small fw-semibold text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Interactions among selected</div>
+                      <div className="small fw-semibold text-danger"><i className="bi bi-exclamation-triangle me-1"></i>{t('pharmacy.interactionsAmongSelected')}</div>
                       {selectedInteractions.map((r, i) => <div key={i} className="small text-muted">• {r.a} + {r.b}: {r.risk}</div>)}
                     </div>
                   )}
@@ -503,22 +509,22 @@ export default function PharmacyPage() {
               {drugInfo ? (
                 <>
                   <div className="fw-semibold mb-1">{drugInfo.drugName}</div>
-                  {drugInfo.fda?.openfda?.brand_name?.[0] && <div className="small text-muted mb-2">Brand: {drugInfo.fda.openfda.brand_name[0]}</div>}
+                  {drugInfo.fda?.openfda?.brand_name?.[0] && <div className="small text-muted mb-2">{t('pharmacy.brand', { name: drugInfo.fda.openfda.brand_name[0] })}</div>}
                   {(drugInfo.interactionWarnings || []).length > 0 && (
                     <div className="mb-2">
-                      <div className="small fw-semibold text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Interaction Warnings</div>
+                      <div className="small fw-semibold text-danger"><i className="bi bi-exclamation-triangle me-1"></i>{t('pharmacy.interactionWarnings')}</div>
                       {drugInfo.interactionWarnings.map((w: string, i: number) => <div key={i} className="small text-muted">• {w}</div>)}
                     </div>
                   )}
                   {(drugInfo.allergyWarnings || []).length > 0 && (
                     <div className="mb-2">
-                      <div className="small fw-semibold text-danger"><i className="bi bi-shield-exclamation me-1"></i>Allergy Warnings</div>
+                      <div className="small fw-semibold text-danger"><i className="bi bi-shield-exclamation me-1"></i>{t('pharmacy.allergyWarnings')}</div>
                       {drugInfo.allergyWarnings.map((w: string, i: number) => <div key={i} className="small text-muted">• {w}</div>)}
                     </div>
                   )}
                   {(drugInfo.topAdverseReactions || []).length > 0 && (
                     <div>
-                      <div className="small fw-semibold text-muted mb-1">Top adverse reactions</div>
+                      <div className="small fw-semibold text-muted mb-1">{t('pharmacy.topAdverse')}</div>
                       <div className="d-flex flex-wrap gap-1">
                         {drugInfo.topAdverseReactions.map((r: any, i: number) => (
                           <span key={i} className="badge bg-light text-dark border">{r.term}</span>
@@ -527,15 +533,15 @@ export default function PharmacyPage() {
                     </div>
                   )}
                   {!drugInfo.fda && drugInfo.patientCount === 0 && (drugInfo.interactionWarnings || []).length === 0 && (drugInfo.allergyWarnings || []).length === 0 && (drugInfo.topAdverseReactions || []).length === 0 && (
-                    <div className="text-muted small">No FDA records found for "{drugInfoTerm}".</div>
+                    <div className="text-muted small">{t('pharmacy.noFdaRecords', { term: drugInfoTerm })}</div>
                   )}
                 </>
               ) : drugInfoTerm ? (
                 <div className="text-center py-3"><div className="spinner-border spinner-border-sm"></div></div>
               ) : selectedDrugs.length > 1 ? (
-                <div className="text-muted small"><i className="bi bi-arrow-left-right me-1"></i>Multiple medications selected — cross-interactions shown above.</div>
+                <div className="text-muted small"><i className="bi bi-arrow-left-right me-1"></i>{t('pharmacy.multipleSelected')}</div>
               ) : (
-                <div className="text-muted small"><i className="bi bi-search me-1"></i>Select a medication from the list (or search) to load FDA drug information, interactions, and adverse reactions.</div>
+                <div className="text-muted small"><i className="bi bi-search me-1"></i>{t('pharmacy.selectMedication')}</div>
               )}
             </div>
           </div>
@@ -545,23 +551,23 @@ export default function PharmacyPage() {
         <div className="col-lg-4">
           {/* Provider → pharmacist notification queue (shared card + modal viewer) */}
           <NotificationFeedCard
-            title="New Prescription Orders"
+            title={t('pharmacy.feedTitle')}
             icon="bi-bell-fill"
             tone="#0d6efd"
             items={pharmacyFeed}
-            emptyText="No pending orders"
+            emptyText={t('pharmacy.feedEmpty')}
             onOpen={(item) => setOpenFeed(item)}
           />
 
           {/* Smart alerts */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px', borderLeft: '4px solid #dc3545' }}>
             <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold"><i className="bi bi-shield-exclamation me-2 text-danger"></i>Smart Clinical Alerts</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-shield-exclamation me-2 text-danger"></i>{t('pharmacy.smartAlerts')}</h6>
               <span className="badge bg-danger rounded-pill">{interactions.length + duplicateTherapies.length}</span>
             </div>
             <div className="card-body">
               {interactions.length === 0 && duplicateTherapies.length === 0 ? (
-                <div className="text-muted small"><i className="bi bi-check-circle me-1 text-success"></i>No interaction or duplicate-therapy flags detected.</div>
+                <div className="text-muted small"><i className="bi bi-check-circle me-1 text-success"></i>{t('pharmacy.noFlags')}</div>
               ) : (
                 <>
                   {interactions.map((r, i) => (
@@ -573,7 +579,7 @@ export default function PharmacyPage() {
                   {duplicateTherapies.map((d) => (
                     <div key={d.category} className="d-flex gap-2 border-bottom py-2 small">
                       <i className="bi bi-layers text-warning"></i>
-                      <div><strong>Duplicate therapy</strong><div className="text-muted">{d.category} × {d.count}</div></div>
+                      <div><strong>{t('pharmacy.duplicateTherapy')}</strong><div className="text-muted">{d.category} × {d.count}</div></div>
                     </div>
                   ))}
                 </>
@@ -584,7 +590,7 @@ export default function PharmacyPage() {
           {/* Verification queue */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold"><i className="bi bi-shield-check me-2 text-warning"></i>Verification Queue</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-shield-check me-2 text-warning"></i>{t('pharmacy.verificationQueue')}</h6>
               <span className="badge bg-warning text-dark rounded-pill">{pendingVerification}</span>
             </div>
             <div className="card-body p-0">
@@ -594,19 +600,19 @@ export default function PharmacyPage() {
                   <button className="btn btn-sm btn-outline-success py-0 px-2" onClick={() => setVerified((v) => ({ ...v, [p.id]: true }))}><i className="bi bi-check-lg"></i></button>
                 </div>
               ))}
-              {pendingVerification === 0 && <div className="text-muted small text-center py-3">All medications verified ✓</div>}
+              {pendingVerification === 0 && <div className="text-muted small text-center py-3">{t('pharmacy.allVerified')}</div>}
             </div>
           </div>
 
           {/* Low stock */}
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', borderLeft: '4px solid #198754' }}>
             <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold"><i className="bi bi-boxes me-2 text-success"></i>Low Stock Alerts</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-boxes me-2 text-success"></i>{t('pharmacy.lowStockAlerts')}</h6>
               <span className="badge bg-success rounded-pill">{lowStock.length}</span>
             </div>
             <div className="card-body p-0">
               {lowStock.length === 0 ? (
-                <div className="text-muted small text-center py-3">All inventory well stocked.</div>
+                <div className="text-muted small text-center py-3">{t('pharmacy.allWellStocked')}</div>
               ) : lowStock.slice(0, 6).map((i: any) => (
                 <div key={i.id} className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom small">
                   <span className="fw-semibold text-truncate">{i.name}</span>
@@ -638,13 +644,14 @@ export default function PharmacyPage() {
 // ── Standard pharmacy medication label (printable) ────────────────────────
 
 function MedicationLabelModal({ p, onClose }: { p: any; onClose: () => void }) {
+  const { t } = useTranslation();
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   return (
     <div className="modal d-block" style={{ background: 'rgba(0,0,0,0.45)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-dialog modal-sm modal-dialog-centered">
         <div className="modal-content" style={{ borderRadius: '16px' }}>
           <div className="modal-header">
-            <h6 className="modal-title mb-0">Medication Label</h6>
+            <h6 className="modal-title mb-0">{t('pharmacy.labelTitle')}</h6>
             <button className="btn-close" onClick={onClose}></button>
           </div>
           <div className="modal-body">
@@ -658,18 +665,18 @@ function MedicationLabelModal({ p, onClose }: { p: any; onClose: () => void }) {
             <div id="med-label-print" className="border border-2 rounded-3 p-3 bg-white" style={{ fontFamily: 'Arial, sans-serif' }}>
               <div className="text-center border-bottom pb-2 mb-2">
                 <div className="fw-bold" style={{ fontSize: '0.9rem' }}>Ma Juan Memorial Hospital Clinic</div>
-                <div className="text-muted" style={{ fontSize: '0.65rem' }}>Pharmacy · Tel: +231 888 955552</div>
+                <div className="text-muted" style={{ fontSize: '0.65rem' }}>{t('pharmacy.labelPharmacyLine')}</div>
               </div>
-              <div className="mb-1" style={{ fontSize: '0.8rem' }}><span className="text-muted">Patient:</span> <b>{p.patient_name || `#${p.patient_id}`}</b></div>
-              <div className="mb-1" style={{ fontSize: '0.8rem' }}><span className="text-muted">Medication:</span> <b>{p.drug}</b></div>
+              <div className="mb-1" style={{ fontSize: '0.8rem' }}><span className="text-muted">{t('pharmacy.labelPatient')}</span> <b>{p.patient_name || `#${p.patient_id}`}</b></div>
+              <div className="mb-1" style={{ fontSize: '0.8rem' }}><span className="text-muted">{t('pharmacy.labelMedication')}</span> <b>{p.drug}</b></div>
               <div className="mb-1" style={{ fontSize: '0.8rem' }}>
-                <span className="text-muted">Directions:</span> <b>{p.dosage || 'As directed'}</b>
+                <span className="text-muted">{t('pharmacy.labelDirections')}</span> <b>{p.dosage || t('pharmacy.asDirected')}</b>
                 {p.note ? <div className="text-muted" style={{ fontSize: '0.65rem' }}>{p.note}</div> : null}
               </div>
               <div className="d-flex justify-content-between mb-2" style={{ fontSize: '0.8rem' }}>
-                <span><span className="text-muted">Qty:</span> <b>{p.quantity || '—'}</b></span>
-                <span><span className="text-muted">Refills:</span> <b>{p.refills ?? 0}</b></span>
-                <span><span className="text-muted">Date:</span> <b>{today}</b></span>
+                <span><span className="text-muted">{t('pharmacy.labelQty')}</span> <b>{p.quantity || '—'}</b></span>
+                <span><span className="text-muted">{t('pharmacy.labelRefills')}</span> <b>{p.refills ?? 0}</b></span>
+                <span><span className="text-muted">{t('pharmacy.labelDate')}</span> <b>{today}</b></span>
               </div>
               <div className="text-center border-top pt-2">
                 <Barcode seed={p.drug} width={180} />
@@ -677,8 +684,8 @@ function MedicationLabelModal({ p, onClose }: { p: any; onClose: () => void }) {
               </div>
             </div>
             <div className="d-flex justify-content-end gap-2 mt-3">
-              <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>Close</button>
-              <button className="btn btn-primary btn-sm" onClick={() => window.print()}><i className="bi bi-printer me-1"></i>Print</button>
+              <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>{t('common.close')}</button>
+              <button className="btn btn-primary btn-sm" onClick={() => window.print()}><i className="bi bi-printer me-1"></i>{t('pharmacy.print')}</button>
             </div>
           </div>
         </div>

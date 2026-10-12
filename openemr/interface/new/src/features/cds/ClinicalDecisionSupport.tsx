@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
@@ -43,6 +44,9 @@ const MEANINGFUL_USE = [
 ];
 
 export default function ClinicalDecisionSupport() {
+  const { t } = useTranslation();
+  /** Priority codes are stored and posted as English; only the label changes. */
+  const priorityLabel = (p: string) => t('cds.priority.' + String(p).toLowerCase(), { defaultValue: p });
   const [activeTab, setActiveTab] = useState<TabId>('rules');
   const [customRule, setCustomRule] = useState({ name: '', trigger: '', action: '', priority: 'Medium', category: 'Custom' });
   const [customRules, setCustomRules] = useState<any[]>(() => {
@@ -97,11 +101,11 @@ export default function ClinicalDecisionSupport() {
   const ruleResults = runRuleEngine(patients.length);
 
   const tabs = [
-    { id: 'rules' as TabId, label: 'Decision Rules', icon: 'bi-cpu' },
-    { id: 'physician' as TabId, label: 'Physician Reminders', icon: 'bi-bell' },
-    { id: 'patient' as TabId, label: 'Patient Reminders', icon: 'bi-person-check' },
-    { id: 'measures' as TabId, label: 'Quality Measures', icon: 'bi-bar-chart' },
-    { id: 'meaningful' as TabId, label: 'Meaningful Use', icon: 'bi-check2-square' },
+    { id: 'rules' as TabId, label: t('cds.tabs.rules'), icon: 'bi-cpu' },
+    { id: 'physician' as TabId, label: t('cds.tabs.physician'), icon: 'bi-bell' },
+    { id: 'patient' as TabId, label: t('cds.tabs.patient'), icon: 'bi-person-check' },
+    { id: 'measures' as TabId, label: t('cds.tabs.measures'), icon: 'bi-bar-chart' },
+    { id: 'meaningful' as TabId, label: t('cds.tabs.meaningful'), icon: 'bi-check2-square' },
   ];
 
   const metCount = MEANINGFUL_USE.filter(m => m.met).length;
@@ -148,15 +152,15 @@ export default function ClinicalDecisionSupport() {
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '6rem', transform: 'rotate(10deg) translate(20px,-10px)' }}><i className="bi bi-cpu"></i></div>
         <div className="position-relative d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
-            <h3 className="mb-1 fw-bold"><i className="bi bi-cpu me-2"></i>Clinical Decision Support</h3>
-            <p className="mb-0 text-white text-opacity-75 small">Rules engine · Quality measures · Meaningful use · Smart reminders</p>
+            <h3 className="mb-1 fw-bold"><i className="bi bi-cpu me-2"></i>{t('cds.title')}</h3>
+            <p className="mb-0 text-white text-opacity-75 small">{t('cds.subtitle')}</p>
           </div>
           <span className="badge bg-white bg-opacity-25 rounded-pill">{CLINICAL_RULES.length + customRules.length} Active Rules</span>
         </div>
       </div>
 
       <ul className="nav nav-tabs mb-4 position-relative" style={{ zIndex: 1 }}>
-        {tabs.map(t => <li className="nav-item" key={t.id}><button className={`nav-link ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}><i className={`bi ${t.icon} me-1`}></i>{t.label}</button></li>)}
+        {tabs.map(tab => <li className="nav-item" key={tab.id}><button className={`nav-link ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}><i className={`bi ${tab.icon} me-1`}></i>{tab.label}</button></li>)}
       </ul>
 
       {/* Decision Rules */}
@@ -167,10 +171,10 @@ export default function ClinicalDecisionSupport() {
               <div className="col-md-6" key={rule.id}>
                 <div className="card shadow-sm border-start border-4" style={{ borderLeftColor: rule.priority === 'High' ? '#dc3545' : rule.priority === 'Medium' ? '#fd7e14' : '#0d6efd' }}>
                   <div className="card-body">
-                    <div className="d-flex justify-content-between"><h6>{rule.name}</h6><span className={`badge ${rule.priority === 'High' ? 'bg-danger' : rule.priority === 'Medium' ? 'bg-warning text-dark' : 'bg-info'}`}>{rule.priority}</span></div>
-                    <small className="text-muted">Trigger: {rule.trigger}</small><br />
-                    <small><strong>Action:</strong> {rule.action}</small>
-                    <div className="d-flex justify-content-between mt-2"><span className="badge bg-secondary">{rule.category}</span><small className="text-muted">{rule.affected} patients affected ({rule.percentAffected}%)</small></div>
+                    <div className="d-flex justify-content-between"><h6>{rule.name}</h6><span className={`badge ${rule.priority === 'High' ? 'bg-danger' : rule.priority === 'Medium' ? 'bg-warning text-dark' : 'bg-info'}`}>{priorityLabel(rule.priority)}</span></div>
+                    <small className="text-muted">{t('cds.triggerLine', { value: rule.trigger })}</small><br />
+                    <small><strong>{t('cds.actionLabel')}</strong> {rule.action}</small>
+                    <div className="d-flex justify-content-between mt-2"><span className="badge bg-secondary">{rule.category}</span><small className="text-muted">{t('cds.affected', { count: rule.affected, percent: rule.percentAffected })}</small></div>
                   </div>
                 </div>
               </div>
@@ -179,14 +183,14 @@ export default function ClinicalDecisionSupport() {
 
           {/* Custom rule builder */}
           <div className="card shadow-sm">
-            <div className="card-header"><h5 className="mb-0">Add Custom Rule</h5></div>
+            <div className="card-header"><h5 className="mb-0">{t('cds.addCustomRule')}</h5></div>
             <div className="card-body">
               <div className="row g-2">
-                <div className="col-md-3"><input className="form-control form-control-sm" placeholder="Rule name" value={customRule.name} onChange={e => setCustomRule({...customRule, name: e.target.value})} /></div>
-                <div className="col-md-3"><input className="form-control form-control-sm" placeholder="Trigger condition" value={customRule.trigger} onChange={e => setCustomRule({...customRule, trigger: e.target.value})} /></div>
-                <div className="col-md-3"><input className="form-control form-control-sm" placeholder="Recommended action" value={customRule.action} onChange={e => setCustomRule({...customRule, action: e.target.value})} /></div>
-                <div className="col-md-1"><select className="form-select form-select-sm" value={customRule.priority} onChange={e => setCustomRule({...customRule, priority: e.target.value})}><option>High</option><option>Medium</option><option>Low</option></select></div>
-                <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addCustomRule} disabled={!customRule.name}>Add Rule</button></div>
+                <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('cds.ruleNamePlaceholder')} value={customRule.name} onChange={e => setCustomRule({...customRule, name: e.target.value})} /></div>
+                <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('cds.triggerPlaceholder')} value={customRule.trigger} onChange={e => setCustomRule({...customRule, trigger: e.target.value})} /></div>
+                <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('cds.actionPlaceholder')} value={customRule.action} onChange={e => setCustomRule({...customRule, action: e.target.value})} /></div>
+                <div className="col-md-1"><select className="form-select form-select-sm" value={customRule.priority} onChange={e => setCustomRule({...customRule, priority: e.target.value})}><option value="High">{t('cds.priority.high')}</option><option value="Medium">{t('cds.priority.medium')}</option><option value="Low">{t('cds.priority.low')}</option></select></div>
+                <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addCustomRule} disabled={!customRule.name}>{t('cds.addRule')}</button></div>
               </div>
               {customRules.length > 0 && customRules.map(r => (
                 <div key={r.id} className="mt-2 p-2 bg-light rounded small d-flex justify-content-between">
@@ -202,38 +206,38 @@ export default function ClinicalDecisionSupport() {
       {/* Physician Reminders */}
       {activeTab === 'physician' && (
         <div>
-          <div className="card shadow-sm mb-4"><div className="card-header"><h5 className="mb-0">Create Reminder</h5></div>
+          <div className="card shadow-sm mb-4"><div className="card-header"><h5 className="mb-0">{t('cds.createReminder')}</h5></div>
             <div className="card-body">
               <div className="row g-2">
-                <div className="col-md-2"><input className="form-control form-control-sm" placeholder="Patient ID" value={reminderForm.pid} onChange={e => setReminderForm({...reminderForm, pid: e.target.value, type: 'physician'})} /></div>
-                <div className="col-md-5"><input className="form-control form-control-sm" placeholder="Reminder message" value={reminderForm.message} onChange={e => setReminderForm({...reminderForm, message: e.target.value})} /></div>
+                <div className="col-md-2"><input className="form-control form-control-sm" placeholder={t('cds.pidPlaceholder')} value={reminderForm.pid} onChange={e => setReminderForm({...reminderForm, pid: e.target.value, type: 'physician'})} /></div>
+                <div className="col-md-5"><input className="form-control form-control-sm" placeholder={t('cds.reminderPlaceholder')} value={reminderForm.message} onChange={e => setReminderForm({...reminderForm, message: e.target.value})} /></div>
                 <div className="col-md-2"><input className="form-control form-control-sm" type="date" value={reminderForm.dueDate} onChange={e => setReminderForm({...reminderForm, dueDate: e.target.value})} /></div>
-                <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addReminder}>Add Reminder</button></div>
+                <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addReminder}>{t('cds.addReminder')}</button></div>
               </div>
             </div></div>
           <div className="card shadow-sm"><div className="card-header"><h5 className="mb-0">Active Physician Reminders ({physicianReminders.length})</h5></div>
-            <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>Patient</th><th>Message</th><th>Due</th><th>Created</th></tr></thead>
+            <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('cds.cols.patient')}</th><th>{t('cds.cols.message')}</th><th>{t('cds.cols.due')}</th><th>{t('cds.cols.created')}</th></tr></thead>
                 <tbody>{physicianReminders.map(r => <tr key={r.id}><td>#{r.pid}</td><td>{r.message}</td><td>{r.dueDate || '—'}</td><td>{new Date(r.created).toLocaleDateString()}</td></tr>)}
-                  {!physicianReminders.length && <tr><td colSpan={4} className="text-muted text-center py-3">No physician reminders.</td></tr>}</tbody></table></div></div>
+                  {!physicianReminders.length && <tr><td colSpan={4} className="text-muted text-center py-3">{t('cds.noPhysicianReminders')}</td></tr>}</tbody></table></div></div>
         </div>
       )}
 
       {/* Patient Reminders */}
       {activeTab === 'patient' && (
         <div>
-          <div className="card shadow-sm mb-4"><div className="card-header"><h5 className="mb-0">Create Patient Reminder</h5></div>
+          <div className="card shadow-sm mb-4"><div className="card-header"><h5 className="mb-0">{t('cds.createPatientReminder')}</h5></div>
             <div className="card-body">
               <div className="row g-2">
-                <div className="col-md-2"><input className="form-control form-control-sm" placeholder="Patient ID" value={reminderForm.pid} onChange={e => setReminderForm({...reminderForm, pid: e.target.value, type: 'patient'})} /></div>
-                <div className="col-md-5"><input className="form-control form-control-sm" placeholder="Reminder message (e.g., Annual checkup due)" value={reminderForm.message} onChange={e => setReminderForm({...reminderForm, message: e.target.value})} /></div>
+                <div className="col-md-2"><input className="form-control form-control-sm" placeholder={t('cds.pidPlaceholder')} value={reminderForm.pid} onChange={e => setReminderForm({...reminderForm, pid: e.target.value, type: 'patient'})} /></div>
+                <div className="col-md-5"><input className="form-control form-control-sm" placeholder={t('cds.reminderPlaceholderPatient')} value={reminderForm.message} onChange={e => setReminderForm({...reminderForm, message: e.target.value})} /></div>
                 <div className="col-md-2"><input className="form-control form-control-sm" type="date" value={reminderForm.dueDate} onChange={e => setReminderForm({...reminderForm, dueDate: e.target.value})} /></div>
-                <div className="col-md-2"><button className="btn btn-success btn-sm w-100" onClick={addReminder}>Add Patient Reminder</button></div>
+                <div className="col-md-2"><button className="btn btn-success btn-sm w-100" onClick={addReminder}>{t('cds.addPatientReminder')}</button></div>
               </div>
             </div></div>
           <div className="card shadow-sm"><div className="card-header"><h5 className="mb-0">Patient Reminders ({patientReminders.length})</h5></div>
-            <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>Patient</th><th>Message</th><th>Due</th><th>Created</th></tr></thead>
+            <div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('cds.cols.patient')}</th><th>{t('cds.cols.message')}</th><th>{t('cds.cols.due')}</th><th>{t('cds.cols.created')}</th></tr></thead>
                 <tbody>{patientReminders.map(r => <tr key={r.id}><td>#{r.pid}</td><td>{r.message}</td><td>{r.dueDate || '—'}</td><td>{new Date(r.created).toLocaleDateString()}</td></tr>)}
-                  {!patientReminders.length && <tr><td colSpan={4} className="text-muted text-center py-3">No patient reminders.</td></tr>}</tbody></table></div></div>
+                  {!patientReminders.length && <tr><td colSpan={4} className="text-muted text-center py-3">{t('cds.noPatientReminders')}</td></tr>}</tbody></table></div></div>
         </div>
       )}
 
@@ -241,14 +245,14 @@ export default function ClinicalDecisionSupport() {
       {activeTab === 'measures' && (
         <div>
           <div className="row g-3 mb-3">
-            <div className="col-md-3"><div className="card shadow-sm text-bg-success"><div className="card-body text-center"><h3>{QUALITY_MEASURES.filter(m => m.status === 'met').length}/{QUALITY_MEASURES.length}</h3><small>Measures Met</small></div></div></div>
-            <div className="col-md-3"><div className="card shadow-sm text-bg-warning"><div className="card-body text-center"><h3>{QUALITY_MEASURES.filter(m => m.status === 'needs-improvement').length}</h3><small>Needs Improvement</small></div></div></div>
+            <div className="col-md-3"><div className="card shadow-sm text-bg-success"><div className="card-body text-center"><h3>{QUALITY_MEASURES.filter(m => m.status === 'met').length}/{QUALITY_MEASURES.length}</h3><small>{t('cds.measuresMet')}</small></div></div></div>
+            <div className="col-md-3"><div className="card shadow-sm text-bg-warning"><div className="card-body text-center"><h3>{QUALITY_MEASURES.filter(m => m.status === 'needs-improvement').length}</h3><small>{t('cds.needsImprovement')}</small></div></div></div>
             <div className="col-md-6"><div className="progress mt-2" style={{height:'30px'}}>
               <div className="progress-bar bg-success" style={{width:`${Math.round(QUALITY_MEASURES.filter(m=>m.status==='met').length/QUALITY_MEASURES.length*100)}%`}}>{Math.round(QUALITY_MEASURES.filter(m=>m.status==='met').length/QUALITY_MEASURES.length*100)}%</div>
             </div></div>
           </div>
-          <div className="card shadow-sm"><div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>ID</th><th>Measure</th><th>Target</th><th>Current</th><th>Status</th></tr></thead>
-              <tbody>{QUALITY_MEASURES.map(m => <tr key={m.id} className={m.status === 'needs-improvement' ? 'table-warning' : ''}><td>{m.id}</td><td>{m.name}</td><td>{m.target}</td><td>{m.current}%</td><td><span className={`badge ${m.status === 'met' ? 'bg-success' : 'bg-warning text-dark'}`}>{m.status === 'met' ? '✓ Met' : '⚠ Improve'}</span></td></tr>)}</tbody></table></div></div>
+          <div className="card shadow-sm"><div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('cds.cols.id')}</th><th>{t('cds.cols.measure')}</th><th>{t('cds.cols.target')}</th><th>{t('cds.cols.current')}</th><th>{t('cds.cols.status')}</th></tr></thead>
+              <tbody>{QUALITY_MEASURES.map(m => <tr key={m.id} className={m.status === 'needs-improvement' ? 'table-warning' : ''}><td>{m.id}</td><td>{m.name}</td><td>{m.target}</td><td>{m.current}%</td><td><span className={`badge ${m.status === 'met' ? 'bg-success' : 'bg-warning text-dark'}`}>{m.status === 'met' ? t('cds.met') : t('cds.improve')}</span></td></tr>)}</tbody></table></div></div>
         </div>
       )}
 
@@ -256,14 +260,14 @@ export default function ClinicalDecisionSupport() {
       {activeTab === 'meaningful' && (
         <div>
           <div className="row g-3 mb-3">
-            <div className="col-md-3"><div className="card shadow-sm text-bg-success"><div className="card-body text-center"><h3>{metCount}/{MEANINGFUL_USE.length}</h3><small>Measures Met</small></div></div></div>
+            <div className="col-md-3"><div className="card shadow-sm text-bg-success"><div className="card-body text-center"><h3>{metCount}/{MEANINGFUL_USE.length}</h3><small>{t('cds.measuresMet')}</small></div></div></div>
             <div className="col-md-9"><div className="progress mt-2" style={{height:'30px'}}>
               <div className="progress-bar bg-success" style={{width:`${Math.round(metCount/MEANINGFUL_USE.length*100)}%`}}>{Math.round(metCount/MEANINGFUL_USE.length*100)}%</div>
               <div className="progress-bar bg-danger" style={{width:`${Math.round((MEANINGFUL_USE.length-metCount)/MEANINGFUL_USE.length*100)}%`}}></div>
             </div></div>
           </div>
-          <div className="card shadow-sm"><div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>Measure</th><th>Threshold</th><th>Actual</th><th>Status</th></tr></thead>
-              <tbody>{MEANINGFUL_USE.map(m => <tr key={m.measure} className={!m.met ? 'table-danger' : ''}><td>{m.measure}</td><td>{m.threshold}</td><td>{m.actual}</td><td>{m.met ? <span className="badge bg-success">✓ Met</span> : <span className="badge bg-danger">✗ Not Met</span>}</td></tr>)}</tbody></table></div></div>
+          <div className="card shadow-sm"><div className="card-body p-0"><table className="table table-sm mb-0"><thead><tr><th>{t('cds.cols.measure')}</th><th>{t('cds.cols.threshold')}</th><th>{t('cds.cols.actual')}</th><th>{t('cds.cols.status')}</th></tr></thead>
+              <tbody>{MEANINGFUL_USE.map(m => <tr key={m.measure} className={!m.met ? 'table-danger' : ''}><td>{m.measure}</td><td>{m.threshold}</td><td>{m.actual}</td><td>{m.met ? <span className="badge bg-success">{t('cds.met')}</span> : <span className="badge bg-danger">{t('cds.notMet')}</span>}</td></tr>)}</tbody></table></div></div>
         </div>
       )}
     </div>

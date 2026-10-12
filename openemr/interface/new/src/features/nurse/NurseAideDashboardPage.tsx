@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { formatDateTime } from '../../utils/date';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -63,6 +64,7 @@ const VITAL_PRESETS: Record<string, string[]> = {
 };
 
 export default function NurseAideDashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -121,8 +123,8 @@ export default function NurseAideDashboardPage() {
     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', filter: 'grayscale(1)', opacity: 0.65 }}>
       <div className="card-body text-center py-5">
         <i className="bi bi-lock fs-1 text-muted d-block mb-2"></i>
-        <h6 className="text-muted mb-1 fw-bold small">{title} — Locked</h6>
-        <p className="small text-muted mb-0">Chart not shared with nursing. Request access from the doctor or registered nurse.</p>
+        <h6 className="text-muted mb-1 fw-bold small">{title}{t('nurse.aide.lockedSuffix')}</h6>
+        <p className="small text-muted mb-0">{t('nurse.aide.lockedMsg')}</p>
       </div>
     </div>
   );
@@ -337,15 +339,15 @@ export default function NurseAideDashboardPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #198754 50%, #20c997 100%)' }}>
         <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-clipboard2-pulse me-2"></i>Nurse Aide Dashboard</h2>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-clipboard2-pulse me-2"></i>{t('nurse.aide.title')}</h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              Welcome, {user?.displayName || 'Nurse Aide'} — Safety-first patient care workspace
+              {t('nurse.aide.welcome', { name: user?.displayName || t('nurse.aide.roleFallback') })}
             </p>
           </div>
           <div className="d-flex gap-2">
             {unreadCount > 0 && (
               <button className="btn btn-light btn-sm rounded-pill" onClick={() => markAllRead.mutate()}>
-                <i className="bi bi-envelope-open me-1"></i>Mark {unreadCount} note{unreadCount !== 1 ? 's' : ''} read
+                <i className="bi bi-envelope-open me-1"></i>{t('nurse.aide.markRead', { count: unreadCount })}
               </button>
             )}
           </div>
@@ -355,10 +357,10 @@ export default function NurseAideDashboardPage() {
       {/* KPI cards */}
       <div className="row g-3 mb-4">
         {[
-          { label: 'Patients on Dashboard', value: patients.length, icon: 'bi-people-fill', color: '#0d6efd' },
-          { label: 'Critical', value: criticalCount, icon: 'bi-exclamation-octagon-fill', color: '#dc3545' },
-          { label: 'High Risk', value: highCount, icon: 'bi-exclamation-triangle-fill', color: '#fd7e14' },
-          { label: 'Unread Clinical Notes', value: unreadCount, icon: 'bi-envelope-fill', color: '#6f42c1' },
+          { label: t('nurse.aide.statPatients'), value: patients.length, icon: 'bi-people-fill', color: '#0d6efd' },
+          { label: t('nurse.aide.statCritical'), value: criticalCount, icon: 'bi-exclamation-octagon-fill', color: '#dc3545' },
+          { label: t('nurse.aide.statHigh'), value: highCount, icon: 'bi-exclamation-triangle-fill', color: '#fd7e14' },
+          { label: t('nurse.aide.statUnread'), value: unreadCount, icon: 'bi-envelope-fill', color: '#6f42c1' },
         ].map((k, i) => (
           <div className="col-md-3" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
@@ -384,7 +386,7 @@ export default function NurseAideDashboardPage() {
             <div className="card-body py-3">
               <div className="input-group">
                 <span className="input-group-text bg-white border-end-0"><i className="bi bi-search text-muted"></i></span>
-                <input className="form-control border-start-0" placeholder="Find patient by name…" value={search} onChange={e => setSearch(e.target.value)} />
+                <input className="form-control border-start-0" placeholder={t('nurse.aide.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
             </div>
           </div>
@@ -395,31 +397,31 @@ export default function NurseAideDashboardPage() {
                 <div className="modal-dialog modal-xl modal-dialog-scrollable">
                   <div className="modal-content" style={{ borderRadius: '20px' }}>
                     <div className="modal-header">
-                      <h5 className="modal-title"><i className="bi bi-person-plus me-2 text-info"></i>New Patient Intake</h5>
+                      <h5 className="modal-title"><i className="bi bi-person-plus me-2 text-info"></i>{t('nurse.aide.newPatientIntake')}</h5>
                       <button className="btn-close" onClick={() => setShowIntake(false)}></button>
                     </div>
                     <div className="modal-body">
                       {intakeResult ? (
                         <div className="text-center py-5">
                           <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '3.2rem' }}></i>
-                          <h5 className="mt-3 fw-bold">Intake Submitted</h5>
+                          <h5 className="mt-3 fw-bold">{t('nurse.aide.intakeSubmitted')}</h5>
                           <p className="text-muted mb-4">{intakeResult}</p>
                           <div className="d-flex justify-content-center gap-2">
-                            <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => { setIntakeResult(''); setShowIntake(false); }}>Close</button>
-                            <button className="btn btn-info btn-sm rounded-pill text-white" onClick={() => setIntakeResult('')}><i className="bi bi-person-plus me-1"></i>Add Another Patient</button>
+                            <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => { setIntakeResult(''); setShowIntake(false); }}>{t('common.close')}</button>
+                            <button className="btn btn-info btn-sm rounded-pill text-white" onClick={() => setIntakeResult('')}><i className="bi bi-person-plus me-1"></i>{t('nurse.aide.addAnotherPatient')}</button>
                           </div>
                         </div>
                       ) : (<>
                       <div className="row g-2">
-                        <div className="col-md-3"><label className="form-label small mb-0">First Name *</label><input className="form-control form-control-sm" value={intakeForm.fname} onChange={e => setIntakeForm({ ...intakeForm, fname: e.target.value })} /></div>
-                        <div className="col-md-2"><label className="form-label small mb-0">Middle Init</label><input className="form-control form-control-sm" value={intakeForm.mname} onChange={e => setIntakeForm({ ...intakeForm, mname: e.target.value })} /></div>
-                        <div className="col-md-3"><label className="form-label small mb-0">Last Name *</label><input className="form-control form-control-sm" value={intakeForm.lname} onChange={e => setIntakeForm({ ...intakeForm, lname: e.target.value })} /></div>
-                        <div className="col-md-2"><label className="form-label small mb-0">Suffix</label><select className="form-select form-select-sm" value={intakeForm.suffix} onChange={e => setIntakeForm({ ...intakeForm, suffix: e.target.value })}><option value="">—</option><option>Jr</option><option>Sr</option><option>II</option><option>III</option><option>IV</option><option>MD</option><option>PhD</option></select></div>
-                        <div className="col-md-2"><label className="form-label small mb-0">DOB</label><input type="date" className="form-control form-control-sm" value={intakeForm.DOB} onChange={e => setIntakeForm({ ...intakeForm, DOB: e.target.value })} /></div>
-                        <div className="col-md-2"><label className="form-label small mb-0">Sex</label><select className="form-select form-select-sm" value={intakeForm.sex} onChange={e => setIntakeForm({ ...intakeForm, sex: e.target.value })}><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select></div>
-                        <div className="col-md-4"><label className="form-label small mb-0">Phone</label><PhoneInput value={intakeForm.phone_contact} onChange={v => setIntakeForm({ ...intakeForm, phone_contact: v })} /></div>
-                        <div className="col-md-4"><label className="form-label small mb-0">Street *</label><input className="form-control form-control-sm" placeholder="House no, street" value={intakeForm.street} onChange={e => setIntakeForm({ ...intakeForm, street: e.target.value })} /></div>
-                        <div className="col-md-3"><label className="form-label small mb-0">City *</label><CitySelect value={intakeForm.city} onChange={v => setIntakeForm({ ...intakeForm, city: v })} className="form-select-sm" /></div>
+                        <div className="col-md-3"><label className="form-label small mb-0">{t('provider.dir.firstNameLabel')}</label><input className="form-control form-control-sm" value={intakeForm.fname} onChange={e => setIntakeForm({ ...intakeForm, fname: e.target.value })} /></div>
+                        <div className="col-md-2"><label className="form-label small mb-0">{t('nurse.aide.middleInit')}</label><input className="form-control form-control-sm" value={intakeForm.mname} onChange={e => setIntakeForm({ ...intakeForm, mname: e.target.value })} /></div>
+                        <div className="col-md-3"><label className="form-label small mb-0">{t('provider.dir.lastNameLabel')}</label><input className="form-control form-control-sm" value={intakeForm.lname} onChange={e => setIntakeForm({ ...intakeForm, lname: e.target.value })} /></div>
+                        <div className="col-md-2"><label className="form-label small mb-0">{t('provider.dir.suffixLabel')}</label><select className="form-select form-select-sm" value={intakeForm.suffix} onChange={e => setIntakeForm({ ...intakeForm, suffix: e.target.value })}><option value="">—</option><option>Jr</option><option>Sr</option><option>II</option><option>III</option><option>IV</option><option>MD</option><option>PhD</option></select></div>
+                        <div className="col-md-2"><label className="form-label small mb-0">{t('nurse.aide.dob')}</label><input type="date" className="form-control form-control-sm" value={intakeForm.DOB} onChange={e => setIntakeForm({ ...intakeForm, DOB: e.target.value })} /></div>
+                        <div className="col-md-2"><label className="form-label small mb-0">{t('nurse.aide.sex')}</label><select className="form-select form-select-sm" value={intakeForm.sex} onChange={e => setIntakeForm({ ...intakeForm, sex: e.target.value })}><option value="">—</option><option value="Male">{t('nurse.aide.sexMale')}</option><option value="Female">{t('nurse.aide.sexFemale')}</option><option value="Other">{t('nurse.aide.sexOther')}</option></select></div>
+                        <div className="col-md-4"><label className="form-label small mb-0">{t('provider.phone')}</label><PhoneInput value={intakeForm.phone_contact} onChange={v => setIntakeForm({ ...intakeForm, phone_contact: v })} /></div>
+                        <div className="col-md-4"><label className="form-label small mb-0">{t('nurse.aide.streetRequired')}</label><input className="form-control form-control-sm" placeholder={t('nurse.aide.houseStreet')} value={intakeForm.street} onChange={e => setIntakeForm({ ...intakeForm, street: e.target.value })} /></div>
+                        <div className="col-md-3"><label className="form-label small mb-0">{t('nurse.aide.cityRequired')}</label><CitySelect value={intakeForm.city} onChange={v => setIntakeForm({ ...intakeForm, city: v })} className="form-select-sm" /></div>
                       </div>
 
                       {/* Duplicate guard — a second chart is only created when the
@@ -428,20 +430,20 @@ export default function NurseAideDashboardPage() {
                         <div className="alert alert-warning mt-3 mb-0 py-2">
                           <div className="fw-semibold small mb-2">
                             <i className="bi bi-shield-exclamation me-1"></i>
-                            Admit blocked — this patient may already be on file
+                            {t('nurse.aide.duplicateBlocked')}
                           </div>
                           {intakeDuplicates.map((d: any) => (
                             <div key={d.id} className="d-flex align-items-center justify-content-between border-bottom py-1 small">
                               <div>
                                 <strong>{d.fname} {d.lname}</strong>
                                 <div className="text-muted">
-                                  DOB: {d.DOB || '—'} · Phone: {d.phone_contact || '—'} · {d.public_id || '—'}
+                                  {t('nurse.aide.dupDob', { dob: d.DOB || '—' })} · {t('nurse.aide.dupPhone', { phone: d.phone_contact || '—' })} · {d.public_id || '—'}
                                 </div>
                               </div>
                               <button className="btn btn-sm btn-outline-primary rounded-pill px-3"
                                 onClick={() => { setIntakeTarget({ pid: d.pid, public_id: d.public_id }); setIntakeOverride(false); setIntakeDuplicates([]); }}
-                                title="Record this visit's vitals on the existing chart">
-                                Use Existing <i className="bi bi-arrow-right ms-1"></i>
+                                title={t('nurse.aide.useExistingTitle')}>
+                                {t('nurse.aide.useExisting')} <i className="bi bi-arrow-right ms-1"></i>
                               </button>
                             </div>
                           ))}
@@ -450,12 +452,11 @@ export default function NurseAideDashboardPage() {
                               id="intake-override-duplicate" checked={intakeOverride}
                               onChange={(e) => { setIntakeOverride(e.target.checked); if (e.target.checked) setIntakeTarget(null); }} />
                             <label className="form-check-label small fw-semibold" htmlFor="intake-override-duplicate">
-                              Override — admit as a new patient anyway
+                              {t('nurse.aide.overrideLabel')}
                             </label>
                           </div>
                           <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                            Only override if you are sure this is a different person (shared phone
-                            number, common name). Otherwise use the existing chart so no duplicate is created.
+                            {t('nurse.aide.overrideHelp')}
                           </div>
                         </div>
                       )}
@@ -463,18 +464,18 @@ export default function NurseAideDashboardPage() {
                       {intakeTarget && (
                         <div className="alert alert-info mt-3 mb-0 py-2 small d-flex align-items-center gap-2">
                           <i className="bi bi-link-45deg"></i>
-                          Recording this visit on the existing chart #{intakeTarget.public_id || intakeTarget.pid}.
+                          {t('nurse.aide.recordingOnChart', { id: intakeTarget.public_id || intakeTarget.pid })}
                           <button className="btn btn-sm btn-outline-secondary rounded-pill ms-auto"
-                            onClick={() => setIntakeTarget(null)}>Change</button>
+                            onClick={() => setIntakeTarget(null)}>{t('nurse.aide.change')}</button>
                         </div>
                       )}
 
                       <hr className="my-3" />
-                      <div className="small fw-semibold text-muted mb-2"><i className="bi bi-heart-pulse me-1 text-danger"></i>Vitals</div>
+                      <div className="small fw-semibold text-muted mb-2"><i className="bi bi-heart-pulse me-1 text-danger"></i>{t('nurse.aide.vitalsHeader')}</div>
                       <div className="row g-2">
                         {[
-                          ['bps', 'Systolic'], ['bpd', 'Diastolic'], ['pulse', 'Pulse'], ['temperature', 'Temp °C'],
-                          ['respiration', 'Resp'], ['oxygen_saturation', 'SpO₂ %'], ['weight', 'Weight kg'], ['height', 'Height cm'],
+                          ['bps', t('nurse.aide.systolic')], ['bpd', t('nurse.aide.diastolic')], ['pulse', t('nurse.aide.pulse')], ['temperature', t('nurse.aide.tempC')],
+                          ['respiration', t('nurse.aide.resp')], ['oxygen_saturation', t('nurse.aide.spo2Percent')], ['weight', t('nurse.aide.weightKg')], ['height', t('nurse.aide.heightCm')],
                         ].map(([k, l]) => (
                           <div className="col-6 col-md-3" key={k}>
                             <label className="form-label small mb-0">{l}</label>
@@ -484,7 +485,7 @@ export default function NurseAideDashboardPage() {
                               list={`intake-${k}`}
                               value={intakeForm[k]}
                               onChange={e => setIntakeForm({ ...intakeForm, [k]: e.target.value })}
-                              placeholder="Type or pick"
+                              placeholder={t('nurse.aide.typeOrPick')}
                             />
                             <datalist id={`intake-${k}`}>
                               {(VITAL_PRESETS[k] || []).map(v => <option key={v} value={v} />)}
@@ -496,9 +497,9 @@ export default function NurseAideDashboardPage() {
                     </div>
                     {!intakeResult && (
                       <div className="modal-footer">
-                        <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setShowIntake(false)}>Cancel</button>
+                        <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setShowIntake(false)}>{t('common.cancel')}</button>
                         <button className="btn btn-info btn-sm rounded-pill text-white" onClick={handleAdmit} disabled={!intakeForm.fname.trim() || !intakeForm.lname.trim() || isInvalidLiberiaNationalNumber(intakeForm.phone_contact) || intakeMutation.isPending}>
-                          {intakeMutation.isPending ? 'Admitting…' : <><i className="bi bi-person-check me-1"></i>{intakeTarget ? 'Admit to Existing Chart' : 'Admit Patient & Record Vitals'}</>}
+                          {intakeMutation.isPending ? t('nurse.aide.admitting') : <><i className="bi bi-person-check me-1"></i>{intakeTarget ? t('nurse.aide.admitToExisting') : t('nurse.aide.admitAndRecord')}</>}
                         </button>
                       </div>
                     )}
@@ -511,12 +512,12 @@ export default function NurseAideDashboardPage() {
           {/* Prioritised patient list */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px', maxHeight: '420px' }}>
             <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold"><i className="bi bi-people me-2 text-primary"></i>My Patients</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-people me-2 text-primary"></i>{t('nurse.aide.myPatients')}</h6>
               <span className="badge bg-primary rounded-pill">{patients.length}</span>
             </div>
             <div className="card-body p-0" style={{ overflowY: 'auto' }}>
               {patients.length === 0 ? (
-                <div className="text-center text-muted py-4 small">No patients found.</div>
+                <div className="text-center text-muted py-4 small">{t('nurse.aide.noPatientsFound')}</div>
               ) : (
                 <div className="list-group list-group-flush">
                   {patients.map((p: any) => (
@@ -526,11 +527,11 @@ export default function NurseAideDashboardPage() {
                       <div className="text-start">
                         <div className="fw-semibold small">
                           {formatPatientNameLastFirst(p)}
-                          {p.is_assigned && <i className="bi bi-person-check ms-1 text-success" title="Assigned to you"></i>}
-                          {p.awaiting_vitals && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>Awaiting vitals</span>}
+                          {p.is_assigned && <i className="bi bi-person-check ms-1 text-success" title={t('nurse.aide.assignedToYou')}></i>}
+                          {p.awaiting_vitals && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>{t('nurse.aide.awaitingVitals')}</span>}
                         </div>
                         <div className={selectedPatient?.pid === p.pid ? 'text-white text-opacity-75' : 'text-muted'} style={{ fontSize: '0.72rem' }}>
-                          {p.room ? `Room ${p.room} · ` : ''}DOB {p.DOB ? String(p.DOB).slice(0, 10) : '—'}
+                          {p.room ? `${t('nurse.aide.roomInline', { room: p.room })} · ` : ''}{t('nurse.aide.dobInline', { date: p.DOB ? String(p.DOB).slice(0, 10) : '—' })}
                         </div>
                       </div>
                       <span className={`badge rounded-pill ${riskBadge(p.risk.level)}`}>{p.risk.level}</span>
@@ -549,10 +550,10 @@ export default function NurseAideDashboardPage() {
             <div className="card border-0 shadow-sm text-center py-5" style={{ borderRadius: '16px' }}>
               <div className="text-muted py-5">
                 <i className="bi bi-arrow-left-circle fs-1 d-block mb-3"></i>
-                <h5>Select a patient to begin care</h5>
-                <p className="small">Vitals, labs, medications, care plan, and notes are all available here.</p>
+                <h5>{t('nurse.aide.selectPatientTitle')}</h5>
+                <p className="small">{t('nurse.aide.selectPatientText')}</p>
                 <button className="btn btn-info btn-lg rounded-pill text-white mt-3 px-5 py-3" onClick={() => { setShowIntake(true); setIntakeDuplicates([]); setIntakeOverride(false); setIntakeTarget(null); }}>
-                  <i className="bi bi-person-plus me-2 fs-5"></i>New Patient Intake
+                  <i className="bi bi-person-plus me-2 fs-5"></i>{t('nurse.aide.newPatientIntake')}
                 </button>
               </div>
             </div>
@@ -570,29 +571,29 @@ export default function NurseAideDashboardPage() {
                         </span>
                       </h5>
                       <div className="text-muted small">
-                        DOB {selectedPatient.DOB ? String(selectedPatient.DOB).slice(0, 10) : '—'} · {selectedPatient.sex || '—'}
-                        {selectedPatient.room ? ` · Room ${selectedPatient.room}` : ''}
-                        {selectedPatient.acuity_level ? ` · Acuity: ${selectedPatient.acuity_level}` : ''}
+                        {t('nurse.aide.dobInline', { date: selectedPatient.DOB ? String(selectedPatient.DOB).slice(0, 10) : '—' })} · {selectedPatient.sex || '—'}
+                        {selectedPatient.room ? ` · ${t('nurse.aide.roomInline', { room: selectedPatient.room })}` : ''}
+                        {selectedPatient.acuity_level ? ` · ${t('nurse.aide.acuityInline', { level: selectedPatient.acuity_level })}` : ''}
                       </div>
                     </div>
                     <div className="d-flex gap-2 flex-wrap">
                       <button className="btn btn-info btn-sm rounded-pill text-white" onClick={() => navigate(`/patients/${selectedPatient.id}/rounds`)}>
-                        <i className="bi bi-clipboard2-pulse me-1"></i>Vital Signs Round
+                        <i className="bi bi-clipboard2-pulse me-1"></i>{t('nurse.aide.vitalSignsRound')}
                       </button>
                       {selectedPatient.chart_shared ? (
                         <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => { const cid = chartPatientId(selectedPatient.id, selectedPatient.pid); if (cid) navigate(`/patients/${cid}`); }}>
-                          Full Chart <i className="bi bi-arrow-right ms-1"></i>
+                          {t('nurse.aide.fullChart')} <i className="bi bi-arrow-right ms-1"></i>
                         </button>
                       ) : (
-                        <span className="badge bg-light text-muted border" title="Chart not shared with nursing — request access from the doctor or registered nurse">
-                          <i className="bi bi-lock me-1"></i>Chart not shared
+                        <span className="badge bg-light text-muted border" title={t('nurse.aide.chartNotSharedTitle')}>
+                          <i className="bi bi-lock me-1"></i>{t('nurse.aide.chartNotShared')}
                         </span>
                       )}
                     </div>
                   </div>
                   {selectedPatient.risk?.flags?.length > 0 && (
                     <div className="alert alert-danger py-2 mt-2 mb-0 small">
-                      <strong><i className="bi bi-shield-exclamation me-1"></i>Safety flags:</strong>{' '}
+                      <strong><i className="bi bi-shield-exclamation me-1"></i>{t('nurse.aide.safetyFlags')}</strong>{' '}
                       {selectedPatient.risk.flags.map((f: any) => `${f.label} (${f.action})`).join(' · ')}
                     </div>
                   )}
@@ -602,16 +603,16 @@ export default function NurseAideDashboardPage() {
               {/* Tabs */}
               <ul className="nav nav-pills gap-2 mb-3">
                 {[
-                  { id: 'overview', label: 'Overview', icon: 'bi-speedometer2' },
-                  { id: 'vitals', label: 'Vitals', icon: 'bi-heart-pulse' },
-                  { id: 'labs', label: 'Labs', icon: 'bi-flask' },
-                  { id: 'meds', label: 'Medications', icon: 'bi-capsule' },
-                  { id: 'plan', label: 'Care Plan', icon: 'bi-clipboard-heart' },
-                  { id: 'notes', label: 'Notes', icon: 'bi-journal-text' },
-                ].map(t => (
-                  <li className="nav-item" key={t.id}>
-                    <button className={`nav-link ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-                      <i className={`bi ${t.icon} me-1`}></i>{t.label}
+                  { id: 'overview', labelKey: 'overview', icon: 'bi-speedometer2' },
+                  { id: 'vitals', labelKey: 'vitals', icon: 'bi-heart-pulse' },
+                  { id: 'labs', labelKey: 'labs', icon: 'bi-flask' },
+                  { id: 'meds', labelKey: 'meds', icon: 'bi-capsule' },
+                  { id: 'plan', labelKey: 'plan', icon: 'bi-clipboard-heart' },
+                  { id: 'notes', labelKey: 'notes', icon: 'bi-journal-text' },
+                ].map(tabItem => (
+                  <li className="nav-item" key={tabItem.id}>
+                    <button className={`nav-link ${tab === tabItem.id ? 'active' : ''}`} onClick={() => setTab(tabItem.id)}>
+                      <i className={`bi ${tabItem.icon} me-1`}></i>{t(`nurse.tab.${tabItem.labelKey}`)}
                     </button>
                   </li>
                 ))}
@@ -622,27 +623,27 @@ export default function NurseAideDashboardPage() {
                 <div className="row g-3">
                   <div className="col-md-6">
                     <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Latest Vitals</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.latestVitals')}</h6></div>
                       <div className="card-body py-2 small">
                         {vitalsHistory[0] ? (
                           <div className="row g-2">
                             {[
-                              ['BP', formatBP(vitalsHistory[0].bps, vitalsHistory[0].bpd)],
-                              ['Pulse', formatVital(vitalsHistory[0].pulse)],
-                              ['Temp', formatVital(vitalsHistory[0].temperature, 1)],
-                              ['Resp', formatVital(vitalsHistory[0].respiration)],
-                              ['SpO₂', formatVital(vitalsHistory[0].oxygen_saturation)],
+                              [t('nurse.aide.thBp'), formatBP(vitalsHistory[0].bps, vitalsHistory[0].bpd)],
+                              [t('nurse.aide.thPulse'), formatVital(vitalsHistory[0].pulse)],
+                              [t('nurse.aide.thTemp'), formatVital(vitalsHistory[0].temperature, 1)],
+                              [t('nurse.aide.thResp'), formatVital(vitalsHistory[0].respiration)],
+                              [t('nurse.aide.thSpo2'), formatVital(vitalsHistory[0].oxygen_saturation)],
                             ].map(([l, v]) => (
                               <div className="col-6" key={l as string}><span className="text-muted">{l}:</span> <strong>{v ?? '—'}</strong></div>
                             ))}
                           </div>
-                        ) : <span className="text-muted">No vitals recorded yet.</span>}
+                        ) : <span className="text-muted">{t('nurse.aide.noVitalsRecordedYet')}</span>}
                       </div>
                     </div>
                     <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Conditions</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.conditions')}</h6></div>
                       <div className="card-body py-2">
-                        {conditions.length === 0 ? <span className="text-muted small">None recorded.</span> : conditions.map((c: any) => (
+                        {conditions.length === 0 ? <span className="text-muted small">{t('nurse.aide.noneRecorded')}</span> : conditions.map((c: any) => (
                           <span className="badge bg-light text-dark border me-1 mb-1" key={c.id}>{c.title || c.diagnosis}</span>
                         ))}
                       </div>
@@ -650,17 +651,17 @@ export default function NurseAideDashboardPage() {
                   </div>
                   <div className="col-md-6">
                     <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Allergies</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.allergies')}</h6></div>
                       <div className="card-body py-2">
-                        {allergies.length === 0 ? <span className="text-muted small">No known allergies.</span> : allergies.map((a: any) => (
+                        {allergies.length === 0 ? <span className="text-muted small">{t('nurse.aide.noKnownAllergies')}</span> : allergies.map((a: any) => (
                           <span className="badge bg-danger bg-opacity-10 text-danger border me-1 mb-1" key={a.id}>{a.allergen || a.title}</span>
                         ))}
                       </div>
                     </div>
                     <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Active Medications</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.activeMedications')}</h6></div>
                       <div className="card-body py-2">
-                        {medications.length === 0 ? <span className="text-muted small">None recorded.</span> : medications.map((m: any) => (
+                        {medications.length === 0 ? <span className="text-muted small">{t('nurse.aide.noneRecorded')}</span> : medications.map((m: any) => (
                           <div key={m.id} className="small">{m.drug} {m.dosage ? `— ${m.dosage}` : ''}</div>
                         ))}
                       </div>
@@ -674,14 +675,14 @@ export default function NurseAideDashboardPage() {
                 <div className="row g-3">
                   <div className="col-md-5">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Record Vitals</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.recordVitals')}</h6></div>
                       <div className="card-body">
                         <div className="row g-2">
                           {[
-                            ['bps', 'Systolic BP', '120'], ['bpd', 'Diastolic BP', '80'],
-                            ['pulse', 'Pulse', '72'], ['temperature', 'Temp (°C)', '37.0'],
-                            ['respiration', 'Respiration', '16'], ['oxygen_saturation', 'SpO₂ %', '98'],
-                            ['weight', 'Weight (kg)', '70'], ['height', 'Height (cm)', '170'],
+                            ['bps', t('nurse.aide.systolicBP'), '120'], ['bpd', t('nurse.aide.diastolicBP'), '80'],
+                            ['pulse', t('nurse.aide.thPulse'), '72'], ['temperature', t('nurse.aide.tempLabel'), '37.0'],
+                            ['respiration', t('nurse.aide.respiration'), '16'], ['oxygen_saturation', t('nurse.aide.spo2Percent'), '98'],
+                            ['weight', t('nurse.aide.weightKgLabel'), '70'], ['height', t('nurse.aide.heightCmLabel'), '170'],
                           ].map(([k, l, ph]) => (
                             <div className="col-6" key={k}>
                               <label className="form-label small mb-0">{l}</label>
@@ -693,23 +694,23 @@ export default function NurseAideDashboardPage() {
                           ))}
                         </div>
                         <div className="alert py-2 px-2 mt-2 mb-2 small" style={{ backgroundColor: liveNews.color + '18', borderLeft: `4px solid ${liveNews.color}` }}>
-                          <strong>NEWS2: {liveNews.total}</strong> — {liveNews.riskLevel}
+                          <strong>{t('nurse.aide.news2', { total: liveNews.total })}</strong> — {liveNews.riskLevel}
                         </div>
                         <button className="btn btn-primary btn-sm rounded-pill w-100" onClick={submitVitals} disabled={recordVitals.isPending}>
-                          {recordVitals.isPending ? 'Saving…' : <><i className="bi bi-check-lg me-1"></i>Save Vitals</>}
+                          {recordVitals.isPending ? t('nurse.aide.saving') : <><i className="bi bi-check-lg me-1"></i>{t('nurse.aide.saveVitals')}</>}
                         </button>
                       </div>
                     </div>
                   </div>
                   <div className="col-md-7">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', maxHeight: '480px', overflowY: 'auto' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Vital History</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.vitalHistory')}</h6></div>
                       <div className="card-body p-0">
                         {vitalsHistory.length === 0 ? (
-                          <div className="text-center text-muted py-4 small">No vitals recorded.</div>
+                          <div className="text-center text-muted py-4 small">{t('nurse.aide.noVitalsRecorded')}</div>
                         ) : (
                           <table className="table table-sm table-hover mb-0 small">
-                            <thead className="table-light"><tr><th>When</th><th>BP</th><th>Pulse</th><th>Temp</th><th>Resp</th><th>SpO₂</th></tr></thead>
+                            <thead className="table-light"><tr><th>{t('nurse.aide.thWhen')}</th><th>{t('nurse.aide.thBp')}</th><th>{t('nurse.aide.thPulse')}</th><th>{t('nurse.aide.thTemp')}</th><th>{t('nurse.aide.thResp')}</th><th>{t('nurse.aide.thSpo2')}</th></tr></thead>
                             <tbody>
                               {vitalsHistory.map((v: any, i: number) => {
                                 const bp = classifyBP(v.bps, v.bpd);
@@ -738,44 +739,44 @@ export default function NurseAideDashboardPage() {
               )}
 
               {/* Labs */}
-              {tab === 'labs' && (!chartShared ? lockedSection('Labs') : (
+              {tab === 'labs' && (!chartShared ? lockedSection(t('nurse.tab.labs')) : (
                 <div className="row g-3">
                   <div className="col-md-5">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Order Lab</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.orderLab')}</h6></div>
                       <div className="card-body">
-                        <label className="form-label small mb-0">Test / Panel</label>
+                        <label className="form-label small mb-0">{t('nurse.aide.testPanel')}</label>
                         <select className="form-select form-select-sm" value={labForm.instructions} onChange={e => setLabForm({ ...labForm, instructions: e.target.value })}>
                           {LAB_PANELS.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
-                        <label className="form-label small mt-2 mb-0">Clinical indication</label>
+                        <label className="form-label small mt-2 mb-0">{t('nurse.aide.clinicalIndication')}</label>
                         <textarea className="form-control form-control-sm" rows={2} value={labForm.clinical_hx} onChange={e => setLabForm({ ...labForm, clinical_hx: e.target.value })} />
-                        <label className="form-label small mt-2 mb-0">Priority</label>
+                        <label className="form-label small mt-2 mb-0">{t('nurse.aide.priority')}</label>
                         <select className="form-select form-select-sm" value={labForm.priority} onChange={e => setLabForm({ ...labForm, priority: e.target.value })}>
-                          <option value="routine">Routine</option><option value="stat">STAT</option><option value="urgent">Urgent</option>
+                          <option value="routine">{t('nurse.aide.priorityRoutine')}</option><option value="stat">{t('nurse.aide.priorityStat')}</option><option value="urgent">{t('nurse.aide.priorityUrgent')}</option>
                         </select>
                         <button className="btn btn-primary btn-sm rounded-pill w-100 mt-3" onClick={() => orderLab.mutate(labForm)} disabled={orderLab.isPending}>
-                          {orderLab.isPending ? 'Ordering…' : <><i className="bi bi-flask me-1"></i>Order Lab</>}
+                          {orderLab.isPending ? t('nurse.aide.ordering') : <><i className="bi bi-flask me-1"></i>{t('nurse.aide.orderLab')}</>}
                         </button>
                       </div>
                     </div>
                   </div>
                   <div className="col-md-7">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', maxHeight: '480px', overflowY: 'auto' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Lab Orders & Results</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.labOrdersResults')}</h6></div>
                       <div className="card-body p-0">
                         {labOrders.length === 0 ? (
-                          <div className="text-center text-muted py-4 small">No lab orders for this patient.</div>
+                          <div className="text-center text-muted py-4 small">{t('nurse.aide.noLabOrders')}</div>
                         ) : (
                           <div className="list-group list-group-flush">
                             {labOrders.map((o: any) => (
                               <div className="list-group-item" key={o.id}>
                                 <div className="d-flex justify-content-between align-items-center">
-                                  <span className="fw-semibold small">{o.instructions || 'Lab order'}</span>
+                                  <span className="fw-semibold small">{o.instructions || t('nurse.aide.labOrder')}</span>
                                   <span className="badge bg-secondary rounded-pill">{o.orderStatus || 'pending'}</span>
                                 </div>
                                 <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                                  {o.specimenId ? `Specimen ${o.specimenId} · ` : ''}{o.hasResults ? 'Results available' : 'Awaiting results'}
+                                  {o.specimenId ? `${t('nurse.aide.specimen', { id: o.specimenId })} · ` : ''}{o.hasResults ? t('nurse.aide.resultsAvailable') : t('nurse.aide.awaitingResults')}
                                 </div>
                               </div>
                             ))}
@@ -788,17 +789,17 @@ export default function NurseAideDashboardPage() {
               ))}
 
               {/* Medications (read-only for nurses) */}
-              {tab === 'meds' && (!chartShared ? lockedSection('Medications') : (
+              {tab === 'meds' && (!chartShared ? lockedSection(t('nurse.tab.meds')) : (
                 <div className="row g-3">
                   <div className="col-md-7">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Medication List</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.medicationList')}</h6></div>
                       <div className="card-body p-0">
                         {medications.length === 0 ? (
-                          <div className="text-center text-muted py-4 small">No medications recorded.</div>
+                          <div className="text-center text-muted py-4 small">{t('nurse.aide.noMedications')}</div>
                         ) : (
                           <table className="table table-sm table-hover mb-0 small">
-                            <thead className="table-light"><tr><th>Drug</th><th>Dosage</th><th>Route</th><th>Note</th></tr></thead>
+                            <thead className="table-light"><tr><th>{t('nurse.aide.thDrug')}</th><th>{t('nurse.aide.thDosage')}</th><th>{t('nurse.aide.thRoute')}</th><th>{t('nurse.aide.thNote')}</th></tr></thead>
                             <tbody>
                               {medications.map((m: any) => (
                                 <tr key={m.id}><td>{m.drug}</td><td>{m.dosage || '—'}</td><td>{m.route || '—'}</td><td>{m.note || '—'}</td></tr>
@@ -811,10 +812,10 @@ export default function NurseAideDashboardPage() {
                   </div>
                   <div className="col-md-5">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Allergies</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.allergies')}</h6></div>
                       <div className="card-body">
                         {allergies.length === 0 ? (
-                          <div className="text-muted small">No known allergies.</div>
+                          <div className="text-muted small">{t('nurse.aide.noKnownAllergies')}</div>
                         ) : (
                           allergies.map((a: any) => (
                             <span key={a.id} className="badge bg-danger bg-opacity-10 text-danger border me-1 mb-1">{a.allergen || a.title}</span>
@@ -827,30 +828,30 @@ export default function NurseAideDashboardPage() {
               ))}
 
               {/* Care Plan */}
-              {tab === 'plan' && (!chartShared ? lockedSection('Care Plan') : (
+              {tab === 'plan' && (!chartShared ? lockedSection(t('nurse.tab.plan')) : (
                 <div className="row g-3">
                   <div className="col-md-5">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Add Care Plan Entry</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.addCarePlanEntry')}</h6></div>
                       <div className="card-body">
-                        <label className="form-label small mb-0">Plan</label>
-                        <textarea className="form-control form-control-sm" rows={3} placeholder="e.g., Monitor SpO₂ every 2 hours…" value={planForm.description} onChange={e => setPlanForm({ ...planForm, description: e.target.value })} />
-                        <label className="form-label small mt-2 mb-0">Type</label>
+                        <label className="form-label small mb-0">{t('nurse.aide.plan')}</label>
+                        <textarea className="form-control form-control-sm" rows={3} placeholder={t('nurse.aide.planPlaceholder')} value={planForm.description} onChange={e => setPlanForm({ ...planForm, description: e.target.value })} />
+                        <label className="form-label small mt-2 mb-0">{t('nurse.aide.type')}</label>
                         <select className="form-select form-select-sm" value={planForm.care_plan_type} onChange={e => setPlanForm({ ...planForm, care_plan_type: e.target.value })}>
-                          <option value="nursing">Nursing</option><option value="dietary">Dietary</option><option value="mobility">Mobility</option><option value="discharge">Discharge</option>
+                          <option value="nursing">{t('nurse.aide.typeNursing')}</option><option value="dietary">{t('nurse.aide.typeDietary')}</option><option value="mobility">{t('nurse.aide.typeMobility')}</option><option value="discharge">{t('nurse.aide.typeDischarge')}</option>
                         </select>
                         <button className="btn btn-primary btn-sm rounded-pill w-100 mt-3" onClick={() => addCarePlan.mutate(planForm)} disabled={!planForm.description || addCarePlan.isPending}>
-                          {addCarePlan.isPending ? 'Adding…' : <><i className="bi bi-plus-lg me-1"></i>Add to Plan</>}
+                          {addCarePlan.isPending ? t('nurse.aide.adding') : <><i className="bi bi-plus-lg me-1"></i>{t('nurse.aide.addToPlan')}</>}
                         </button>
                       </div>
                     </div>
                   </div>
                   <div className="col-md-7">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Care Plan</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.carePlan')}</h6></div>
                       <div className="card-body p-0">
                         {carePlan.length === 0 ? (
-                          <div className="text-center text-muted py-4 small">No care plan entries.</div>
+                          <div className="text-center text-muted py-4 small">{t('nurse.aide.noCarePlan')}</div>
                         ) : (
                           <div className="list-group list-group-flush">
                             {carePlan.map((c: any) => (
@@ -875,32 +876,32 @@ export default function NurseAideDashboardPage() {
                 <div className="row g-3">
                   <div className="col-md-5">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Add Nurse Note</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.addNurseNote')}</h6></div>
                       <div className="card-body">
-                        <input className="form-control form-control-sm mb-2" placeholder="Title" value={noteForm.title} onChange={e => setNoteForm({ ...noteForm, title: e.target.value })} />
-                        <textarea className="form-control form-control-sm" rows={4} placeholder="Nursing assessment…" value={noteForm.note} onChange={e => setNoteForm({ ...noteForm, note: e.target.value })} />
+                        <input className="form-control form-control-sm mb-2" placeholder={t('nurse.aide.titlePlaceholder')} value={noteForm.title} onChange={e => setNoteForm({ ...noteForm, title: e.target.value })} />
+                        <textarea className="form-control form-control-sm" rows={4} placeholder={t('nurse.aide.assessmentPlaceholder')} value={noteForm.note} onChange={e => setNoteForm({ ...noteForm, note: e.target.value })} />
                         <button className="btn btn-primary btn-sm rounded-pill w-100 mt-2" onClick={() => addNote.mutate(noteForm)} disabled={!noteForm.note || addNote.isPending}>
-                          {addNote.isPending ? 'Saving…' : <><i className="bi bi-journal-plus me-1"></i>Add Nurse Note</>}
+                          {addNote.isPending ? t('nurse.aide.saving') : <><i className="bi bi-journal-plus me-1"></i>{t('nurse.aide.addNurseNote')}</>}
                         </button>
                       </div>
                     </div>
                   </div>
                   <div className="col-md-7">
                     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', maxHeight: '480px', overflowY: 'auto' }}>
-                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">Clinical Notes</h6></div>
+                      <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold small">{t('nurse.aide.clinicalNotes')}</h6></div>
                       <div className="card-body p-0">
                         {notes.length === 0 ? (
-                          <div className="text-center text-muted py-4 small">No notes.</div>
+                          <div className="text-center text-muted py-4 small">{t('nurse.aide.noNotes')}</div>
                         ) : (
                           <div className="list-group list-group-flush">
                             {notes.map((n: any) => (
                               <div className="list-group-item" key={n.id}>
                                 <div className="d-flex justify-content-between">
-                                  <span className="fw-semibold small">{n.title || 'Note'}</span>
+                                  <span className="fw-semibold small">{n.title || t('nurse.aide.noteFallback')}</span>
                                   <span className="text-muted" style={{ fontSize: '0.7rem' }}>{fmtDate(n.date)}</span>
                                 </div>
                                 <div className="small text-muted">{n.body}</div>
-                                <div className="text-muted" style={{ fontSize: '0.7rem' }}>By {n.author_name || n.user || '—'}</div>
+                                <div className="text-muted" style={{ fontSize: '0.7rem' }}>{t('nurse.aide.by', { name: n.author_name || n.user || '—' })}</div>
                               </div>
                             ))}
                           </div>

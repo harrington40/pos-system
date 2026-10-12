@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
@@ -30,6 +31,10 @@ interface ReceiptData {
 }
 
 export default function MedicalBillingPage() {
+  const { t } = useTranslation();
+  /** Payment methods are posted to the API as their English text, so the
+   *  value stays English and only the label the reader sees is translated. */
+  const methodLabel = (m: string) => t(`billing.paymentMethods.${m.toLowerCase().replace(/[^a-z]/g, '')}`, { defaultValue: m });
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabId>('billing');
@@ -96,12 +101,12 @@ export default function MedicalBillingPage() {
       queryClient.invalidateQueries({ queryKey: ['billing-auto-calc'] });
       queryClient.invalidateQueries({ queryKey: ['billing-transactions'] });
       if (data?.receipt) setReceipt(data.receipt);
-      if (data?.duplicate) alert('A payment was just recorded for this patient — duplicate entry prevented.');
+      if (data?.duplicate) alert(t('billing.page.duplicate'));
       setPayAmount('');
       setPayOverride(false);
     },
     onError: (e: any) => {
-      const msg = e?.response?.data?.message || e?.message || 'Payment failed';
+      const msg = e?.response?.data?.message || e?.message || t('billing.page.paymentFailed');
       alert(Array.isArray(msg) ? msg.join('\n') : msg);
     },
   });
@@ -148,9 +153,9 @@ export default function MedicalBillingPage() {
 
   // ── Tabs ───────────────────────────────────────────────────────
   const tabs: { id: TabId; label: string; icon: string }[] = [
-    { id: 'billing', label: 'Patient Billing', icon: 'bi-cash-coin' },
-    { id: 'ar', label: 'A/R Ledger', icon: 'bi-journal-bookmark' },
-    ...(isAdmin ? [{ id: 'codes' as TabId, label: 'CPT/ICD Codes', icon: 'bi-tag' }] : []),
+    { id: 'billing', label: t('billing.page.tabBilling'), icon: 'bi-cash-coin' },
+    { id: 'ar', label: t('billing.page.tabAr'), icon: 'bi-journal-bookmark' },
+    ...(isAdmin ? [{ id: 'codes' as TabId, label: t('billing.page.tabCodes'), icon: 'bi-tag' }] : []),
   ];
 
   return (
@@ -193,15 +198,15 @@ export default function MedicalBillingPage() {
             <div>
               <h3 className="mb-1 fw-bold"><i className="bi bi-currency-dollar me-2"></i>{HOSPITAL}</h3>
               <p className="mb-0 text-white text-opacity-75 small">
-                🇱🇷 {LOCATION} · Liberian Healthcare Billing · LRD {EXCHANGE_RATE}:1 USD
+                {t('billing.page.tagline', { location: LOCATION, rate: EXCHANGE_RATE })}
               </p>
             </div>
             <div className="d-flex gap-2">
               <span className="badge bg-white bg-opacity-25 rounded-pill">
-                <i className="bi bi-people me-1"></i>{patients.length} Patients
+                <i className="bi bi-people me-1"></i>{t('billing.page.patients', { count: patients.length })}
               </span>
               <span className="badge bg-white bg-opacity-25 rounded-pill">
-                <i className="bi bi-exclamation-triangle me-1"></i>{fm(totalOutstanding)} Outstanding
+                <i className="bi bi-exclamation-triangle me-1"></i>{t('billing.page.outstanding', { amount: fm(totalOutstanding) })}
               </span>
             </div>
           </div>
@@ -211,10 +216,10 @@ export default function MedicalBillingPage() {
       {/* ── Stats Bar ───────────────────────────────────────────── */}
       <div className="row g-2 mb-3">
         {[
-          { v: patients.length, l: 'Total Patients', c: '#0d6efd', i: 'bi-people' },
-          { v: withBalance, l: 'With Balance', c: '#fd7e14', i: 'bi-cash' },
-          { v: fm(totalOutstanding), l: 'Outstanding (LRD)', c: '#dc3545', i: 'bi-exclamation-triangle' },
-          { v: `${EXCHANGE_RATE}:1`, l: 'Exchange Rate', c: '#198754', i: 'bi-graph-up' },
+          { v: patients.length, l: t('billing.page.statPatients'), c: '#0d6efd', i: 'bi-people' },
+          { v: withBalance, l: t('billing.page.statWithBalance'), c: '#fd7e14', i: 'bi-cash' },
+          { v: fm(totalOutstanding), l: t('billing.page.statOutstanding'), c: '#dc3545', i: 'bi-exclamation-triangle' },
+          { v: `${EXCHANGE_RATE}:1`, l: t('billing.page.statExchangeRate'), c: '#198754', i: 'bi-graph-up' },
         ].map((s, i) => (
           <div className="col-md-3 col-sm-6" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
@@ -235,11 +240,11 @@ export default function MedicalBillingPage() {
 
       {/* ── Tabs ─────────────────────────────────────────────────── */}
       <ul className="nav nav-pills mb-3 gap-1">
-        {tabs.map(t => (
-          <li className="nav-item" key={t.id}>
-            <button className={`nav-link small ${activeTab === t.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(t.id)}>
-              <i className={`bi ${t.icon} me-1`}></i>{t.label}
+        {tabs.map((tab) => (
+          <li className="nav-item" key={tab.id}>
+            <button className={`nav-link small ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}>
+              <i className={`bi ${tab.icon} me-1`}></i>{tab.label}
             </button>
           </li>
         ))}
@@ -254,12 +259,12 @@ export default function MedicalBillingPage() {
           <div className="col-lg-5">
             <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
               <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-search me-2" style={{ color: '#C8102E' }}></i>Find Patient</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-search me-2" style={{ color: '#C8102E' }}></i>{t('billing.page.findPatient')}</h6>
               </div>
               <div className="card-body">
                 <div className="input-group mb-2">
                   <span className="input-group-text bg-white"><i className="bi bi-search"></i></span>
-                  <input className="form-control" placeholder="Search by name or PID..."
+                  <input className="form-control" placeholder={t('billing.page.searchPlaceholder')}
                     value={searchPid} onChange={e => setSearchPid(e.target.value)} />
                 </div>
                 <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
@@ -275,7 +280,7 @@ export default function MedicalBillingPage() {
                         </div>
                         <span className={`badge rounded-pill ${p.balance > 0 ? 'bg-danger' : 'bg-success'}`}
                           style={{ fontSize: '0.7rem' }}>
-                          {p.balance > 0 ? fm(p.balance) : 'Cleared'}
+                          {p.balance > 0 ? fm(p.balance) : t('billing.page.cleared')}
                         </span>
                       </div>
                       {p.encounterDate && (
@@ -284,7 +289,7 @@ export default function MedicalBillingPage() {
                     </div>
                   ))}
                   {patients.length === 0 && (
-                    <div className="text-center text-muted py-3 small">No patients found. Start typing to search.</div>
+                    <div className="text-center text-muted py-3 small">{t('billing.page.noPatients')}</div>
                   )}
                 </div>
               </div>
@@ -298,8 +303,8 @@ export default function MedicalBillingPage() {
                 style={{ borderRadius: '16px', minHeight: '300px' }}>
                 <div className="text-center text-muted p-5">
                   <i className="bi bi-arrow-left-circle fs-1 d-block mb-3 opacity-25"></i>
-                  <p className="fw-semibold">Select a patient to view billing details</p>
-                  <small>Charges are auto-calculated from their encounters</small>
+                  <p className="fw-semibold">{t('billing.page.selectPatient')}</p>
+                  <small>{t('billing.page.selectPatientHint')}</small>
                 </div>
               </div>
             ) : calcLoading ? (
@@ -310,10 +315,10 @@ export default function MedicalBillingPage() {
                   style={{ borderRadius: '16px 16px 0 0' }}>
                   <h6 className="mb-0 fw-bold">
                     <i className="bi bi-calculator me-2" style={{ color: '#002868' }}></i>
-                    Auto-Calculated Charges — {autoCalc?.grandTotalLRD || 'L$0'}
+                    {t('billing.page.autoCalcCharges', { amount: autoCalc?.grandTotalLRD || 'L$0' })}
                   </h6>
                   <span className="badge rounded-pill" style={{ backgroundColor: '#002868', color: '#fff' }}>
-                    {autoCalc?.encounterCount || 0} Encounter{autoCalc?.encounterCount !== 1 ? 's' : ''}
+                    {t('billing.page.encounters', { count: autoCalc?.encounterCount || 0 })}
                   </span>
                 </div>
                 <div className="card-body">
@@ -341,7 +346,7 @@ export default function MedicalBillingPage() {
                   {(!autoCalc?.encounters || autoCalc.encounters.length === 0) && (
                     <div className="text-center py-3 text-muted small">
                       <i className="bi bi-info-circle me-1"></i>
-                      No active encounters. Charges appear automatically when the patient visits.
+                      {t('billing.page.noEncounters')}
                     </div>
                   )}
 
@@ -349,28 +354,28 @@ export default function MedicalBillingPage() {
                   <div className="border-top pt-3 mt-3">
                     <h6 className="fw-bold small mb-2">
                       <i className="bi bi-cash-coin me-1" style={{ color: '#C8102E' }}></i>
-                      Record Payment
+                      {t('billing.page.recordPayment')}
                     </h6>
                     <div className="row g-2 align-items-end">
                       <div className="col-md-4">
-                        <label className="form-label small">Auto-Calculated Amount</label>
+                        <label className="form-label small">{t('billing.page.amountAutoCalculated')}</label>
                         <div className="form-control form-control-sm bg-light fw-bold" style={{ color: '#C8102E' }}>
                           {payAmount ? `${fm(parseFloat(payAmount))} ($${parseFloat(payAmount).toFixed(2)} USD)` : '—'}
                         </div>
                       </div>
                       <div className="col-md-4">
-                        <label className="form-label small">Payment Method</label>
+                        <label className="form-label small">{t('billing.page.paymentMethod')}</label>
                         <select className="form-select form-select-sm" value={payMethod}
                           onChange={e => setPayMethod(e.target.value)}>
-                          {LIBERIAN_PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+                          {LIBERIAN_PAYMENT_METHODS.map(m => <option key={m} value={m}>{methodLabel(m)}</option>)}
                         </select>
                       </div>
                       <div className="col-md-3">
                         <div className="form-check mb-1">
                           <input className="form-check-input" type="checkbox" id="mbPayOverride"
                             checked={payOverride} onChange={e => setPayOverride(e.target.checked)} />
-                          <label className="form-check-label small" htmlFor="mbPayOverride" title="Allow payment when no services were rendered">
-                            Override: no services
+                          <label className="form-check-label small" htmlFor="mbPayOverride" title={t('billing.page.overrideTitle')}>
+                            {t('billing.page.override')}
                           </label>
                         </div>
                         <button className="btn btn-sm rounded-pill text-white w-100"
@@ -379,7 +384,7 @@ export default function MedicalBillingPage() {
                           disabled={payMutation.isPending || !payAmount}>
                           {payMutation.isPending ? (
                             <span className="spinner-border spinner-border-sm"></span>
-                          ) : `Pay ${payAmount ? fm(parseFloat(payAmount)) : ''}`}
+                          ) : t('billing.page.payAmount', { amount: payAmount ? fm(parseFloat(payAmount)) : '' })}
                         </button>
                       </div>
                     </div>
@@ -394,10 +399,10 @@ export default function MedicalBillingPage() {
                 <div className="card-header bg-white d-flex justify-content-between py-3" style={{ borderRadius: '16px 16px 0 0' }}>
                   <h6 className="mb-0 fw-bold small">
                     <i className="bi bi-clock-history me-2" style={{ color: '#002868' }}></i>
-                    Recent Transactions — Patient #{selectedPid}
+                    {t('billing.page.recentTransactions', { pid: selectedPid })}
                   </h6>
                   <span className="badge bg-secondary rounded-pill" style={{fontSize:'0.65rem'}}>
-                    {transactions.length} entries
+                    {t('billing.page.entries', { count: transactions.length })}
                   </span>
                 </div>
                 <div className="card-body p-0">
@@ -405,7 +410,7 @@ export default function MedicalBillingPage() {
                     <table className="table table-sm small mb-0">
                       <thead className="table-light sticky-top">
                         <tr>
-                          <th>Date</th><th>Description</th><th className="text-end">Amount</th><th>Method</th><th></th>
+                          <th>{t('billing.page.dateCol')}</th><th>{t('billing.page.descriptionCol')}</th><th className="text-end">{t('billing.page.amountCol')}</th><th>{t('billing.page.methodCol')}</th><th></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -441,7 +446,7 @@ export default function MedicalBillingPage() {
                                       if (r.data) setReceipt(r.data);
                                     } catch { /* receipt not found */ }
                                   }}>
-                                  <i className="bi bi-receipt me-1"></i>Receipt
+                                  <i className="bi bi-receipt me-1"></i>{t('billing.page.receipt')}
                                 </button>
                               )}
                             </td>
@@ -449,7 +454,7 @@ export default function MedicalBillingPage() {
                         ))}
                         {transactions.length === 0 && (
                           <tr><td colSpan={5} className="text-center text-muted py-3">
-                            <i className="bi bi-inbox me-1"></i>No transactions yet
+                            <i className="bi bi-inbox me-1"></i>{t('billing.page.noTransactions')}
                           </td></tr>
                         )}
                       </tbody>
@@ -471,10 +476,10 @@ export default function MedicalBillingPage() {
             style={{ borderRadius: '16px 16px 0 0' }}>
             <h6 className="mb-0 fw-bold">
               <i className="bi bi-journal-bookmark me-2" style={{ color: '#002868' }}></i>
-              Accounts Receivable Ledger — {HOSPITAL}
+              {t('billing.page.arLedger', { hospital: HOSPITAL })}
             </h6>
             <span className="badge rounded-pill" style={{ backgroundColor: '#C8102E' }}>
-              {withBalance} with balance
+              {t('billing.page.withBalance', { count: withBalance })}
             </span>
           </div>
           <div className="card-body p-0">
@@ -482,8 +487,8 @@ export default function MedicalBillingPage() {
               <table className="table table-hover small mb-0">
                 <thead className="table-light sticky-top">
                   <tr>
-                    <th>PID</th><th>Patient</th><th>Last Visit</th><th className="text-end">Charges</th>
-                    <th className="text-end">Paid</th><th className="text-end">Balance</th><th>Status</th>
+                    <th>{t('billing.page.pidCol')}</th><th>{t('billing.page.patientCol')}</th><th>{t('billing.page.lastVisitCol')}</th><th className="text-end">{t('billing.page.chargesCol')}</th>
+                    <th className="text-end">{t('billing.page.paidCol')}</th><th className="text-end">{t('billing.page.balanceCol')}</th><th>{t('billing.page.statusCol')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -508,7 +513,7 @@ export default function MedicalBillingPage() {
                   ))}
                   {withBalance === 0 && (
                     <tr><td colSpan={7} className="text-center text-muted py-4">
-                      <i className="bi bi-check-circle me-1 text-success"></i>All accounts cleared — no outstanding balances
+                      <i className="bi bi-check-circle me-1 text-success"></i>{t('billing.page.allAccountsCleared')}
                     </td></tr>
                   )}
                 </tbody>
@@ -527,13 +532,13 @@ export default function MedicalBillingPage() {
           <div className="col-lg-4">
             <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
               <div className="card-header bg-white py-3">
-                <h6 className="mb-0 fw-bold small"><i className="bi bi-plus-circle me-2" style={{color:'#C8102E'}}></i>Add Code</h6>
+                <h6 className="mb-0 fw-bold small"><i className="bi bi-plus-circle me-2" style={{color:'#C8102E'}}></i>{t('billing.page.addCode')}</h6>
               </div>
               <div className="card-body">
                 <div className="row g-2">
-                  <div className="col-5"><input className="form-control form-control-sm" placeholder="Code" value={newCode.code} onChange={e=>setNewCode({...newCode,code:e.target.value})} /></div>
-                  <div className="col-4"><input className="form-control form-control-sm" placeholder="Description" value={newCode.code_text} onChange={e=>setNewCode({...newCode,code_text:e.target.value})} /></div>
-                  <div className="col-3"><input className="form-control form-control-sm" placeholder="Fee $" type="number" value={newCode.fees} onChange={e=>setNewCode({...newCode,fees:e.target.value})} /></div>
+                  <div className="col-5"><input className="form-control form-control-sm" placeholder={t('billing.page.codePlaceholder')} value={newCode.code} onChange={e=>setNewCode({...newCode,code:e.target.value})} /></div>
+                  <div className="col-4"><input className="form-control form-control-sm" placeholder={t('billing.page.descriptionPlaceholder')} value={newCode.code_text} onChange={e=>setNewCode({...newCode,code_text:e.target.value})} /></div>
+                  <div className="col-3"><input className="form-control form-control-sm" placeholder={t('billing.page.feePlaceholder')} type="number" value={newCode.fees} onChange={e=>setNewCode({...newCode,fees:e.target.value})} /></div>
                 </div>
                 <div className="d-flex gap-1 mt-2">
                   <select className="form-select form-select-sm" style={{width:'auto'}} value={newCode.code_type} onChange={e=>setNewCode({...newCode,code_type:e.target.value})}>
@@ -541,7 +546,7 @@ export default function MedicalBillingPage() {
                   </select>
                   <button className="btn btn-sm rounded-pill text-white" style={{backgroundColor:'#C8102E'}}
                     onClick={()=>addCode.mutate(newCode)} disabled={!newCode.code||addCode.isPending}>
-                    {addCode.isPending?<span className="spinner-border spinner-border-sm"></span>:<><i className="bi bi-plus-lg me-1"></i>Add</>}
+                    {addCode.isPending?<span className="spinner-border spinner-border-sm"></span>:<><i className="bi bi-plus-lg me-1"></i>{t('billing.page.add')}</>}
                   </button>
                 </div>
               </div>
@@ -552,7 +557,7 @@ export default function MedicalBillingPage() {
           <div className="col-lg-4">
             <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
               <div className="card-header bg-white py-3 d-flex justify-content-between">
-                <h6 className="mb-0 fw-bold small">CPT4 Codes</h6>
+                <h6 className="mb-0 fw-bold small">{t('billing.page.cpt4Codes')}</h6>
                 <span className="badge bg-primary rounded-pill">{cptCodes.length}</span>
               </div>
               <div className="card-body p-0" style={{maxHeight:'400px',overflow:'auto'}}>
@@ -563,10 +568,10 @@ export default function MedicalBillingPage() {
                         <td><code>{c.code}</code></td>
                         <td className="text-muted">{c.code_text}</td>
                         <td className="text-end">${c.fees||0}</td>
-                        <td><button className="btn btn-outline-danger btn-sm py-0 px-1" onClick={()=>deleteCode.mutate({code:c.code,type:'CPT4'})} title="Delete"><i className="bi bi-trash"></i></button></td>
+                        <td><button className="btn btn-outline-danger btn-sm py-0 px-1" onClick={()=>deleteCode.mutate({code:c.code,type:'CPT4'})} title={t('common.delete')}><i className="bi bi-trash"></i></button></td>
                       </tr>
                     ))}
-                    {!cptCodes.length && <tr><td colSpan={4} className="text-muted text-center">Add CPT codes above</td></tr>}
+                    {!cptCodes.length && <tr><td colSpan={4} className="text-muted text-center">{t('billing.page.addCptHint')}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -577,7 +582,7 @@ export default function MedicalBillingPage() {
           <div className="col-lg-4">
             <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
               <div className="card-header bg-white py-3 d-flex justify-content-between">
-                <h6 className="mb-0 fw-bold small">ICD-10 Codes</h6>
+                <h6 className="mb-0 fw-bold small">{t('billing.page.icd10Codes')}</h6>
                 <span className="badge bg-info rounded-pill">{icd10Codes.length}</span>
               </div>
               <div className="card-body p-0" style={{maxHeight:'400px',overflow:'auto'}}>
@@ -587,10 +592,10 @@ export default function MedicalBillingPage() {
                       <tr key={c.code}>
                         <td><code>{c.code}</code></td>
                         <td className="text-muted">{c.code_text}</td>
-                        <td><button className="btn btn-outline-danger btn-sm py-0 px-1" onClick={()=>deleteCode.mutate({code:c.code,type:'ICD10'})} title="Delete"><i className="bi bi-trash"></i></button></td>
+                        <td><button className="btn btn-outline-danger btn-sm py-0 px-1" onClick={()=>deleteCode.mutate({code:c.code,type:'ICD10'})} title={t('common.delete')}><i className="bi bi-trash"></i></button></td>
                       </tr>
                     ))}
-                    {!icd10Codes.length && <tr><td colSpan={3} className="text-muted text-center">Add ICD-10 codes above</td></tr>}
+                    {!icd10Codes.length && <tr><td colSpan={3} className="text-muted text-center">{t('billing.page.addIcdHint')}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -614,19 +619,19 @@ export default function MedicalBillingPage() {
               <h5 className="mb-0 fw-bold">{receipt.hospital}</h5>
               <small className="text-white-50">{receipt.location}</small>
               <div className="mt-1" style={{ fontSize: '0.75rem' }}>{receipt.dateFormatted} · {receipt.timeFormatted}</div>
-              <div className="badge bg-white text-dark mt-1" style={{ fontSize: '0.7rem' }}>Receipt #: {receipt.receiptNumber}</div>
+              <div className="badge bg-white text-dark mt-1" style={{ fontSize: '0.7rem' }}>{t('billing.receipt.number', { number: receipt.receiptNumber })}</div>
             </div>
             <div className="p-3 border-bottom" style={{ fontSize: '0.82rem' }}>
               <div className="row">
-                <div className="col-6"><small className="text-muted">Patient:</small><br/><strong>{receipt.patient.name}</strong></div>
-                <div className="col-3"><small className="text-muted">PID:</small><br/><strong>{receipt.patient.pid}</strong></div>
-                <div className="col-3"><small className="text-muted">DOB:</small><br/><strong>{formatDateHuman(receipt.patient.dob)}</strong></div>
+                <div className="col-6"><small className="text-muted">{t('billing.receipt.patient')}</small><br/><strong>{receipt.patient.name}</strong></div>
+                <div className="col-3"><small className="text-muted">{t('billing.receipt.pid')}</small><br/><strong>{receipt.patient.pid}</strong></div>
+                <div className="col-3"><small className="text-muted">{t('billing.receipt.dob')}</small><br/><strong>{formatDateHuman(receipt.patient.dob)}</strong></div>
               </div>
             </div>
             <div className="p-3 border-bottom" style={{ fontSize: '0.78rem' }}>
-              <small className="text-muted text-uppercase fw-bold">Services</small>
+              <small className="text-muted text-uppercase fw-bold">{t('billing.receipt.services')}</small>
               <table className="table table-sm small mt-1 mb-0">
-                <thead><tr className="text-muted"><th>Code</th><th>Description</th><th className="text-end">Total</th></tr></thead>
+                <thead><tr className="text-muted"><th>{t('billing.receipt.code')}</th><th>{t('billing.receipt.description')}</th><th className="text-end">{t('billing.receipt.total')}</th></tr></thead>
                 <tbody>
                   {receipt.items.map((item, i) => (
                     <tr key={i}>
@@ -639,17 +644,17 @@ export default function MedicalBillingPage() {
               </table>
             </div>
             <div className="p-3 border-bottom" style={{ fontSize: '0.82rem', backgroundColor: '#f9fafb' }}>
-              <div className="d-flex justify-content-between mb-1"><span>Subtotal:</span><span className="fw-semibold">{receipt.summary.subtotalLRD}</span></div>
-              <div className="d-flex justify-content-between mb-1"><span>Insurance (60%):</span><span className="text-muted">{receipt.summary.insuranceCoveredLRD}</span></div>
-              <div className="d-flex justify-content-between mb-2"><span>Patient Obligation:</span><span className="fw-semibold">{receipt.summary.patientObligationLRD}</span></div>
+              <div className="d-flex justify-content-between mb-1"><span>{t('billing.receipt.subtotal')}</span><span className="fw-semibold">{receipt.summary.subtotalLRD}</span></div>
+              <div className="d-flex justify-content-between mb-1"><span>{t('billing.receipt.insurance')}</span><span className="text-muted">{receipt.summary.insuranceCoveredLRD}</span></div>
+              <div className="d-flex justify-content-between mb-2"><span>{t('billing.receipt.patientObligation')}</span><span className="fw-semibold">{receipt.summary.patientObligationLRD}</span></div>
               <hr className="my-1" />
               <div className="d-flex justify-content-between fw-bold" style={{ color: '#C8102E', fontSize: '0.9rem' }}>
-                <span>Amount Paid:</span><span>{receipt.summary.amountPaidLRD}</span>
+                <span>{t('billing.receipt.amountPaid')}</span><span>{receipt.summary.amountPaidLRD}</span>
               </div>
-              <div className="d-flex justify-content-between small"><span>Method:</span><span>{receipt.payment.method}</span></div>
-              <div className="d-flex justify-content-between small"><span>Received By:</span><span>{receipt.payment.receivedBy}</span></div>
+              <div className="d-flex justify-content-between small"><span>{t('billing.receipt.method')}</span><span>{receipt.payment.method}</span></div>
+              <div className="d-flex justify-content-between small"><span>{t('billing.receipt.receivedBy')}</span><span>{receipt.payment.receivedBy}</span></div>
               {receipt.summary.balanceLRD !== 'L$0' && (
-                <div className="d-flex justify-content-between small text-danger mt-1"><span>Remaining:</span><span className="fw-bold">{receipt.summary.balanceLRD}</span></div>
+                <div className="d-flex justify-content-between small text-danger mt-1"><span>{t('billing.receipt.remaining')}</span><span className="fw-bold">{receipt.summary.balanceLRD}</span></div>
               )}
             </div>
             <div className="p-3 text-center text-muted" style={{ fontSize: '0.7rem' }}>
@@ -659,9 +664,9 @@ export default function MedicalBillingPage() {
             <div className="p-2 border-top d-flex gap-2 justify-content-center">
               <button className="btn btn-sm rounded-pill px-4 text-white" style={{ backgroundColor: '#C8102E' }}
                 onClick={() => window.print()}>
-                <i className="bi bi-printer me-1"></i>Print
+                <i className="bi bi-printer me-1"></i>{t('billing.receipt.print')}
               </button>
-              <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setReceipt(null)}>Close</button>
+              <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setReceipt(null)}>{t('billing.receipt.close')}</button>
             </div>
           </div>
         </div>

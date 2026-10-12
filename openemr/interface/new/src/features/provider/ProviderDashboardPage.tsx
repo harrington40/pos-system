@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import RecentApprovalsPanel from '../../components/shared/RecentApprovalsPanel';
@@ -12,6 +13,7 @@ import { formatDateOnly } from '../../utils/date';
 import { chartPatientId } from '../../utils/patientChart';
 
 export default function ProviderDashboardPage() {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -82,7 +84,7 @@ export default function ProviderDashboardPage() {
     const map = new Map<string, any>();
     for (const n of labNotifications) {
       const chartId = Number(n.patientId ?? n.patientPid ?? n.pid) || 0;
-      const name = n.patientName || nameFromTitle(n.title) || 'Unlinked notice';
+      const name = n.patientName || nameFromTitle(n.title) || i18n.t('provider.dash.unlinkedNotice');
       const key = chartId > 0 ? `id:${chartId}` : `name:${name.toLowerCase()}`;
       let g = map.get(key);
       if (!g) {
@@ -105,7 +107,7 @@ export default function ProviderDashboardPage() {
     return Array.from(map.values()).sort((a: any, b: any) =>
       String(b.latest || '').localeCompare(String(a.latest || '')),
     );
-  }, [labNotifications]);
+  }, [labNotifications, i18n]);
 
   /** Keep an expanded group readable — cap the visible notices. */
   const LAB_NOTICE_LIMIT = 6;
@@ -135,8 +137,8 @@ export default function ProviderDashboardPage() {
         queryClient.invalidateQueries({ queryKey: ['provider-chat-unread'] });
         queryClient.invalidateQueries({ queryKey: ['chat-patients'] });
         addChatToast(
-          'New patient message',
-          event.payload?.body || event.payload?.title || 'A patient sent you a message',
+          t('provider.dash.toastNewMessage'),
+          event.payload?.body || event.payload?.title || t('provider.dash.toastBody'),
         );
       }
     },
@@ -161,7 +163,7 @@ export default function ProviderDashboardPage() {
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
         <div className="text-center">
           <div className="spinner-grow text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status" />
-          <p className="text-muted">Loading your dashboard...</p>
+          <p className="text-muted">{t('provider.dash.loading')}</p>
         </div>
       </div>
     );
@@ -236,21 +238,21 @@ export default function ProviderDashboardPage() {
               </h2>
               <div className="d-flex gap-3 text-white text-opacity-75 small">
                 {provider?.specialty && <span><i className="bi bi-briefcase me-1"></i>{provider.specialty}</span>}
-                {provider?.npi && <span><i className="bi bi-upc me-1"></i>NPI: {provider.npi}</span>}
+                {provider?.npi && <span><i className="bi bi-upc me-1"></i>{t('provider.npiPrefix', { npi: provider.npi })}</span>}
                 <span><i className="bi bi-calendar3 me-1"></i>{date}</span>
                 {syncedAt && (
-                  <span title={`Last synced: ${new Date(syncedAt).toLocaleTimeString()}`}>
-                    <i className="bi bi-arrow-repeat me-1"></i>Synced
+                  <span title={t('provider.dash.lastSynced', { time: new Date(syncedAt).toLocaleTimeString() })}>
+                    <i className="bi bi-arrow-repeat me-1"></i>{t('provider.dash.synced')}
                   </span>
                 )}
               </div>
             </div>
             <div className="d-flex gap-2">
               <button className="btn btn-light btn-sm rounded-pill" onClick={() => navigate('/appointments')}>
-                <i className="bi bi-calendar-plus me-1"></i>Schedule
+                <i className="bi bi-calendar-plus me-1"></i>{t('provider.dash.schedule')}
               </button>
               <button className="btn btn-outline-light btn-sm rounded-pill" onClick={() => navigate('/providers')}>
-                <i className="bi bi-people me-1"></i>All Providers
+                <i className="bi bi-people me-1"></i>{t('provider.dash.allProviders')}
               </button>
             </div>
           </div>
@@ -260,10 +262,10 @@ export default function ProviderDashboardPage() {
       {/* Quick Stats */}
       <div className="row g-3 mb-4">
         {[
-          { value: totalCount, label: "Today's Appointments", icon: 'bi-calendar-check', color: '#0d6efd' },
-          { value: pendingCount, label: 'Waiting / In Progress', icon: 'bi-hourglass-split', color: '#fd7e14' },
-          { value: completedCount, label: 'Completed', icon: 'bi-check2-circle', color: '#198754' },
-          { value: totalAssigned, label: 'All Patients', icon: 'bi-people', color: '#6f42c1' },
+          { value: totalCount, label: t('provider.dash.todayAppointments'), icon: 'bi-calendar-check', color: '#0d6efd' },
+          { value: pendingCount, label: t('provider.dash.waiting'), icon: 'bi-hourglass-split', color: '#fd7e14' },
+          { value: completedCount, label: t('provider.dash.completed'), icon: 'bi-check2-circle', color: '#198754' },
+          { value: totalAssigned, label: t('provider.dash.allPatients'), icon: 'bi-people', color: '#6f42c1' },
         ].map((card, i) => (
           <div className="col-md-3 col-sm-6" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
@@ -286,7 +288,7 @@ export default function ProviderDashboardPage() {
       {unreadChatMessages.length > 0 && (
         <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '20px', borderLeft: '4px solid #0dcaf0' }}>
           <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-chat-dots me-2 text-info"></i>New Patient Messages</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-chat-dots me-2 text-info"></i>{t('provider.dash.newPatientMessages')}</h6>
             <span className="badge bg-danger rounded-pill">{unreadCount}</span>
           </div>
           <div className="card-body p-0">
@@ -305,7 +307,7 @@ export default function ProviderDashboardPage() {
           </div>
           <div className="card-footer bg-white py-2 text-center">
             <button className="btn btn-link btn-sm text-decoration-none" onClick={() => navigate('/messages/patient-chat')}>
-              <i className="bi bi-chat-dots me-1"></i>Open Patient Chat
+              <i className="bi bi-chat-dots me-1"></i>{t('provider.dash.openPatientChat')}
             </button>
           </div>
         </div>
@@ -316,8 +318,8 @@ export default function ProviderDashboardPage() {
         <div className="col-lg-5">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-calendar-check me-2 text-primary"></i>Today's Schedule</h6>
-              <span className="badge bg-primary rounded-pill">{todayAppointments?.length || 0} appts</span>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-calendar-check me-2 text-primary"></i>{t('provider.dash.todaysSchedule')}</h6>
+              <span className="badge bg-primary rounded-pill">{t('provider.dash.appointmentCount', { count: todayAppointments?.length || 0 })}</span>
             </div>
             <div className="card-body p-0" style={{ maxHeight: '500px', overflow: 'auto' }}>
               {todayAppointments?.length > 0 ? (
@@ -339,14 +341,14 @@ export default function ProviderDashboardPage() {
                       <small className="text-muted">{apt.pc_catname || apt.pc_title}</small>
                     </div>
                     <span className={`badge rounded-pill ${apt.pc_apptstatus === 'Checkout' ? 'bg-success' : apt.pc_apptstatus === 'Check In' ? 'bg-info' : 'bg-warning text-dark'}`}>
-                      {apt.pc_apptstatus === 'Checkout' ? 'Done' : apt.pc_apptstatus === 'Check In' ? 'In' : 'Scheduled'}
+                      {apt.pc_apptstatus === 'Checkout' ? t('provider.dash.apptDone') : apt.pc_apptstatus === 'Check In' ? t('provider.dash.apptIn') : t('provider.dash.apptScheduled')}
                     </span>
                   </div>
                 ))
               ) : (
                 <div className="text-center text-muted py-5">
                   <i className="bi bi-calendar-x fs-1 d-block mb-2 opacity-25"></i>
-                  <p className="small">No appointments today</p>
+                  <p className="small">{t('provider.dash.noAppointmentsToday')}</p>
                 </div>
               )}
             </div>
@@ -355,17 +357,17 @@ export default function ProviderDashboardPage() {
           {/* Quick Actions */}
           <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-lightning-charge me-2 text-warning"></i>Quick Actions</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-lightning-charge me-2 text-warning"></i>{t('provider.dash.quickActions')}</h6>
             </div>
             <div className="card-body">
               <div className="row g-2">
                 {[
-                  { label: 'Order Labs', icon: 'bi-flask', color: '#fd7e14', path: '/labs', badge: readyLabs },
-                  { label: 'Drug Info', icon: 'bi-capsule', color: '#6f42c1', path: '/drug-info' },
-                  { label: 'Patient Flow', icon: 'bi-kanban', color: '#198754', path: '/appointments/flow' },
-                  { label: 'Messages', icon: 'bi-chat-dots', color: '#0dcaf0', path: '/messages', badge: unreadCount },
-                  { label: 'Pharmacy', icon: 'bi-capsule-pill', color: '#dc3545', path: '/pharmacy', badge: pharmacyNotify },
-                  { label: 'Referrals', icon: 'bi-send', color: '#0d6efd', path: '/referrals' },
+                  { label: t('provider.dash.orderLabs'), icon: 'bi-flask', color: '#fd7e14', path: '/labs', badge: readyLabs },
+                  { label: t('provider.dash.drugInfo'), icon: 'bi-capsule', color: '#6f42c1', path: '/drug-info' },
+                  { label: t('provider.dash.patientFlow'), icon: 'bi-kanban', color: '#198754', path: '/appointments/flow' },
+                  { label: t('provider.dash.messages'), icon: 'bi-chat-dots', color: '#0dcaf0', path: '/messages', badge: unreadCount },
+                  { label: t('provider.dash.pharmacy'), icon: 'bi-capsule-pill', color: '#dc3545', path: '/pharmacy', badge: pharmacyNotify },
+                  { label: t('provider.dash.referrals'), icon: 'bi-send', color: '#0d6efd', path: '/referrals' },
                 ].map((action, i) => (
                   <div className="col-6" key={i}>
                     <button className="btn btn-light w-100 text-start d-flex align-items-center gap-2 py-2 position-relative"
@@ -391,13 +393,13 @@ export default function ProviderDashboardPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '20px 20px 0 0' }}>
               <h6 className="mb-0 fw-bold">
-                <i className="bi bi-people me-2 text-success"></i>All Patients
-                <small className="text-muted ms-2 fw-normal">Click to examine & treat</small>
+                <i className="bi bi-people me-2 text-success"></i>{t('provider.dash.allPatients')}
+                <small className="text-muted ms-2 fw-normal">{t('provider.dash.clickToExamine')}</small>
               </h6>
               <div className="d-flex align-items-center gap-2">
                 <div className="input-group input-group-sm" style={{ maxWidth: '220px' }}>
                   <span className="input-group-text bg-white"><i className="bi bi-search"></i></span>
-                  <input className="form-control form-control-sm" placeholder="Search patients…" value={patientSearch} onChange={e => setPatientSearch(e.target.value)} />
+                  <input className="form-control form-control-sm" placeholder={t('provider.dash.searchPatients')} value={patientSearch} onChange={e => setPatientSearch(e.target.value)} />
                 </div>
                 <span className="badge bg-success rounded-pill">{assignedPatients?.length || 0}</span>
               </div>
@@ -430,7 +432,7 @@ export default function ProviderDashboardPage() {
                               </div>
                             </div>
                             <div className="d-flex align-items-center gap-2">
-                              {daysAgo > 0 && <small className="text-muted">{daysAgo}d ago</small>}
+                              {daysAgo > 0 && <small className="text-muted">{t('provider.dash.daysAgo', { count: daysAgo })}</small>}
                               <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} text-muted`}></i>
                             </div>
                           </div>
@@ -444,13 +446,13 @@ export default function ProviderDashboardPage() {
                         {/* Billing */}
                         <span className={!canViewFinancials(user) ? 'text-muted' : p.balance > 0 ? 'text-danger fw-semibold' : 'text-success'}>
                           <i className="bi bi-cash me-1"></i>
-                          {!canViewFinancials(user) ? `Billing ${maskFinancial(p.balance)}` : p.balance > 0 ? `${fmtLrd(p.balance)} due` : 'Cleared'}
+                          {!canViewFinancials(user) ? t('provider.dash.billingPrefix', { amount: maskFinancial(p.balance) }) : p.balance > 0 ? t('provider.dash.due', { amount: fmtLrd(p.balance) }) : t('provider.dash.cleared')}
                         </span>
                         {/* Last Encounter */}
                         {p.lastEncounterDate && (
                           <span>
                             <i className="bi bi-clock-history me-1"></i>
-                            Seen {p.daysSinceLastEncounter === 0 ? 'today' : `${p.daysSinceLastEncounter}d ago`}
+                            {p.daysSinceLastEncounter === 0 ? t('provider.dash.seenToday') : t('provider.dash.seenDaysAgo', { count: p.daysSinceLastEncounter })}
                           </span>
                         )}
                         {/* Next Appointment */}
@@ -468,12 +470,12 @@ export default function ProviderDashboardPage() {
                       <div className="px-3 pb-3 border-top" style={{ background: '#f8f9fa', borderRadius: '0 0 14px 14px' }}>
                         {/* Quick Info Bar */}
                         <div className="d-flex gap-2 mt-2 mb-2 flex-wrap">
-                          <span className="badge bg-light text-dark border"><i className="bi bi-telephone me-1"></i>{p.phone_contact || 'No phone'}</span>
-                          <span className="badge bg-light text-dark border"><i className="bi bi-envelope me-1"></i>{p.email || 'No email'}</span>
-                          <span className="badge bg-light text-dark border"><i className="bi bi-clock me-1"></i>Registered {p.regdate ? new Date(p.regdate).toLocaleDateString() : '—'}</span>
+                          <span className="badge bg-light text-dark border"><i className="bi bi-telephone me-1"></i>{p.phone_contact || t('provider.dash.noPhone')}</span>
+                          <span className="badge bg-light text-dark border"><i className="bi bi-envelope me-1"></i>{p.email || t('provider.dash.noEmail')}</span>
+                          <span className="badge bg-light text-dark border"><i className="bi bi-clock me-1"></i>{t('provider.dash.registered', { date: p.regdate ? new Date(p.regdate).toLocaleDateString() : '—' })}</span>
                           {p.lastEncounterDate && (
                             <span className="badge bg-light text-dark border">
-                              <i className="bi bi-file-text me-1"></i>Last: {p.lastEncounterReason || 'Visit'} ({p.lastEncounterDate?.split(' ')[0]})
+                              <i className="bi bi-file-text me-1"></i>{t('provider.dash.lastReason', { reason: p.lastEncounterReason || t('provider.dash.visit') })} ({p.lastEncounterDate?.split(' ')[0]})
                             </span>
                           )}
                         </div>
@@ -482,14 +484,14 @@ export default function ProviderDashboardPage() {
                         <div className="row g-2 mb-2">
                           <div className="col-6">
                             <div className={`p-2 rounded-3 small ${!canViewFinancials(user) ? 'bg-light' : p.balance > 0 ? 'bg-danger bg-opacity-10' : 'bg-success bg-opacity-10'}`}>
-                              <div className="text-muted" style={{fontSize:'0.65rem'}}>Billing</div>
+                              <div className="text-muted" style={{fontSize:'0.65rem'}}>{t('provider.dash.billing')}</div>
                               {canViewFinancials(user) ? (
                                 <>
                                   <div className="fw-bold" style={{color: p.balance > 0 ? '#dc3545' : '#198754'}}>
-                                    {p.balance > 0 ? fmtLrd(p.balance) : 'Cleared'}
+                                    {p.balance > 0 ? fmtLrd(p.balance) : t('provider.dash.cleared')}
                                   </div>
                                   <div className="text-muted" style={{fontSize:'0.6rem'}}>
-                                    Charges: {fmtLrd(p.totalCharges || 0)} · Paid: {fmtLrd(p.totalPayments || 0)}
+                                    {t('provider.dash.chargesAndPaid', { charges: fmtLrd(p.totalCharges || 0), paid: fmtLrd(p.totalPayments || 0) })}
                                   </div>
                                 </>
                               ) : (
@@ -499,9 +501,9 @@ export default function ProviderDashboardPage() {
                           </div>
                           <div className="col-6">
                             <div className="p-2 rounded-3 small bg-info bg-opacity-10">
-                              <div className="text-muted" style={{fontSize:'0.65rem'}}>Next Appointment</div>
+                              <div className="text-muted" style={{fontSize:'0.65rem'}}>{t('provider.dash.nextAppointment')}</div>
                               <div className="fw-bold text-info">
-                                {p.nextApptDate ? `${p.nextApptDate} ${p.nextApptTime?.substring(0, 5)}` : 'None scheduled'}
+                                {p.nextApptDate ? `${p.nextApptDate} ${p.nextApptTime?.substring(0, 5)}` : t('provider.dash.noneScheduled')}
                               </div>
                               <div className="text-muted" style={{fontSize:'0.6rem'}}>
                                 {p.nextApptCategory || '—'} · {p.nextApptStatus || '—'}
@@ -513,17 +515,17 @@ export default function ProviderDashboardPage() {
                         {/* Treatment Actions */}
                         <div className="row g-2">
                           {[
-                            { label: 'Start Screening', icon: 'bi-clipboard2-pulse', color: '#0d6efd', desc: 'Vitals, Prescribe, Labs & Notes',
+                            { label: t('provider.dash.startScreening'), icon: 'bi-clipboard2-pulse', color: '#0d6efd', desc: t('provider.dash.startScreeningDesc'),
                               action: () => navigate(`/patients/${p.id}/screening`) },
-                            { label: 'Order Labs', icon: 'bi-flask', color: '#fd7e14', desc: 'Blood work, cultures, panels',
+                            { label: t('provider.dash.orderLabs'), icon: 'bi-flask', color: '#fd7e14', desc: t('provider.dash.orderLabsDesc'),
                               action: () => navigate(`/labs`) },
-                            { label: 'Prescribe', icon: 'bi-prescription2', color: '#6f42c1', desc: 'Write & send e-prescriptions',
+                            { label: t('provider.dash.prescribe'), icon: 'bi-prescription2', color: '#6f42c1', desc: t('provider.dash.prescribeDesc'),
                               action: () => navigate(`/pharmacy`) },
-                            { label: 'Record Vitals', icon: 'bi-heart-pulse', color: '#dc3545', desc: 'BP, pulse, temp, O₂, weight',
+                            { label: t('provider.dash.recordVitals'), icon: 'bi-heart-pulse', color: '#dc3545', desc: t('provider.dash.recordVitalsDesc'),
                               action: () => { const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); } },
-                            { label: 'Imaging', icon: 'bi-image', color: '#20c997', desc: 'Order X-ray, DICOM, ultrasound',
+                            { label: t('provider.dash.imaging'), icon: 'bi-image', color: '#20c997', desc: t('provider.dash.imagingDesc'),
                               action: () => navigate(`/dicom`) },
-                            { label: 'Refer to Specialist', icon: 'bi-send', color: '#0dcaf0', desc: 'Create referral to specialist',
+                            { label: t('provider.dash.referSpecialist'), icon: 'bi-send', color: '#0dcaf0', desc: t('provider.dash.referSpecialistDesc'),
                               action: () => navigate(`/referrals`) },
                           ].map((btn, i) => (
                             <div className="col-md-6" key={i}>
@@ -549,7 +551,7 @@ export default function ProviderDashboardPage() {
                         <div className="text-center mt-2">
                           <button className="btn btn-outline-success btn-sm rounded-pill"
                             onClick={(e) => { e.stopPropagation(); const cid = chartPatientId(p.id, p.pid); if (cid) navigate(`/patients/${cid}`); }}>
-                            <i className="bi bi-folder2-open me-1"></i>Open Full Patient Chart
+                            <i className="bi bi-folder2-open me-1"></i>{t('provider.dash.openFullChart')}
                           </button>
                         </div>
                       </div>
@@ -560,7 +562,7 @@ export default function ProviderDashboardPage() {
               {(!assignedPatients || assignedPatients.length === 0) && (
                 <div className="text-center text-muted py-5">
                   <i className="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
-                  <p className="small">No patients assigned yet</p>
+                  <p className="small">{t('provider.dash.noPatientsAssigned')}</p>
                 </div>
               )}
             </div>
@@ -570,7 +572,7 @@ export default function ProviderDashboardPage() {
           {recentEncounters?.length > 0 && (
             <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '20px' }}>
               <div className="card-header bg-white py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-info"></i>Recent Encounters</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-info"></i>{t('provider.dash.recentEncounters')}</h6>
               </div>
               <div className="card-body p-0">
                 {recentEncounters.map((enc: any, i: number) => (
@@ -579,7 +581,7 @@ export default function ProviderDashboardPage() {
                     <i className="bi bi-file-text text-info"></i>
                     <div className="flex-grow-1 min-w-0">
                       <div className="small text-truncate"><strong>{enc.lname}, {enc.fname}</strong></div>
-                      <small className="text-muted">{enc.date} — {enc.reason || 'Visit'}</small>
+                      <small className="text-muted">{enc.date} — {enc.reason || t('provider.dash.visit')}</small>
                     </div>
                     <i className="bi bi-chevron-right text-muted small"></i>
                   </div>
@@ -596,16 +598,16 @@ export default function ProviderDashboardPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '20px 20px 0 0' }}>
               <h6 className="mb-0 fw-bold">
-                <i className="bi bi-bell-fill me-2 text-danger"></i>Lab Results Ready to View
-                {labUnread > 0 && <span className="badge bg-danger rounded-pill ms-2">{labUnread} new</span>}
+                <i className="bi bi-bell-fill me-2 text-danger"></i>{t('provider.dash.labResultsReady')}
+                {labUnread > 0 && <span className="badge bg-danger rounded-pill ms-2">{t('provider.dash.newCount', { count: labUnread })}</span>}
               </h6>
               <span className="badge bg-primary rounded-pill">
-                {labNotifyGroups.length} patient{labNotifyGroups.length !== 1 ? 's' : ''} · {labReadyOrders.length} validated
+                {t('provider.dash.patientsCount', { count: labNotifyGroups.length })} · {t('provider.dash.validatedCount', { count: labReadyOrders.length })}
               </span>
             </div>
             <div className="card-body p-0">
               {labNotifyGroups.length === 0 && (
-                <div className="text-center text-muted small py-3">No lab notifications yet</div>
+                <div className="text-center text-muted small py-3">{t('provider.dash.noLabNotifications')}</div>
               )}
               {visibleLabGroups.map((g: any) => {
                 const open = labNotifyExpanded === g.key;
@@ -621,19 +623,19 @@ export default function ProviderDashboardPage() {
                       <div className="flex-grow-1 min-w-0">
                         <div className="fw-semibold small text-truncate">{g.name}</div>
                         <small className="text-muted" style={{ fontSize: '0.65rem' }}>
-                          {g.items.length} result notice{g.items.length !== 1 ? 's' : ''}
-                          {g.unread > 0 ? ` · ${g.unread} unread` : ' · all read'}
+                          {t('provider.dash.resultsNotice', { count: g.items.length })}
+                          {g.unread > 0 ? t('provider.dash.unreadCount', { count: g.unread }) : t('provider.dash.allRead')}
                         </small>
                       </div>
                       {g.chartId > 0 ? (
                         <button className="btn btn-primary btn-sm rounded-pill py-0 px-2 flex-shrink-0" style={{ fontSize: '0.65rem' }}
                           onClick={(e) => { e.stopPropagation(); navigate(`/patients/${g.chartId}`); }}>
-                          <i className="bi bi-eye me-1"></i>View
+                          <i className="bi bi-eye me-1"></i>{t('provider.dash.view')}
                         </button>
                       ) : (
                         <span className="badge bg-light text-muted border flex-shrink-0" style={{ fontSize: '0.6rem' }}
-                          title="This notice was recorded before the patient reference was stored, so it has no chart link.">
-                          no chart link
+                          title={t('provider.dash.noChartLinkTitle')}>
+                          {t('provider.dash.noChartLink')}
                         </span>
                       )}
                       <i className={`bi bi-chevron-${open ? 'up' : 'down'} text-muted small flex-shrink-0`}></i>
@@ -658,7 +660,7 @@ export default function ProviderDashboardPage() {
                                 <button className="btn btn-outline-secondary btn-sm rounded-pill py-0 px-2 flex-shrink-0" style={{ fontSize: '0.6rem' }}
                                   disabled={ackLabNotification.isPending}
                                   onClick={() => ackLabNotification.mutate(n.id)}>
-                                  Mark read
+                                  {t('provider.dash.markRead')}
                                 </button>
                               )}
                             </div>
@@ -666,7 +668,7 @@ export default function ProviderDashboardPage() {
                         })}
                         {g.items.length > LAB_NOTICE_LIMIT && (
                           <div className="text-muted ms-4" style={{ fontSize: '0.6rem' }}>
-                            +{g.items.length - LAB_NOTICE_LIMIT} more notice{g.items.length - LAB_NOTICE_LIMIT !== 1 ? 's' : ''}
+                            {t('provider.dash.moreNotices', { count: g.items.length - LAB_NOTICE_LIMIT })}
                           </div>
                         )}
                       </div>
@@ -678,7 +680,7 @@ export default function ProviderDashboardPage() {
             {labNotifyGroups.length > 3 && (
               <div className="card-footer bg-white py-2 text-center">
                 <button className="btn btn-link btn-sm text-decoration-none" onClick={() => setLabNotifyShowAll((v) => !v)}>
-                  {labNotifyShowAll ? 'Show less' : `Show all ${labNotifyGroups.length} patients`}
+                  {labNotifyShowAll ? t('provider.dash.showLess') : t('provider.dash.showAllPatients', { count: labNotifyGroups.length })}
                 </button>
               </div>
             )}
@@ -691,8 +693,8 @@ export default function ProviderDashboardPage() {
         <div className="mt-4">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white d-flex justify-content-between py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-flask me-2 text-success"></i>Lab Orders Status</h6>
-              <span className="badge bg-success rounded-pill">{groupedLabOrders.length} patient{groupedLabOrders.length !== 1 ? 's' : ''} · {labOrders.length} orders</span>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-flask me-2 text-success"></i>{t('provider.dash.labOrdersStatus')}</h6>
+              <span className="badge bg-success rounded-pill">{t('provider.dash.patientsCount', { count: groupedLabOrders.length })} · {t('provider.dash.ordersCount', { count: labOrders.length })}</span>
             </div>
             <div className="card-body p-0">
               {groupedLabOrders.slice(0, 6).map((g: any) => (
@@ -706,7 +708,7 @@ export default function ProviderDashboardPage() {
                     </div>
                     <div className="flex-grow-1 min-w-0">
                       <div className="fw-semibold text-truncate small">{g.patientName}</div>
-                      <small className="text-muted" style={{ fontSize: '0.65rem' }}>{g.count} test{g.count !== 1 ? 's' : ''}{g.hasStat ? ' · STAT priority' : ''}</small>
+                      <small className="text-muted" style={{ fontSize: '0.65rem' }}>{t('provider.dash.testCount', { count: g.count })}{g.hasStat ? t('provider.dash.statPriority') : ''}</small>
                     </div>
                     {g.hasStat && <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>STAT</span>}
                   </div>
@@ -717,11 +719,11 @@ export default function ProviderDashboardPage() {
                         <span style={{ color: o.statusColor, fontSize: '0.6rem', fontWeight: 700 }}>{o.orderStatus?.[0]?.toUpperCase()}</span>
                       </div>
                       <div className="flex-grow-1 min-w-0">
-                        <span className="small">{o.instructions || 'Lab order'}</span>
+                        <span className="small">{o.instructions || t('provider.dash.labOrder')}</span>
                         <span className="text-muted ms-2" style={{ fontSize: '0.6rem' }}>{o.estimatedTime}</span>
                       </div>
                       <span className="badge rounded-pill" style={{ backgroundColor: o.statusColor, color: '#fff', fontSize: '0.6rem' }}>{o.statusLabel}</span>
-                      {o.hasResults && <i className="bi bi-check-circle text-success small" title="Results available"></i>}
+                      {o.hasResults && <i className="bi bi-check-circle text-success small" title={t('provider.dash.resultsAvailable')}></i>}
                     </div>
                   ))}
                 </div>

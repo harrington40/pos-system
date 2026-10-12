@@ -1,11 +1,13 @@
 import { Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../api/nest-client';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 
 export default function AppLayout() {
+  const { t } = useTranslation();
   const { data: licenseStatus } = useQuery({
     queryKey: ['license-status'],
     queryFn: async () => { const r = await nestClient.get('/license/status'); return r.data; },
@@ -42,14 +44,14 @@ export default function AppLayout() {
               <i className={`bi ${isExpired ? 'bi-exclamation-triangle-fill' : 'bi-clock-fill'} fs-5`}></i>
               <span>
                 {isExpired
-                  ? 'Your license has expired. Please renew to restore full access.'
-                  : `Your free trial period will be expiring in ${daysRemaining} day${daysRemaining > 1 ? 's' : ''}. Please activate a license to continue using OpenRx without interruption.`
+                  ? t('shell.licenseExpired')
+                  : t('shell.licenseTrial', { count: daysRemaining })
                 }
               </span>
             </div>
             <NavLink to="/license" className="btn btn-light btn-sm fw-semibold" style={{ whiteSpace: 'nowrap' }}>
               <i className="bi bi-key me-1"></i>
-              {isExpired ? 'Renew License' : 'Activate License'}
+              {isExpired ? t('shell.renewLicense') : t('shell.activateLicense')}
             </NavLink>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getVendorPortal, acknowledgePurchaseOrderVendor, type PurchaseOrder } from '../../api/endpoints/inventory';
@@ -17,6 +18,7 @@ const money = (v: number | null | undefined) =>
   v == null ? '—' : `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function VendorPortalPage() {
+  const { t } = useTranslation();
   const { token = '' } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   const [msg, setMsg] = useState('');
@@ -29,8 +31,8 @@ export default function VendorPortalPage() {
 
   const ackMut = useMutation({
     mutationFn: (orderId: number) => acknowledgePurchaseOrderVendor(token, orderId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['vendor-portal', token] }); setMsg('Purchase order acknowledged'); },
-    onError: () => setMsg('Could not acknowledge the order'),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['vendor-portal', token] }); setMsg(t('vendorPortal.acknowledged')); },
+    onError: () => setMsg(t('vendorPortal.couldNotAcknowledge')),
   });
 
   return (
@@ -42,10 +44,10 @@ export default function VendorPortalPage() {
               <div className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px', backgroundColor: '#0d6efd15' }}>
                 <i className="bi bi-truck fs-2 text-primary"></i>
               </div>
-              <h4 className="fw-bold mb-1">Vendor Portal</h4>
-              {isLoading && <div className="text-muted small">Loading…</div>}
-              {isError && <div className="text-danger small">Vendor not found or the link is invalid.</div>}
-              {data && <p className="text-muted mb-0">{data.vendor.name} — {data.vendor.contact_name || 'No contact'}</p>}
+              <h4 className="fw-bold mb-1">{t('vendorPortal.title')}</h4>
+              {isLoading && <div className="text-muted small">{t('vendorPortal.loading')}</div>}
+              {isError && <div className="text-danger small">{t('vendorPortal.notFound')}</div>}
+              {data && <p className="text-muted mb-0">{data.vendor.name} — {data.vendor.contact_name || t('vendorPortal.noContact')}</p>}
             </div>
 
             {msg && <div className="alert alert-success py-2 small">{msg}</div>}
@@ -54,7 +56,7 @@ export default function VendorPortalPage() {
               <>
                 {data.orders.length === 0 ? (
                   <div className="text-center text-muted py-5">
-                    <i className="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>No purchase orders yet
+                    <i className="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>{t('vendorPortal.noOrders')}
                   </div>
                 ) : (
                   data.orders.map((po: PurchaseOrder) => (
@@ -62,12 +64,12 @@ export default function VendorPortalPage() {
                       <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                         <div>
                           <div className="fw-bold">{po.po_number}</div>
-                          <small className="text-muted">Ordered {fmtDate(po.order_date)} · Expected {fmtDate(po.expected_date)}</small>
+                          <small className="text-muted">{t('vendorPortal.ordered', { date: fmtDate(po.order_date), expected: fmtDate(po.expected_date) })}</small>
                         </div>
                         <span className={`badge rounded-pill ${STATUS_STYLES[po.status] || 'bg-secondary'}`}>{po.status.replace(/_/g, ' ')}</span>
                       </div>
                       <table className="table table-sm small mb-2">
-                        <thead className="table-light"><tr><th>Item</th><th className="text-end">Qty</th><th className="text-end">Unit Cost</th><th className="text-end">Line Total</th></tr></thead>
+                        <thead className="table-light"><tr><th>{t('vendorPortal.cols.item')}</th><th className="text-end">{t('vendorPortal.cols.qty')}</th><th className="text-end">{t('vendorPortal.cols.unitCost')}</th><th className="text-end">{t('vendorPortal.cols.lineTotal')}</th></tr></thead>
                         <tbody>
                           {po.items.map((it) => (
                             <tr key={it.id}>
@@ -80,10 +82,10 @@ export default function VendorPortalPage() {
                         </tbody>
                       </table>
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="fw-semibold small">Total: {money(po.total_cost)}</span>
+                        <span className="fw-semibold small">{t('vendorPortal.total', { amount: money(po.total_cost) })}</span>
                         {po.status === 'DRAFT' && (
                           <button className="btn btn-primary btn-sm rounded-pill" disabled={ackMut.isPending} onClick={() => ackMut.mutate(po.id)}>
-                            {ackMut.isPending ? <span className="spinner-border spinner-border-sm" /> : 'Acknowledge Order'}
+                            {ackMut.isPending ? <span className="spinner-border spinner-border-sm" /> : t('vendorPortal.acknowledge')}
                           </button>
                         )}
                       </div>

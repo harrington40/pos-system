@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import { useInvalidateNotifications } from '../../hooks/useNotifications';
@@ -14,6 +15,7 @@ const CATEGORIES = [
 ];
 
 export default function FdaLookupPage() {
+  const { t } = useTranslation();
   const [category, setCategory] = useState('drugs');
   const [searchTerm, setSearchTerm] = useState('');
   const [smartSearch, setSmartSearch] = useState('');
@@ -151,8 +153,8 @@ export default function FdaLookupPage() {
       <div className="rounded-4 p-4 mb-4 text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #198754 60%, #00c9a7 100%)', zIndex: 1 }}>
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '6rem', transform: 'rotate(10deg) translate(20px,-10px)' }}><i className="bi bi-shield-check"></i></div>
         <div className="position-relative">
-          <h3 className="mb-1 fw-bold"><i className="bi bi-shield-check me-2"></i>FDA Regulatory Lookup</h3>
-          <p className="mb-0 text-white text-opacity-75 small">Search FDA databases for drug labels, device recalls, food safety, and more — powered by openFDA.gov</p>
+          <h3 className="mb-1 fw-bold"><i className="bi bi-shield-check me-2"></i>{t('fda.lookup.title')}</h3>
+          <p className="mb-0 text-white text-opacity-75 small">{t('fda.lookup.subtitle')}</p>
         </div>
       </div>
 
@@ -161,10 +163,10 @@ export default function FdaLookupPage() {
         <div className="card shadow-sm mb-3" style={{ position: 'relative', zIndex: 1 }}>
           <div className="card-header bg-white d-flex justify-content-between align-items-center py-2">
             <h6 className="mb-0 fw-bold">
-              <i className="bi bi-bell-fill me-2 text-danger"></i>Drug Information Notices
-              {drugUnread > 0 && <span className="badge bg-danger rounded-pill ms-2">{drugUnread} new</span>}
+              <i className="bi bi-bell-fill me-2 text-danger"></i>{t('fda.lookup.noticesTitle')}
+              {drugUnread > 0 && <span className="badge bg-danger rounded-pill ms-2">{t('fda.lookup.newBadge', { count: drugUnread })}</span>}
             </h6>
-            <small className="text-muted" style={{ fontSize: '0.65rem' }}>{drugNotices.length} recent</small>
+            <small className="text-muted" style={{ fontSize: '0.65rem' }}>{t('fda.lookup.recent', { count: drugNotices.length })}</small>
           </div>
           <div className="card-body p-0">
             {drugNotices.slice(0, 4).map((n: any) => {
@@ -201,9 +203,9 @@ export default function FdaLookupPage() {
             key={cat.key}
             className={`btn btn-sm ${category === cat.key ? 'btn-primary' : 'btn-outline-secondary'}`}
             onClick={() => setCategory(cat.key)}
-            title={cat.desc}
+            title={t('fda.lookup.catDesc.' + cat.key, { defaultValue: cat.desc })}
           >
-            <i className={`bi ${cat.icon} me-1`}></i>{cat.label}
+            <i className={`bi ${cat.icon} me-1`}></i>{t('fda.lookup.cat.' + cat.key, { defaultValue: cat.label })}
           </button>
         ))}
       </div>
@@ -213,13 +215,13 @@ export default function FdaLookupPage() {
         <div className="col-md-7">
           <div className="card shadow-sm">
             <div className="card-header bg-white py-2">
-              <h6 className="mb-0"><i className="bi bi-search me-2"></i>Search {CATEGORIES.find(c => c.key === category)?.label}</h6>
+              <h6 className="mb-0"><i className="bi bi-search me-2"></i>{t('fda.lookup.searchHeading', { category: t('fda.lookup.cat.' + category, { defaultValue: CATEGORIES.find(c => c.key === category)?.label }) })}</h6>
             </div>
             <div className="card-body">
               <div className="input-group mb-3">
                 <input
                   className="form-control"
-                  placeholder={`Search ${category}...`}
+                  placeholder={t('fda.lookup.searchPlaceholder', { category: t('fda.lookup.cat.' + category, { defaultValue: CATEGORIES.find(c => c.key === category)?.label }) })}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -229,11 +231,11 @@ export default function FdaLookupPage() {
               </div>
 
               {isLoading && <div className="text-center py-3"><div className="spinner-border spinner-border-sm text-primary"/></div>}
-              {error && <div className="alert alert-danger small">Failed to fetch FDA data</div>}
+              {error && <div className="alert alert-danger small">{t('fda.lookup.fetchFailed')}</div>}
 
               {data?.results?.length > 0 && (
                 <div>
-                  <small className="text-muted">{data.total || data.results.length} results</small>
+                  <small className="text-muted">{t('fda.lookup.results', { count: data.total || data.results.length })}</small>
                   {data.results.slice(0, 10).map((r: any, i: number) => (
                     <div key={i} className="card bg-light mb-2 border-0">
                       <div className="card-body py-2 small">
@@ -241,16 +243,16 @@ export default function FdaLookupPage() {
                         {r.device_name && <div><strong>{r.device_name}</strong></div>}
                         {r.product_description && <div><strong>{r.product_description}</strong></div>}
                         {r.manufacturer && <div className="text-muted">{r.manufacturer}</div>}
-                        {r.indications && <div className="mt-1"><span className="fw-semibold">Indications:</span> {r.indications.substring(0, 200)}</div>}
-                        {r.warnings && <div className="mt-1 text-danger"><span className="fw-semibold">Warnings:</span> {r.warnings.substring(0, 200)}</div>}
-                        {r.recall_number && <div className="mt-1"><span className="badge bg-danger me-1">Recall</span> {r.reason_for_recall?.substring(0, 150)}</div>}
+                        {r.indications && <div className="mt-1"><span className="fw-semibold">{t('fda.lookup.indications')}</span> {r.indications.substring(0, 200)}</div>}
+                        {r.warnings && <div className="mt-1 text-danger"><span className="fw-semibold">{t('fda.lookup.warnings')}</span> {r.warnings.substring(0, 200)}</div>}
+                        {r.recall_number && <div className="mt-1"><span className="badge bg-danger me-1">{t('fda.lookup.recall')}</span> {r.reason_for_recall?.substring(0, 150)}</div>}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
               {data && !data.results?.length && searchTerm.length >= 2 && (
-                <p className="text-muted small">No results found for "{searchTerm}"</p>
+                <p className="text-muted small">{t('fda.lookup.noResults', { term: searchTerm })}</p>
               )}
             </div>
           </div>
@@ -260,14 +262,14 @@ export default function FdaLookupPage() {
         <div className="col-md-5">
           <div className="card shadow-sm border-primary">
             <div className="card-header bg-primary text-white py-2">
-              <h6 className="mb-0"><i className="bi bi-lightbulb me-2"></i>Smart Drug Lookup</h6>
+              <h6 className="mb-0"><i className="bi bi-lightbulb me-2"></i>{t('fda.lookup.smartTitle')}</h6>
             </div>
             <div className="card-body">
-              <p className="small text-muted">Cross-references FDA data with your patients — finds interactions, allergies, and adverse events.</p>
+              <p className="small text-muted">{t('fda.lookup.smartHint')}</p>
               <div className="input-group mb-3">
                 <input
                   className="form-control form-control-sm"
-                  placeholder="Enter drug name..."
+                  placeholder={t('fda.lookup.smartPlaceholder')}
                   value={smartSearch}
                   onChange={e => setSmartSearch(e.target.value)}
                 />
@@ -287,19 +289,19 @@ export default function FdaLookupPage() {
                   {smartData.drug.interactionWarnings?.length > 0 && (
                     <div className="alert alert-warning py-2 mb-2">
                       <i className="bi bi-exclamation-triangle me-1"></i>
-                      <strong>Potential Drug Interactions:</strong>
+                      <strong>{t('fda.lookup.potentialInteractions')}</strong>
                       {smartData.drug.interactionWarnings.map((w: string, i: number) => <div key={i}>• {w}</div>)}
                     </div>
                   )}
 
                   <div className="mb-2">
-                    <span className="badge bg-info me-1">{smartData.drug.patientCount} patients</span>
-                    on this medication in the system
+                    <span className="badge bg-info me-1">{t('fda.lookup.patientCount', { count: smartData.drug.patientCount })}</span>
+                    {t('fda.lookup.onThisMedication')}
                   </div>
 
                   {smartData.drug.topAdverseReactions?.length > 0 && (
                     <div className="mt-2">
-                      <strong>Top Adverse Reactions:</strong>
+                      <strong>{t('fda.lookup.topAdverse')}</strong>
                       <div className="d-flex flex-wrap gap-1 mt-1">
                         {smartData.drug.topAdverseReactions.map((r: any, i: number) => (
                           <span key={i} className="badge bg-light text-dark border">{r.term} ({r.count})</span>
@@ -310,7 +312,7 @@ export default function FdaLookupPage() {
 
                   {smartData.drug.patientsOnDrug?.length > 0 && (
                     <div className="mt-3">
-                      <strong>Patients on this drug:</strong>
+                      <strong>{t('fda.lookup.patientsOnDrug')}</strong>
                       {smartData.drug.patientsOnDrug.map((p: any, i: number) => (
                         <div key={i} className="text-muted">• {p.fname} {p.lname} (PID {p.pid}) — {p.dosage}</div>
                       ))}
@@ -338,7 +340,7 @@ export default function FdaLookupPage() {
                 <small className="text-white text-opacity-75">
                   {openNotice.patientName ? `${openNotice.patientName} · ` : ''}
                   {openNotice.createdAt ? new Date(openNotice.createdAt).toLocaleString() : ''}
-                  {openNotice.createdBy ? ` · by ${openNotice.createdBy}` : ''}
+                  {openNotice.createdBy ? t('fda.lookup.modal.byUser', { name: openNotice.createdBy }) : ''}
                 </small>
               </div>
               <button className="btn btn-sm btn-outline-light rounded-circle" style={{ width: '32px', height: '32px' }}
@@ -347,22 +349,22 @@ export default function FdaLookupPage() {
             <div className="card-body">
               {(openNotice.details?.allergyWarnings || []).length > 0 && (
                 <div className="alert alert-danger py-2 small mb-3">
-                  <strong><i className="bi bi-exclamation-octagon me-1"></i>Allergy warnings</strong>
+                  <strong><i className="bi bi-exclamation-octagon me-1"></i>{t('fda.lookup.modal.allergyWarnings')}</strong>
                   {openNotice.details.allergyWarnings.map((w: string, i: number) => <div key={i}>• {w}</div>)}
                 </div>
               )}
               {(openNotice.details?.interactionWarnings || []).length > 0 && (
                 <div className="alert alert-warning py-2 small mb-3">
-                  <strong><i className="bi bi-exclamation-triangle me-1"></i>Drug interactions</strong>
+                  <strong><i className="bi bi-exclamation-triangle me-1"></i>{t('fda.lookup.modal.drugInteractions')}</strong>
                   {openNotice.details.interactionWarnings.map((w: string, i: number) => <div key={i}>• {w}</div>)}
                 </div>
               )}
 
               <div className="row g-2 mb-3">
                 {[
-                  { l: 'Patients on this drug', v: openNotice.details?.patientCount ?? 0, c: '#0d6efd' },
-                  { l: 'Allergy warnings', v: (openNotice.details?.allergyWarnings || []).length, c: '#dc3545' },
-                  { l: 'Interactions', v: (openNotice.details?.interactionWarnings || []).length, c: '#fd7e14' },
+                  { l: t('fda.lookup.modal.statPatients'), v: openNotice.details?.patientCount ?? 0, c: '#0d6efd' },
+                  { l: t('fda.lookup.modal.statAllergy'), v: (openNotice.details?.allergyWarnings || []).length, c: '#dc3545' },
+                  { l: t('fda.lookup.modal.statInteractions'), v: (openNotice.details?.interactionWarnings || []).length, c: '#fd7e14' },
                 ].map((s) => (
                   <div className="col-4" key={s.l}>
                     <div className="p-2 rounded-3 text-center" style={{ backgroundColor: `${s.c}12` }}>
@@ -375,13 +377,13 @@ export default function FdaLookupPage() {
 
               {openNotice.details?.label && (
                 <>
-                  <h6 className="small fw-bold text-muted text-uppercase">FDA label specifics</h6>
+                  <h6 className="small fw-bold text-muted text-uppercase">{t('fda.lookup.modal.labelSpecifics')}</h6>
                   <ul className="list-unstyled small mb-3">
                     {[
-                      ['Brand name', openNotice.details.label.brandName],
-                      ['Generic name', openNotice.details.label.genericName],
-                      ['Manufacturer', openNotice.details.label.manufacturer],
-                      ['Route', openNotice.details.label.route],
+                      [t('fda.lookup.modal.brandName'), openNotice.details.label.brandName],
+                      [t('fda.lookup.modal.genericName'), openNotice.details.label.genericName],
+                      [t('fda.lookup.modal.manufacturer'), openNotice.details.label.manufacturer],
+                      [t('fda.lookup.modal.route'), openNotice.details.label.route],
                     ]
                       .filter(([, v]) => v)
                       .map(([k, v]) => (
@@ -389,10 +391,10 @@ export default function FdaLookupPage() {
                       ))}
                   </ul>
                   {[
-                    ['Indications', openNotice.details.label.indications],
-                    ['Dosage & administration', openNotice.details.label.dosage],
-                    ['Warnings', openNotice.details.label.warnings],
-                    ['Adverse reactions', openNotice.details.label.adverseReactions],
+                    [t('fda.lookup.modal.indications'), openNotice.details.label.indications],
+                    [t('fda.lookup.modal.dosage'), openNotice.details.label.dosage],
+                    [t('fda.lookup.modal.warnings'), openNotice.details.label.warnings],
+                    [t('fda.lookup.modal.adverseReactions'), openNotice.details.label.adverseReactions],
                   ]
                     .filter(([, v]) => v)
                     .map(([k, v]) => (
@@ -405,7 +407,7 @@ export default function FdaLookupPage() {
               )}
               {(openNotice.details?.topAdverseReactions || []).length > 0 && (
                 <>
-                  <h6 className="small fw-bold text-muted text-uppercase mt-3">Top adverse reactions (FDA events)</h6>
+                  <h6 className="small fw-bold text-muted text-uppercase mt-3">{t('fda.lookup.modal.topAdverse')}</h6>
                   <div className="d-flex flex-wrap gap-1">
                     {openNotice.details.topAdverseReactions.map((r: any, i: number) => (
                       <span key={i} className="badge bg-light text-dark border">{r.term} ({r.count})</span>
@@ -416,7 +418,7 @@ export default function FdaLookupPage() {
 
               {(openNotice.details?.patientsOnDrug || []).length > 0 && (
                 <>
-                  <h6 className="small fw-bold text-muted text-uppercase mt-3">Patients prescribed this drug</h6>
+                  <h6 className="small fw-bold text-muted text-uppercase mt-3">{t('fda.lookup.modal.patientsPrescribed')}</h6>
                   <div className="small">
                     {openNotice.details.patientsOnDrug.map((p: any, i: number) => (
                       <div key={i} className="text-muted">• {p.fname} {p.lname} (PID {p.pid}) — {p.dosage}</div>
@@ -430,10 +432,10 @@ export default function FdaLookupPage() {
                 <button className="btn btn-outline-secondary btn-sm rounded-pill me-2"
                   disabled={ackNotice.isPending}
                   onClick={() => { ackNotice.mutate(openNotice.id); setOpenNotice(null); }}>
-                  Mark read
+                  {t('fda.lookup.modal.markRead')}
                 </button>
               )}
-              <button className="btn btn-primary btn-sm rounded-pill" onClick={() => setOpenNotice(null)}>Close</button>
+              <button className="btn btn-primary btn-sm rounded-pill" onClick={() => setOpenNotice(null)}>{t('common.close')}</button>
             </div>
           </div>
         </div>

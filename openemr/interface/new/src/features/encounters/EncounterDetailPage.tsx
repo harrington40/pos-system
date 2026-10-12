@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEncounter, getSoapNotes, getVitals, updateEncounter } from '../../api/endpoints/encounters';
@@ -11,6 +13,7 @@ import { formatPatientNameLastFirst } from '../../utils/patientName';
 type TabId = 'visit' | 'soap' | 'vitals';
 
 export default function EncounterDetailPage() {
+  const { t } = useTranslation();
   const { id: patientUuid, encounterId: encounterUuid } = useParams<{
     id: string;
     encounterId: string;
@@ -48,7 +51,7 @@ export default function EncounterDetailPage() {
     return (
       <div className="text-center p-5">
         <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
+          <span className="visually-hidden">{t('encounters.detail.loading')}</span>
         </div>
       </div>
     );
@@ -58,7 +61,7 @@ export default function EncounterDetailPage() {
     return (
       <div className="alert alert-danger">
         <i className="bi bi-exclamation-circle me-2"></i>
-        Encounter not found.
+        {t('encounters.detail.notFound')}
       </div>
     );
   }
@@ -78,17 +81,17 @@ export default function EncounterDetailPage() {
         <ol className="breadcrumb">
           <li className="breadcrumb-item">
             <a href="/app/patients" onClick={(e) => { e.preventDefault(); navigate('/patients'); }} style={{ cursor: 'pointer' }}>
-              Patient Search
+              {t('encounters.detail.breadcrumbPatients')}
             </a>
           </li>
           <li className="breadcrumb-item">
             <a href={`/app/patients/${patientUuid}`} onClick={(e) => { e.preventDefault(); navigate(`/patients/${patientUuid}`); }} style={{ cursor: 'pointer' }}>
-              {patient ? formatPatientNameLastFirst(patient) : 'Patient'}
+              {patient ? formatPatientNameLastFirst(patient) : t('encounters.list.patientFallback')}
             </a>
           </li>
           <li className="breadcrumb-item">
             <a href={`/app/patients/${patientUuid}/encounters`} onClick={(e) => { e.preventDefault(); navigate(`/patients/${patientUuid}/encounters`); }} style={{ cursor: 'pointer' }}>
-              Encounters
+              {t('encounters.detail.breadcrumbEncounters')}
             </a>
           </li>
           <li className="breadcrumb-item active">{encounter.date}</li>
@@ -102,7 +105,7 @@ export default function EncounterDetailPage() {
             <div>
               <h4 className="mb-1">
                 <i className="bi bi-file-medical me-2"></i>
-                Encounter — {encounter.date}
+                {t('encounters.detail.header', { date: encounter.date })}
               </h4>
               <p className="text-muted mb-0">
                 <span className={`badge ${classColors[encounter.class_code ?? ''] ?? 'bg-secondary'} me-2`}>
@@ -123,7 +126,7 @@ export default function EncounterDetailPage() {
 
           {/* Reason field — inline editable */}
           <div className="mt-3">
-            <strong>Reason for Visit:</strong>
+            <strong>{t('encounters.detail.reasonForVisit')}</strong>
             {editReason ? (
               <div className="d-flex gap-2 mt-1">
                 <input
@@ -139,10 +142,10 @@ export default function EncounterDetailPage() {
                     setEditReason(false);
                   }}
                 >
-                  Save
+                  {t('common.save')}
                 </button>
                 <button className="btn btn-sm btn-secondary" onClick={() => setEditReason(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             ) : (
@@ -157,7 +160,7 @@ export default function EncounterDetailPage() {
                 {encounter.reason || (
                   <span className="text-muted fst-italic">
                     <i className="bi bi-pencil me-1"></i>
-                    Add reason...
+                    {t('encounters.detail.addReason')}
                   </span>
                 )}
               </div>
@@ -174,7 +177,7 @@ export default function EncounterDetailPage() {
             onClick={() => setActiveTab('visit')}
           >
             <i className="bi bi-info-circle me-1"></i>
-            Visit Details
+            {t('encounters.detail.tabVisit')}
           </button>
         </li>
         <li className="nav-item">
@@ -183,7 +186,7 @@ export default function EncounterDetailPage() {
             onClick={() => setActiveTab('soap')}
           >
             <i className="bi bi-journal-text me-1"></i>
-            SOAP Notes
+            {t('encounters.detail.tabSoap')}
           </button>
         </li>
         <li className="nav-item">
@@ -192,7 +195,7 @@ export default function EncounterDetailPage() {
             onClick={() => setActiveTab('vitals')}
           >
             <i className="bi bi-heart-pulse me-1"></i>
-            Vital Signs
+            {t('encounters.detail.tabVitals')}
           </button>
         </li>
       </ul>
@@ -201,32 +204,32 @@ export default function EncounterDetailPage() {
       {activeTab === 'visit' && (
         <div className="card">
           <div className="card-header">
-            <h5 className="mb-0">Visit Details</h5>
+            <h5 className="mb-0">{t('encounters.detail.tabVisit')}</h5>
           </div>
           <div className="card-body">
             <div className="row">
               <div className="col-md-4 mb-3">
-                <div className="text-muted small text-uppercase">Date</div>
+                <div className="text-muted small text-uppercase">{t('encounters.detail.fDate')}</div>
                 <div className="fw-medium">{encounter.date}</div>
               </div>
               <div className="col-md-4 mb-3">
-                <div className="text-muted small text-uppercase">Onset Date</div>
+                <div className="text-muted small text-uppercase">{t('encounters.detail.fOnset')}</div>
                 <div className="fw-medium">{encounter.onset_date || '—'}</div>
               </div>
               <div className="col-md-4 mb-3">
-                <div className="text-muted small text-uppercase">Facility</div>
+                <div className="text-muted small text-uppercase">{t('encounters.detail.fFacility')}</div>
                 <div className="fw-medium">{encounter.facility || '—'}</div>
               </div>
               <div className="col-md-4 mb-3">
-                <div className="text-muted small text-uppercase">Provider ID</div>
+                <div className="text-muted small text-uppercase">{t('encounters.detail.fProviderId')}</div>
                 <div className="fw-medium">{encounter.provider_id || '—'}</div>
               </div>
               <div className="col-md-4 mb-3">
-                <div className="text-muted small text-uppercase">Sensitivity</div>
+                <div className="text-muted small text-uppercase">{t('encounters.detail.fSensitivity')}</div>
                 <div className="fw-medium">{encounter.sensitivity || '—'}</div>
               </div>
               <div className="col-md-4 mb-3">
-                <div className="text-muted small text-uppercase">POS Code</div>
+                <div className="text-muted small text-uppercase">{t('encounters.detail.fPosCode')}</div>
                 <div className="fw-medium">{encounter.pos_code || '—'}</div>
               </div>
             </div>
@@ -250,6 +253,7 @@ export default function EncounterDetailPage() {
 }
 
 function SoapNotesTab({ patientId, encounterId, existingNotes }: { patientId: string; encounterId: string; existingNotes: any[] }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
 
@@ -264,8 +268,8 @@ function SoapNotesTab({ patientId, encounterId, existingNotes }: { patientId: st
   return (
     <div className="card">
       <div className="card-header d-flex justify-content-between">
-        <h5 className="mb-0">SOAP Notes</h5>
-        <small className="text-muted">🎤 Voice dictation available</small>
+        <h5 className="mb-0">{t('encounters.detail.soapTitle')}</h5>
+        <small className="text-muted">{t('encounters.detail.voiceHint')}</small>
       </div>
       <div className="card-body">
         {/* Voice dictation input */}
@@ -275,30 +279,30 @@ function SoapNotesTab({ patientId, encounterId, existingNotes }: { patientId: st
 
         <div className="row g-2 mb-3">
           <div className="col-md-6">
-            <label className="form-label small">Subjective <VoiceInput onResult={(text) => setForm(f => ({ ...f, subjective: f.subjective + ' ' + text }))} /></label>
-            <textarea className="form-control form-control-sm" rows={3} value={form.subjective} onChange={e => setForm({...form, subjective: e.target.value})} placeholder="Patient's description of symptoms..." />
+            <label className="form-label small">{t('encounters.detail.subjective')} <VoiceInput onResult={(text) => setForm(f => ({ ...f, subjective: f.subjective + ' ' + text }))} /></label>
+            <textarea className="form-control form-control-sm" rows={3} value={form.subjective} onChange={e => setForm({...form, subjective: e.target.value})} placeholder={t('encounters.detail.subjectivePlaceholder')} />
           </div>
           <div className="col-md-6">
-            <label className="form-label small">Objective <VoiceInput onResult={(text) => setForm(f => ({ ...f, objective: f.objective + ' ' + text }))} /></label>
-            <textarea className="form-control form-control-sm" rows={3} value={form.objective} onChange={e => setForm({...form, objective: e.target.value})} placeholder="Physical exam findings, vitals..." />
+            <label className="form-label small">{t('encounters.detail.objective')} <VoiceInput onResult={(text) => setForm(f => ({ ...f, objective: f.objective + ' ' + text }))} /></label>
+            <textarea className="form-control form-control-sm" rows={3} value={form.objective} onChange={e => setForm({...form, objective: e.target.value})} placeholder={t('encounters.detail.objectivePlaceholder')} />
           </div>
           <div className="col-md-6">
-            <label className="form-label small">Assessment <VoiceInput onResult={(text) => setForm(f => ({ ...f, assessment: f.assessment + ' ' + text }))} /></label>
-            <textarea className="form-control form-control-sm" rows={3} value={form.assessment} onChange={e => setForm({...form, assessment: e.target.value})} placeholder="Diagnosis, differential..." />
+            <label className="form-label small">{t('encounters.detail.assessment')} <VoiceInput onResult={(text) => setForm(f => ({ ...f, assessment: f.assessment + ' ' + text }))} /></label>
+            <textarea className="form-control form-control-sm" rows={3} value={form.assessment} onChange={e => setForm({...form, assessment: e.target.value})} placeholder={t('encounters.detail.assessmentPlaceholder')} />
           </div>
           <div className="col-md-6">
-            <label className="form-label small">Plan <VoiceInput onResult={(text) => setForm(f => ({ ...f, plan: f.plan + ' ' + text }))} /></label>
-            <textarea className="form-control form-control-sm" rows={3} value={form.plan} onChange={e => setForm({...form, plan: e.target.value})} placeholder="Treatment plan, follow-up..." />
+            <label className="form-label small">{t('encounters.detail.plan')} <VoiceInput onResult={(text) => setForm(f => ({ ...f, plan: f.plan + ' ' + text }))} /></label>
+            <textarea className="form-control form-control-sm" rows={3} value={form.plan} onChange={e => setForm({...form, plan: e.target.value})} placeholder={t('encounters.detail.planPlaceholder')} />
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => createSoap.mutate(form)} disabled={createSoap.isPending}>
-          {createSoap.isPending ? 'Saving...' : 'Save SOAP Note'}
+          {createSoap.isPending ? t('patients.common.saving') : t('encounters.detail.saveSoap')}
         </button>
 
         {/* Existing notes */}
         {existingNotes.length > 0 && (
           <div className="mt-3">
-            <h6>Previous Notes</h6>
+            <h6>{t('encounters.detail.previousNotes')}</h6>
             {existingNotes.map((note: any) => (
               <div key={note.id} className="mb-2 p-2 bg-light rounded small">
                 <div className="text-muted">{note.date}</div>

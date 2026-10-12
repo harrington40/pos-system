@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
@@ -51,6 +52,7 @@ const urgencyColor: Record<string, string> = {
 };
 
 export default function ReferralsPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [patientSearch, setPatientSearch] = useState('');
   const debouncedSearch = useDebounce(patientSearch, 300);
@@ -237,9 +239,9 @@ export default function ReferralsPage() {
       `}</style>
       {/* Header */}
       <div className="rounded-4 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #20c997 0%, #0d6efd 55%, #6610f2 100%)' }}>
-        <h2 className="mb-1 fw-bold"><i className="bi bi-send me-2"></i>Smart Referrals</h2>
+        <h2 className="mb-1 fw-bold"><i className="bi bi-send me-2"></i>{t('referrals.title')}</h2>
         <p className="mb-0 text-white text-opacity-75 small">
-          <i className="bi bi-stars me-1"></i>AI-assisted specialist matching · patient notes auto-loaded
+          <i className="bi bi-stars me-1"></i>{t('referrals.subtitle')}
         </p>
       </div>
 
@@ -249,11 +251,11 @@ export default function ReferralsPage() {
           style={{ borderRadius: '20px', borderLeft: '4px solid #dc3545', position: 'relative', zIndex: 1 }}>
           <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '20px 20px 0 0' }}>
             <h6 className="mb-0 fw-bold">
-              <i className="bi bi-bell-fill me-2 text-danger"></i>Referrals for You
+              <i className="bi bi-bell-fill me-2 text-danger"></i>{t('referrals.referralsForYou')}
               <span className="badge bg-danger rounded-pill ms-2">{pendingCount}</span>
             </h6>
             {urgentCount > 0 && (
-              <span className="badge bg-warning text-dark rounded-pill">{urgentCount} urgent</span>
+              <span className="badge bg-warning text-dark rounded-pill">{t('referrals.urgent', { count: urgentCount })}</span>
             )}
           </div>
           <div className="card-body p-0">
@@ -269,9 +271,9 @@ export default function ReferralsPage() {
                   <div className="fw-semibold small text-truncate">{r.patientName}</div>
                   <small className="text-muted d-block text-truncate" style={{ fontSize: '0.65rem' }}>{r.reason}</small>
                 </div>
-                <span className={`badge rounded-pill ${urgencyBadge[r.urgency] || 'bg-info'}`} style={{ fontSize: '0.6rem' }}>{r.urgency}</span>
+                <span className={`badge rounded-pill ${urgencyBadge[r.urgency] || 'bg-info'}`} style={{ fontSize: '0.6rem' }}>{t('referrals.urgency.' + r.urgency, { defaultValue: r.urgency })}</span>
                 {r.referringProvider && (
-                  <small className="text-muted d-none d-lg-block" style={{ fontSize: '0.6rem' }}>from {r.referringProvider}</small>
+                  <small className="text-muted d-none d-lg-block" style={{ fontSize: '0.6rem' }}>{t('referrals.fromProvider', { name: r.referringProvider })}</small>
                 )}
                 <i className="bi bi-chevron-right text-muted small"></i>
               </div>
@@ -280,7 +282,7 @@ export default function ReferralsPage() {
           {pendingReferrals.length > 3 && (
             <div className="card-footer bg-white py-2 text-center">
               <button className="btn btn-link btn-sm text-decoration-none" onClick={() => setShowAllPending((v) => !v)}>
-                {showAllPending ? 'Show less' : `Show all ${pendingReferrals.length}`}
+                {showAllPending ? t('referrals.showLess') : t('referrals.showAll', { count: pendingReferrals.length })}
               </button>
             </div>
           )}
@@ -289,7 +291,7 @@ export default function ReferralsPage() {
 
       {success && (
         <div className="alert alert-success d-flex align-items-center gap-2">
-          <i className="bi bi-check-circle-fill"></i> Referral sent successfully.
+          <i className="bi bi-check-circle-fill"></i> {t('referrals.sentSuccess')}
         </div>
       )}
 
@@ -298,11 +300,11 @@ export default function ReferralsPage() {
         <div className="col-lg-7">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-send me-2 text-primary"></i>New Referral</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-send me-2 text-primary"></i>{t('referrals.newReferral')}</h6>
             </div>
             <div className="card-body">
               {/* Patient picker */}
-              <label className="form-label small fw-semibold">Patient</label>
+              <label className="form-label small fw-semibold">{t('referrals.patient')}</label>
               {selectedPatient ? (
                 <div className="d-flex align-items-center gap-3 p-3 rounded-3 mb-3" style={{ background: '#f0fdfa', border: '1px solid #c6f6e5' }}>
                   <div className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -314,7 +316,7 @@ export default function ReferralsPage() {
                     <small className="text-muted">PID #{selectedPatient.pid} · {fmtDate(selectedPatient.DOB)} · {selectedPatient.sex || '—'}</small>
                   </div>
                   <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => { setSelectedPatient(null); setPatientSearch(''); }}>
-                    Change
+                    {t('referrals.change')}
                   </button>
                 </div>
               ) : (
@@ -323,7 +325,7 @@ export default function ReferralsPage() {
                     <span className="input-group-text bg-white"><i className="bi bi-search"></i></span>
                     <input
                       className="form-control"
-                      placeholder="Search patient by name or ID…"
+                      placeholder={t('referrals.searchPlaceholder')}
                       value={patientSearch}
                       onChange={(e) => { setPatientSearch(e.target.value); setShowDropdown(true); }}
                       onFocus={() => setShowDropdown(true)}
@@ -342,7 +344,7 @@ export default function ReferralsPage() {
                           <small className="text-muted">{fmtDate(p.DOB)}</small>
                         </button>
                       ))}
-                      {!searchResults.length && <div className="list-group-item text-muted small">No patients found</div>}
+                      {!searchResults.length && <div className="list-group-item text-muted small">{t('referrals.noPatients')}</div>}
                     </div>
                   )}
                 </div>
@@ -350,13 +352,13 @@ export default function ReferralsPage() {
 
               {/* Smart suggestions */}
               {selectedPatient && suggestLoading && (
-                <div className="text-center py-4"><span className="spinner-border spinner-border-sm text-primary"></span> <span className="text-muted small ms-1">Analyzing patient…</span></div>
+                <div className="text-center py-4"><span className="spinner-border spinner-border-sm text-primary"></span> <span className="text-muted small ms-1">{t('referrals.analyzing')}</span></div>
               )}
 
               {selectedPatient && suggest && (
                 <div className="mb-3">
                   <label className="form-label small fw-semibold">
-                    <i className="bi bi-stars text-warning me-1"></i>Smart specialist suggestions
+                    <i className="bi bi-stars text-warning me-1"></i>{t('referrals.smartSuggestions')}
                   </label>
                   {suggest.suggestions?.length ? (
                     <div className="d-flex flex-column gap-2">
@@ -379,37 +381,37 @@ export default function ReferralsPage() {
                                 {pr.title ? `${pr.title} ` : ''}{pr.fname} {pr.lname}
                               </button>
                             ))}
-                            {!s.providers.length && <small className="text-muted">No matching provider in the system</small>}
+                            {!s.providers.length && <small className="text-muted">{t('referrals.noMatchingProvider')}</small>}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-muted small">No clear specialist match — choose a provider below.</div>
+                    <div className="text-muted small">{t('referrals.noClearMatch')}</div>
                   )}
                 </div>
               )}
 
               {/* Reason */}
               <div className="mb-3">
-                <label className="form-label small fw-semibold">Reason for referral</label>
-                <input className="form-control" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Cardiology evaluation for chest pain" />
+                <label className="form-label small fw-semibold">{t('referrals.reasonLabel')}</label>
+                <input className="form-control" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('referrals.reasonPlaceholder')} />
               </div>
 
               {/* Urgency + manual provider */}
               <div className="row g-2 mb-3">
                 <div className="col-md-4">
-                  <label className="form-label small fw-semibold">Urgency</label>
+                  <label className="form-label small fw-semibold">{t('referrals.urgencyLabel')}</label>
                   <select className="form-select" value={urgency} onChange={(e) => setUrgency(e.target.value)}>
-                    <option value="routine">Routine</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="stat">STAT</option>
+                    <option value="routine">{t('referrals.urgency.routine')}</option>
+                    <option value="urgent">{t('referrals.urgency.urgent')}</option>
+                    <option value="stat">{t('referrals.urgency.stat')}</option>
                   </select>
                 </div>
                 <div className="col-md-8">
-                  <label className="form-label small fw-semibold">Specialist / Provider</label>
+                  <label className="form-label small fw-semibold">{t('referrals.specialist')}</label>
                   <select className="form-select" value={specialistId} onChange={(e) => setSpecialistId(e.target.value)}>
-                    <option value="">— {selectedSpecialistName ? selectedSpecialistName : 'Select provider'} —</option>
+                    <option value="">— {selectedSpecialistName ? selectedSpecialistName : t('referrals.selectProvider')} —</option>
                     {allProviders.map((pr) => (
                       <option key={pr.id} value={pr.id}>{pr.title ? `${pr.title} ` : ''}{pr.fname} {pr.lname}{pr.specialty ? ` (${pr.specialty})` : ''}</option>
                     ))}
@@ -420,16 +422,16 @@ export default function ReferralsPage() {
               {/* Clinical notes (auto-populated, sorted by date) */}
               <div className="mb-3">
                 <label className="form-label small fw-semibold">
-                  <i className="bi bi-journal-medical me-1 text-info"></i>Clinical notes (auto-loaded, sorted by date)
+                  <i className="bi bi-journal-medical me-1 text-info"></i>{t('referrals.clinicalNotes')}
                 </label>
-                <textarea className="form-control" rows={8} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Clinical summary will be populated when a patient is selected…" />
+                <textarea className="form-control" rows={8} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('referrals.notesPlaceholder')} />
               </div>
 
               {error && <div className="alert alert-danger py-2 small">{error}</div>}
 
               <button className="btn btn-primary rounded-pill px-4" onClick={handleSend} disabled={sendReferral.isPending || !selectedPatient}>
                 {sendReferral.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-send me-1"></i>}
-                Send Referral
+                {t('referrals.sendReferral')}
               </button>
             </div>
           </div>
@@ -439,7 +441,7 @@ export default function ReferralsPage() {
         <div className="col-lg-5">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white d-flex justify-content-between py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-success"></i>Referral History</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-success"></i>{t('referrals.history')}</h6>
               <span className="badge bg-primary rounded-pill">{referrals.length}</span>
             </div>
             <div className="card-body p-0" style={{ maxHeight: '680px', overflowY: 'auto' }}>
@@ -447,18 +449,18 @@ export default function ReferralsPage() {
                 <div key={r.id} className="px-3 py-3 border-bottom">
                   <div className="d-flex justify-content-between align-items-start">
                     <div className="fw-semibold small">{r.patientName}</div>
-                    <span className={`badge rounded-pill ${urgencyBadge[r.urgency] || 'bg-info'}`} style={{ fontSize: '0.65rem' }}>{r.urgency}</span>
+                    <span className={`badge rounded-pill ${urgencyBadge[r.urgency] || 'bg-info'}`} style={{ fontSize: '0.65rem' }}>{t('referrals.urgency.' + r.urgency, { defaultValue: r.urgency })}</span>
                   </div>
                   <div className="small text-primary">{r.reason}</div>
                   <div className="d-flex justify-content-between align-items-center text-muted" style={{ fontSize: '0.7rem' }}>
-                    <span><i className="bi bi-person-badge me-1"></i>{r.specialistName || 'General referral'}</span>
+                    <span><i className="bi bi-person-badge me-1"></i>{r.specialistName || t('referrals.generalReferral')}</span>
                     <span><i className="bi bi-calendar3 me-1"></i>{fmtDate(r.date)}</span>
                   </div>
                   <div className="mt-1">
-                    <span className={`badge ${r.status === 'pending' ? 'bg-secondary' : r.status === 'accepted' ? 'bg-success' : 'bg-info'}`} style={{ fontSize: '0.65rem' }}>{r.status}</span>
+                    <span className={`badge ${r.status === 'pending' ? 'bg-secondary' : r.status === 'accepted' ? 'bg-success' : 'bg-info'}`} style={{ fontSize: '0.65rem' }}>{t('referrals.status.' + r.status, { defaultValue: r.status })}</span>
                     {r.body && (
                       <details className="small text-muted mt-1">
-                        <summary className="text-muted">View notes</summary>
+                        <summary className="text-muted">{t('referrals.viewNotes')}</summary>
                         <pre className="bg-light p-2 rounded-2 mt-1" style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem' }}>{r.body}</pre>
                       </details>
                     )}
@@ -468,7 +470,7 @@ export default function ReferralsPage() {
               {!referrals.length && (
                 <div className="text-center text-muted py-5">
                   <i className="bi bi-send fs-1 d-block mb-2 opacity-25"></i>
-                  <p className="small">No referrals sent yet.</p>
+                  <p className="small">{t('referrals.noReferrals')}</p>
                 </div>
               )}
             </div>
@@ -488,7 +490,7 @@ export default function ReferralsPage() {
               style={{ background: 'linear-gradient(135deg, #20c997, #0d6efd)', borderRadius: '20px 20px 0 0' }}>
               <div>
                 <h6 className="mb-0 fw-bold">
-                  <i className="bi bi-send-check me-2"></i>Referral — {openReferral.patientName}
+                  <i className="bi bi-send-check me-2"></i>{t('referrals.modal.title', { name: openReferral.patientName })}
                 </h6>
                 <small className="text-white text-opacity-75">{fmtDate(openReferral.date)}</small>
               </div>
@@ -500,30 +502,30 @@ export default function ReferralsPage() {
                 <span className={`badge rounded-pill ${urgencyBadge[openReferral.urgency] || 'bg-info'}`}>
                   {String(openReferral.urgency || '').toUpperCase()}
                 </span>
-                <span className="badge bg-light text-dark border rounded-pill">status: {openReferral.status}</span>
+                <span className="badge bg-light text-dark border rounded-pill">{t('referrals.modal.statusBadge', { status: t('referrals.status.' + openReferral.status, { defaultValue: openReferral.status }) })}</span>
                 {openReferral.specialty && <span className="badge bg-primary rounded-pill">{openReferral.specialty}</span>}
               </div>
 
               <dl className="row small mb-3">
-                <dt className="col-sm-4 text-muted">Patient</dt>
+                <dt className="col-sm-4 text-muted">{t('referrals.modal.patient')}</dt>
                 <dd className="col-sm-8 fw-semibold">{openReferral.patientName}</dd>
-                <dt className="col-sm-4 text-muted">Patient ID</dt>
+                <dt className="col-sm-4 text-muted">{t('referrals.modal.patientId')}</dt>
                 <dd className="col-sm-8">
                   PID {openReferral.pid}
-                  {openReferral.patientDOB ? ` · DOB ${String(openReferral.patientDOB).slice(0, 10)}` : ''}
+                  {openReferral.patientDOB ? t('referrals.modal.dobSuffix', { dob: String(openReferral.patientDOB).slice(0, 10) }) : ''}
                   {openReferral.patientSex ? ` · ${openReferral.patientSex}` : ''}
                 </dd>
-                <dt className="col-sm-4 text-muted">Reason</dt>
+                <dt className="col-sm-4 text-muted">{t('referrals.modal.reason')}</dt>
                 <dd className="col-sm-8 fw-semibold">{openReferral.reason || '—'}</dd>
-                <dt className="col-sm-4 text-muted">Referred by</dt>
+                <dt className="col-sm-4 text-muted">{t('referrals.modal.referredBy')}</dt>
                 <dd className="col-sm-8">{openReferral.referringProvider || '—'}</dd>
-                <dt className="col-sm-4 text-muted">Assigned specialist</dt>
+                <dt className="col-sm-4 text-muted">{t('referrals.modal.assignedSpecialist')}</dt>
                 <dd className="col-sm-8">{openReferral.specialistName || '—'}</dd>
               </dl>
 
               {openReferral.body && (
                 <>
-                  <h6 className="small fw-bold text-muted text-uppercase">Clinical notes</h6>
+                  <h6 className="small fw-bold text-muted text-uppercase">{t('referrals.modal.clinicalNotes')}</h6>
                   <div className="p-3 bg-light rounded-3 small" style={{ whiteSpace: 'pre-wrap', maxHeight: '260px', overflow: 'auto' }}>
                     {openReferral.body}
                   </div>
@@ -533,18 +535,18 @@ export default function ReferralsPage() {
             <div className="card-footer bg-white d-flex flex-wrap gap-2" style={{ borderRadius: '0 0 20px 20px' }}>
               {chartPatientId(openReferral.patientId, openReferral.pid) !== null && (
                 <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => openReferralChart(openReferral)}>
-                  <i className="bi bi-folder2-open me-1"></i>Open chart
+                  <i className="bi bi-folder2-open me-1"></i>{t('referrals.modal.openChart')}
                 </button>
               )}
               <button className="btn btn-success btn-sm rounded-pill ms-auto"
                 disabled={ackReferral.isPending}
                 onClick={() => ackReferral.mutate({ id: openReferral.id, status: 'accepted' })}>
-                <i className="bi bi-check2-circle me-1"></i>Accept
+                <i className="bi bi-check2-circle me-1"></i>{t('referrals.modal.accept')}
               </button>
               <button className="btn btn-outline-secondary btn-sm rounded-pill"
                 disabled={ackReferral.isPending}
                 onClick={() => ackReferral.mutate({ id: openReferral.id, status: 'reviewed' })}>
-                Mark reviewed
+                {t('referrals.modal.markReviewed')}
               </button>
             </div>
           </div>

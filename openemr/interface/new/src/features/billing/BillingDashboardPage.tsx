@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import ChargeCatalogPanel from './ChargeCatalogPanel';
@@ -87,6 +88,7 @@ interface ReceiptData {
 }
 
 export default function BillingDashboardPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
@@ -149,13 +151,13 @@ export default function BillingDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['billing-clearance'] });
       queryClient.invalidateQueries({ queryKey: ['billing-stats'] });
       if (data?.receipt) setReceipt(data.receipt);
-      if (data?.duplicate) alert('A payment was just recorded for this patient — duplicate entry prevented.');
+      if (data?.duplicate) alert(t('billing.page.duplicate'));
       setShowPayForm(false);
       setPayAmount('');
       setPayOverride(false);
     },
     onError: (e: any) => {
-      const msg = e?.response?.data?.message || e?.message || 'Payment failed';
+      const msg = e?.response?.data?.message || e?.message || t('billing.page.paymentFailed');
       alert(Array.isArray(msg) ? msg.join('\n') : msg);
     },
   });
@@ -310,19 +312,19 @@ export default function BillingDashboardPage() {
           <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
               <h2 className="mb-1 fw-bold">
-                <i className="bi bi-cash-stack me-2"></i>Billing & Discharge
+                <i className="bi bi-cash-stack me-2"></i>{t('billing.dashboard.title')}
               </h2>
               <p className="mb-0 text-white text-opacity-75 small">
-                All patients synced · Smart status tracking · Financial clearance
+                {t('billing.dashboard.subtitle')}
               </p>
             </div>
           </div>
           <div className="row g-2 mt-3">
             {[
-              { v: patients.length, l: 'Total Patients', c: '#ffc107', i: 'bi-people-fill' },
-              { v: formatUSD(totalOutstanding), l: 'Outstanding', c: '#dc3545', i: 'bi-exclamation-triangle' },
-              { v: overdueCount, l: 'Overdue', c: '#fd7e14', i: 'bi-clock-history' },
-              { v: stats?.pendingClaims || 0, l: 'Pending Claims', c: '#0dcaf0', i: 'bi-hourglass-split' },
+              { v: patients.length, l: t('billing.page.statPatients'), c: '#ffc107', i: 'bi-people-fill' },
+              { v: formatUSD(totalOutstanding), l: t('billing.dashboard.statOutstanding'), c: '#dc3545', i: 'bi-exclamation-triangle' },
+              { v: overdueCount, l: t('billing.dashboard.filters.overdue'), c: '#fd7e14', i: 'bi-clock-history' },
+              { v: stats?.pendingClaims || 0, l: t('billing.dashboard.statPendingClaims'), c: '#0dcaf0', i: 'bi-hourglass-split' },
             ].map(s => (
               <div className="col-auto" key={s.l}>
                 <div className="d-flex align-items-center gap-2 bg-white bg-opacity-15 rounded-pill px-3 py-1">
@@ -342,7 +344,7 @@ export default function BillingDashboardPage() {
           <span className="input-group-text bg-white border-end-0 rounded-pill-start">
             <i className="bi bi-search text-muted"></i>
           </span>
-          <input className="form-control border-start-0 rounded-pill-end" placeholder="Search patients by name or ID..."
+          <input className="form-control border-start-0 rounded-pill-end" placeholder={t('billing.dashboard.searchPlaceholder')}
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="d-flex flex-wrap gap-1">
@@ -350,7 +352,7 @@ export default function BillingDashboardPage() {
             <button key={f.key}
               className={`btn btn-sm rounded-pill ${statusFilter === f.key ? 'btn-primary' : 'btn-outline-secondary'}`}
               onClick={() => setStatusFilter(f.key)}>
-              <i className={`bi ${f.icon} me-1`}></i>{f.label}
+              <i className={`bi ${f.icon} me-1`}></i>{t('billing.dashboard.filters.' + f.key, { defaultValue: f.label })}
               {statusCounts[f.key] > 0 && (
                 <span className="badge ms-1 rounded-pill" style={{
                   backgroundColor: statusFilter === f.key ? 'rgba(255,255,255,0.3)' : '#6c757d20',
@@ -368,20 +370,20 @@ export default function BillingDashboardPage() {
           <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
             <h6 className="mb-0 fw-bold">
               <i className="bi bi-lock-fill me-2" style={{ color: '#dc3545' }}></i>
-              Pending Billing Holds
+              {t('billing.dashboard.pendingHolds')}
             </h6>
             <span className="badge bg-danger rounded-pill">
-              {groupedHolds.length} patient{groupedHolds.length !== 1 ? 's' : ''} · {holds.length} item{holds.length !== 1 ? 's' : ''}
+              {t('billing.dashboard.holdPatients', { count: groupedHolds.length })} · {t('billing.dashboard.holdItems', { count: holds.length })}
             </span>
           </div>
           <div className="card-body p-0" style={{ maxHeight: '280px', overflowY: 'auto' }}>
             <table className="table table-sm table-hover mb-0 small align-middle">
               <thead className="table-light sticky-top">
                 <tr>
-                  <th className="ps-3">Patient</th>
-                  <th>Held Items</th>
-                  <th className="text-end">Amount</th>
-                  <th className="text-end pe-3">Action</th>
+                  <th className="ps-3">{t('billing.page.patientCol')}</th>
+                  <th>{t('billing.dashboard.heldItems')}</th>
+                  <th className="text-end">{t('billing.page.amountCol')}</th>
+                  <th className="text-end pe-3">{t('billing.dashboard.action')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -392,18 +394,18 @@ export default function BillingDashboardPage() {
                         className="text-primary"
                         style={{ cursor: 'pointer' }}
                         onClick={() => setSelectedPid(g.pid)}>
-                        {g.patient_name || `Patient #${g.pid}`}
+                        {g.patient_name || t('billing.dashboard.patientNumber', { pid: g.pid })}
                       </span>
                     </td>
                     <td>
                       {g.lab > 0 && (
                         <span className="badge rounded-pill bg-primary me-1">
-                          <i className="bi bi-flask me-1"></i>{g.lab} lab
+                          <i className="bi bi-flask me-1"></i>{t('billing.dashboard.labCount', { count: g.lab })}
                         </span>
                       )}
                       {g.pharmacy > 0 && (
                         <span className="badge rounded-pill bg-success me-1">
-                          <i className="bi bi-capsule me-1"></i>{g.pharmacy} pharmacy
+                          <i className="bi bi-capsule me-1"></i>{t('billing.dashboard.pharmacyCount', { count: g.pharmacy })}
                         </span>
                       )}
                     </td>
@@ -412,7 +414,7 @@ export default function BillingDashboardPage() {
                       <button className="btn btn-sm btn-success rounded-pill"
                         disabled={clearPatientHoldsMutation.isPending}
                         onClick={() => clearPatientHoldsMutation.mutate(g.pid)}>
-                        <i className="bi bi-check2-circle me-1"></i>Clear all
+                        <i className="bi bi-check2-circle me-1"></i>{t('billing.dashboard.clearAll')}
                       </button>
                     </td>
                   </tr>
@@ -431,19 +433,19 @@ export default function BillingDashboardPage() {
               style={{ borderRadius: '16px 16px 0 0' }}>
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-people me-2" style={{ color: '#0d6efd' }}></i>
-                Patient Billing Sync
+                {t('billing.dashboard.patientSync')}
               </h6>
-              <span className="badge bg-primary rounded-pill">{filteredPatients.length} patients</span>
+              <span className="badge bg-primary rounded-pill">{t('billing.dashboard.patients', { count: filteredPatients.length })}</span>
             </div>
             <div className="card-body p-0" style={{ maxHeight: '600px', overflowY: 'auto' }}>
               {isLoading ? (
                 <div className="text-center py-5 text-muted">
-                  <span className="spinner-border spinner-border-sm me-2"></span>Syncing patients...
+                  <span className="spinner-border spinner-border-sm me-2"></span>{t('billing.dashboard.syncing')}
                 </div>
               ) : filteredPatients.length === 0 ? (
                 <div className="text-center py-5 text-muted">
                   <i className="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
-                  No patients matching filter
+                  {t('billing.dashboard.noFilterMatch')}
                 </div>
               ) : (
                 filteredPatients.map((p: BillingPatient) => (
@@ -455,16 +457,16 @@ export default function BillingDashboardPage() {
                       <div>
                         <div className="fw-bold small">{p.fname} {p.lname}</div>
                         <div className="small text-muted" style={{ fontSize: '0.7rem' }}>
-                          PID: {p.pid} · {formatDateHuman(p.dob)} · {p.sex}
+                          {t('billing.receipt.pid')} {p.pid} · {formatDateHuman(p.dob)} · {p.sex}
                         </div>
                         {p.encounterDate && (
                           <div className="small text-muted" style={{ fontSize: '0.7rem' }}>
-                            Last visit: {formatDateHuman(p.encounterDate)}
-                            {p.daysSinceLastEncounter !== null && ` (${p.daysSinceLastEncounter}d ago)`}
+                            {t('billing.dashboard.lastVisit', { date: formatDateHuman(p.encounterDate) })}
+                            {p.daysSinceLastEncounter !== null && t('billing.dashboard.daysAgo', { count: p.daysSinceLastEncounter })}
                           </div>
                         )}
                         {!p.encounterDate && (
-                          <div className="small text-muted fst-italic" style={{ fontSize: '0.7rem' }}>No encounter recorded</div>
+                          <div className="small text-muted fst-italic" style={{ fontSize: '0.7rem' }}>{t('billing.dashboard.noEncounter')}</div>
                         )}
                       </div>
                       <div className="text-end">
@@ -489,7 +491,7 @@ export default function BillingDashboardPage() {
                         )}
                         {p.pendingClaimCount > 0 && (
                           <div className="small text-warning fw-semibold" style={{ fontSize: '0.65rem' }}>
-                            {p.pendingClaimCount} claim{p.pendingClaimCount > 1 ? 's' : ''}
+                            {t('billing.dashboard.claims', { count: p.pendingClaimCount })}
                           </div>
                         )}
                       </div>
@@ -517,8 +519,8 @@ export default function BillingDashboardPage() {
               style={{ borderRadius: '16px', minHeight: '400px' }}>
               <div className="text-center text-muted p-5">
                 <i className="bi bi-arrow-left-circle fs-1 d-block mb-3 opacity-25"></i>
-                <p className="mb-1 fw-semibold">Select a patient to view financial clearance</p>
-                <small>All patients are synced automatically — click to review their billing status</small>
+                <p className="mb-1 fw-semibold">{t('billing.dashboard.selectPatient')}</p>
+                <small>{t('billing.dashboard.selectPatientHint')}</small>
               </div>
             </div>
           ) : clearanceLoading ? (
@@ -536,11 +538,11 @@ export default function BillingDashboardPage() {
                   </h6>
                   {clearance.canDischarge ? (
                     <span className="badge bg-success rounded-pill">
-                      <i className="bi bi-check-circle me-1"></i>Ready
+                      <i className="bi bi-check-circle me-1"></i>{t('billing.dashboard.ready')}
                     </span>
                   ) : (
                     <span className="badge bg-danger rounded-pill">
-                      <i className="bi bi-x-circle me-1"></i>Blocked
+                      <i className="bi bi-x-circle me-1"></i>{t('billing.dashboard.blocked')}
                     </span>
                   )}
                 </div>
@@ -548,10 +550,10 @@ export default function BillingDashboardPage() {
               <div className="card-body">
                 <div className="row g-2 mb-3">
                   {[
-                    { v: formatUSD(clearance.totalCharges), l: 'Total Charges', c: '#0d6efd', i: 'bi-file-earmark-medical' },
-                    { v: formatUSD(clearance.totalPayments), l: 'Total Payments', c: '#198754', i: 'bi-cash' },
-                    { v: formatUSD(clearance.balance), l: 'Balance', c: clearance.balance > 0 ? '#dc3545' : '#198754', i: 'bi-calculator' },
-                    { v: `${clearance.claimsSubmitted} (${clearance.claimsPending} pending)`, l: 'Claims', c: '#fd7e14', i: 'bi-building' },
+                    { v: formatUSD(clearance.totalCharges), l: t('billing.dashboard.totalCharges'), c: '#0d6efd', i: 'bi-file-earmark-medical' },
+                    { v: formatUSD(clearance.totalPayments), l: t('billing.dashboard.totalPayments'), c: '#198754', i: 'bi-cash' },
+                    { v: formatUSD(clearance.balance), l: t('billing.dashboard.balance'), c: clearance.balance > 0 ? '#dc3545' : '#198754', i: 'bi-calculator' },
+                    { v: t('billing.dashboard.claimsValue', { submitted: clearance.claimsSubmitted, pending: clearance.claimsPending }), l: t('billing.dashboard.claimsCard'), c: '#fd7e14', i: 'bi-building' },
                   ].map(c => (
                     <div className="col-6" key={c.l}>
                       <div className="p-2 rounded-3" style={{ backgroundColor: `${c.c}10` }}>
@@ -564,18 +566,18 @@ export default function BillingDashboardPage() {
 
                 <div className="d-flex flex-wrap align-items-center gap-2 mb-3 px-2 py-2 rounded-3 border"
                   style={{ backgroundColor: 'rgba(255,255,255,0.5)' }}>
-                  <span className="small fw-semibold text-muted"><i className="bi bi-shield-check me-1"></i>Coverage:</span>
+                  <span className="small fw-semibold text-muted"><i className="bi bi-shield-check me-1"></i>{t('billing.dashboard.coverage')}</span>
                   <select className="form-select form-select-sm rounded-pill" style={{ width: '170px' }}
                     value={coverageType} onChange={(e) => setCoverageType(e.target.value)}>
-                    <option value="self_pay">No insurance (self-pay)</option>
-                    <option value="insured">Insured</option>
+                    <option value="self_pay">{t('billing.dashboard.noInsurance')}</option>
+                    <option value="insured">{t('billing.dashboard.insured')}</option>
                   </select>
                   {coverageType === 'insured' && (
                     <div className="input-group input-group-sm" style={{ width: '140px' }}>
                       <input type="number" min={0} max={100} className="form-control text-end"
                         value={coveragePercent} onChange={(e) => setCoveragePercent(e.target.value)}
-                        title="Patient responsibility %" />
-                      <span className="input-group-text px-1" style={{ fontSize: '0.7rem' }}>% patient</span>
+                        title={t('billing.dashboard.patientResponsibility')} />
+                      <span className="input-group-text px-1" style={{ fontSize: '0.7rem' }}>{t('billing.dashboard.patientPercent')}</span>
                     </div>
                   )}
                   <button className="btn btn-sm btn-outline-primary rounded-pill"
@@ -583,17 +585,20 @@ export default function BillingDashboardPage() {
                     onClick={() => selectedPid !== null && coverageMutation.mutate({
                       pid: selectedPid, insuranceType: coverageType, patientPercent: Number(coveragePercent),
                     })}>
-                    <i className="bi bi-save me-1"></i>Update coverage
+                    <i className="bi bi-save me-1"></i>{t('billing.dashboard.updateCoverage')}
                   </button>
                   <span className="small text-muted ms-auto">
                     {coverageType === 'insured'
-                      ? `Patient ${Number(coveragePercent) || 0}% · Insurance ${100 - (Number(coveragePercent) || 0)}%`
-                      : 'Patient responsible for 100%'}
+                      ? t('billing.dashboard.splitSummary', {
+                          patient: Number(coveragePercent) || 0,
+                          insurance: 100 - (Number(coveragePercent) || 0),
+                        })
+                      : t('billing.dashboard.patientFull')}
                   </span>
                 </div>
 
                 <h6 className="fw-bold small text-uppercase text-muted mb-2">
-                  <i className="bi bi-list-check me-1"></i>Clearance Checklist
+                  <i className="bi bi-list-check me-1"></i>{t('billing.dashboard.checklist')}
                 </h6>
                 <div className="list-group list-group-flush mb-3">
                   {clearance.items.map((item, i) => (
@@ -613,7 +618,7 @@ export default function BillingDashboardPage() {
                       <div className="flex-grow-1">
                         <div className="small fw-semibold">{item.description}</div>
                         <div className="small text-muted">
-                          {formatUSD(item.amount)} · Paid: {formatUSD(item.paid)}
+                          {formatUSD(item.amount)} · {t('billing.dashboard.paidInline', { amount: formatUSD(item.paid) })}
                         </div>
                       </div>
                       <span className={`badge rounded-pill ${
@@ -630,7 +635,7 @@ export default function BillingDashboardPage() {
                   <div className="mb-3">
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <h6 className="fw-bold small text-uppercase text-muted mb-0">
-                        <i className="bi bi-diagram-3 me-1"></i>Encounter Breakdown
+                        <i className="bi bi-diagram-3 me-1"></i>{t('billing.dashboard.encounterBreakdown')}
                       </h6>
                       <button
                         type="button"
@@ -638,8 +643,8 @@ export default function BillingDashboardPage() {
                         style={{ fontSize: '0.66rem' }}
                         onClick={() => setShowCptCodes((v) => !v)}
                         title={showCptCodes
-                          ? 'Hide the CPT / HCPCS codes'
-                          : 'Highlight the CPT / HCPCS code on every charge line'}
+                          ? t('billing.dashboard.hideCptTitle')
+                          : t('billing.dashboard.showCptTitle')}
                       >
                         <i className="bi bi-upc-scan me-1"></i>CPT{showCptCodes ? ' ✓' : ''}
                       </button>
@@ -648,11 +653,11 @@ export default function BillingDashboardPage() {
                       <table className="table table-sm small align-middle mb-0">
                         <thead className="table-light sticky-top">
                           <tr>
-                            <th>Encounter</th>
-                            <th className="text-end">Charges</th>
-                            <th className="text-end">Paid</th>
-                            <th className="text-end">Balance</th>
-                            <th className="text-center">Holds</th>
+                            <th>{t('billing.dashboard.encounterCol')}</th>
+                            <th className="text-end">{t('billing.dashboard.chargesCol')}</th>
+                            <th className="text-end">{t('billing.dashboard.paidCol')}</th>
+                            <th className="text-end">{t('billing.dashboard.balanceCol')}</th>
+                            <th className="text-center">{t('billing.dashboard.holdsCol')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -667,7 +672,7 @@ export default function BillingDashboardPage() {
                               <tr>
                                 <td>
                                   <div className="fw-semibold">
-                                    {e.label || e.reason || 'Visit'}
+                                    {e.label || e.reason || t('billing.dashboard.visitFallback')}
                                     {e.encounterId > 0 && (
                                       <span className="text-muted ms-1" style={{ fontSize: '0.65rem', fontWeight: 400 }}>
                                         #{e.encounterId}
@@ -688,9 +693,9 @@ export default function BillingDashboardPage() {
                                   {e.labTests?.length > 0 && (
                                     <div className="text-muted" style={{ fontSize: '0.68rem' }}>
                                       <i className="bi bi-flask me-1"></i>
-                                      Lab: {e.labTests.join(', ')}
+                                      {t('billing.dashboard.labPrefix')} {e.labTests.join(', ')}
                                       {e.labLink === 'date' && (
-                                        <span className="fst-italic ms-1">(matched by order date)</span>
+                                        <span className="fst-italic ms-1">{t('billing.dashboard.matchedByOrderDate')}</span>
                                       )}
                                     </div>
                                   )}
@@ -702,8 +707,8 @@ export default function BillingDashboardPage() {
                                 </td>
                                 <td className="text-center">
                                   {e.pendingHolds > 0
-                                    ? <span className="badge bg-danger rounded-pill">{e.pendingHolds} held</span>
-                                    : <span className="badge bg-success bg-opacity-25 text-success rounded-pill">cleared</span>}
+                                    ? <span className="badge bg-danger rounded-pill">{t('billing.dashboard.held', { count: e.pendingHolds })}</span>
+                                    : <span className="badge bg-success bg-opacity-25 text-success rounded-pill">{t('billing.dashboard.cleared')}</span>}
                                 </td>
                               </tr>
                               {groups.map((g: any) => (
@@ -733,12 +738,12 @@ export default function BillingDashboardPage() {
                                         {l.labOrder && (
                                           <span className="ms-1" style={{ fontSize: '0.65rem' }}>
                                             <i className="bi bi-flask me-1"></i>
-                                            ordered as “{l.labOrder.testName}” · {l.labOrder.status}
+                                            {t('billing.dashboard.orderedAs', { name: l.labOrder.testName, status: l.labOrder.status })}
                                           </span>
                                         )}
                                       </td>
                                       <td className="text-end">{formatUSD(l.amount)}</td>
-                                      <td colSpan={3} className="text-end">qty {l.qty}</td>
+                                      <td colSpan={3} className="text-end">{t('billing.dashboard.qtyInline', { count: l.qty })}</td>
                                     </tr>
                                   ))}
                                 </Fragment>
@@ -749,7 +754,7 @@ export default function BillingDashboardPage() {
                         </tbody>
                         <tfoot>
                           <tr className="fw-bold table-light">
-                            <td>Total</td>
+                            <td>{t('billing.dashboard.totalRow')}</td>
                             <td className="text-end">{formatUSD(breakdown.totals?.charges || 0)}</td>
                             <td className="text-end text-success">{formatUSD(breakdown.totals?.paid || 0)}</td>
                             <td className="text-end text-danger">{formatUSD(breakdown.totals?.balance || 0)}</td>
@@ -775,15 +780,15 @@ export default function BillingDashboardPage() {
                   <div className="p-3 rounded-3 mb-3" style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                     <div className="d-flex align-items-center gap-2 mb-2">
                       <i className="bi bi-cpu text-success"></i>
-                      <span className="fw-bold small text-success">Auto-Calculated from Encounters</span>
+                      <span className="fw-bold small text-success">{t('billing.dashboard.autoCalcFromEncounters')}</span>
                     </div>
                     <div className="row small">
                       <div className="col-6">
-                        <span className="text-muted">Grand Total:</span>
+                        <span className="text-muted">{t('billing.dashboard.grandTotal')}</span>
                         <span className="float-end fw-bold">{autoCalc.grandTotalLRD}</span>
                       </div>
                       <div className="col-6">
-                        <span className="text-muted">Encounters:</span>
+                        <span className="text-muted">{t('billing.dashboard.encounters')}</span>
                         <span className="float-end fw-semibold">{autoCalc.encounterCount}</span>
                       </div>
                     </div>
@@ -800,19 +805,19 @@ export default function BillingDashboardPage() {
                 <div className="p-3 rounded-3 mb-3" style={{ backgroundColor: '#f8f9fa' }}>
                   <div className="row small">
                     <div className="col-6">
-                      <span className="text-muted">Insurance (60%):</span>
+                      <span className="text-muted">{t('billing.dashboard.insurance60')}</span>
                       <span className="float-end fw-semibold">{formatLRD(clearance.insuranceCovered)}</span>
                     </div>
                     <div className="col-6">
-                      <span className="text-muted">Patient (40%):</span>
+                      <span className="text-muted">{t('billing.dashboard.patient40')}</span>
                       <span className="float-end fw-semibold">{formatLRD(clearance.patientObligation)}</span>
                     </div>
                     <div className="col-6 mt-1">
-                      <span className="text-muted">Patient Paid:</span>
+                      <span className="text-muted">{t('billing.dashboard.patientPaid')}</span>
                       <span className="float-end fw-semibold text-success">{formatLRD(clearance.patientPaid)}</span>
                     </div>
                     <div className="col-6 mt-1">
-                      <span className="text-muted">Remaining:</span>
+                      <span className="text-muted">{t('billing.dashboard.remaining')}</span>
                       <span className={`float-end fw-bold ${clearance.remainingPatientBalance > 0 ? 'text-danger' : 'text-success'}`}>
                         {formatLRD(clearance.remainingPatientBalance)}
                       </span>
@@ -826,16 +831,16 @@ export default function BillingDashboardPage() {
                     <div className="d-flex gap-2 flex-wrap">
                       <button className="btn rounded-pill px-4 text-white" style={{ backgroundColor: '#C8102E' }}
                         onClick={() => setShowPayForm(true)}>
-                        <i className="bi bi-cash-coin me-1"></i>Record Payment
+                        <i className="bi bi-cash-coin me-1"></i>{t('billing.dashboard.recordPayment')}
                       </button>
                       {clearance.canDischarge && (
                         <button className="btn btn-success rounded-pill px-4"
                           onClick={() => dischargeMutation.mutate(selectedPid!)}
                           disabled={dischargeMutation.isPending}>
                           {dischargeMutation.isPending ? (
-                            <><span className="spinner-border spinner-border-sm me-1"></span>Processing...</>
+                            <><span className="spinner-border spinner-border-sm me-1"></span>{t('billing.dashboard.processing')}</>
                           ) : (
-                            <><i className="bi bi-box-arrow-right me-1"></i>Process Discharge</>
+                            <><i className="bi bi-box-arrow-right me-1"></i>{t('billing.dashboard.processDischarge')}</>
                           )}
                         </button>
                       )}
@@ -844,24 +849,24 @@ export default function BillingDashboardPage() {
                     <div className="p-3 rounded-3 mb-2" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
                       <h6 className="fw-bold small mb-2">
                         <i className="bi bi-cash-coin me-1" style={{ color: '#C8102E' }}></i>
-                        Record Payment — {clearance.patientName}
+                        {t('billing.dashboard.recordPaymentFor', { patient: clearance.patientName })}
                       </h6>
                       <div className="row g-2">
                         <div className="col-5">
-                          <label className="form-label small">Amount (Auto-Calculated)</label>
+                          <label className="form-label small">{t('billing.dashboard.amountAutoCalculated')}</label>
                           <div className="form-control form-control-sm bg-light fw-bold" style={{ color: '#C8102E' }}>
                             {formatLRD(clearance.remainingPatientBalance)} (${clearance.remainingPatientBalance.toFixed(2)} USD)
                           </div>
                         </div>
                         <div className="col-4">
-                          <label className="form-label small">Method</label>
+                          <label className="form-label small">{t('billing.dashboard.methodLabel')}</label>
                           <select className="form-select form-select-sm" value={payMethod}
                             onChange={e => setPayMethod(e.target.value)}>
-                            <option>Cash</option>
-                            <option>Mobile Money</option>
-                            <option>Bank Transfer</option>
-                            <option>Credit Card</option>
-                            <option>Insurance</option>
+                            <option value="Cash">{t('billing.paymentMethods.cash')}</option>
+                            <option value="Mobile Money">{t('billing.paymentMethods.mobilemoney')}</option>
+                            <option value="Bank Transfer">{t('billing.paymentMethods.banktransfer')}</option>
+                            <option value="Credit Card">{t('billing.paymentMethods.creditcard')}</option>
+                            <option value="Insurance">{t('billing.paymentMethods.insurance')}</option>
                           </select>
                         </div>
                         <div className="col-3 align-self-end">
@@ -870,7 +875,7 @@ export default function BillingDashboardPage() {
                               <input className="form-check-input" type="checkbox" id="payOverride"
                                 checked={payOverride} onChange={e => setPayOverride(e.target.checked)} />
                               <label className="form-check-label small text-danger fw-semibold" htmlFor="payOverride">
-                                Override: no services
+                                {t('billing.page.override')}
                               </label>
                             </div>
                           )}
@@ -879,12 +884,12 @@ export default function BillingDashboardPage() {
                             onClick={handlePay}
                             disabled={payMutation.isPending || clearance.remainingPatientBalance <= 0
                               || ((clearance.totalCharges ?? 0) <= 0 && !payOverride)}>
-                            {payMutation.isPending ? 'Processing...' : `Pay ${formatLRD(clearance.remainingPatientBalance)}`}
+                            {payMutation.isPending ? t('billing.dashboard.processing') : t('billing.dashboard.payAmount', { amount: formatLRD(clearance.remainingPatientBalance) })}
                           </button>
                         </div>
                       </div>
                       <button className="btn btn-link btn-sm text-muted mt-1"
-                        onClick={() => setShowPayForm(false)}>Cancel</button>
+                        onClick={() => setShowPayForm(false)}>{t('common.cancel')}</button>
                     </div>
                   )}
 
@@ -906,19 +911,19 @@ export default function BillingDashboardPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white d-flex justify-content-between py-3" style={{ borderRadius: '16px 16px 0 0' }}>
               <h6 className="mb-0 fw-bold">
-                <i className="bi bi-flask me-2" style={{ color: '#6f42c1' }}></i>Lab Billing Codes (CPT)
+                <i className="bi bi-flask me-2" style={{ color: '#6f42c1' }}></i>{t('billing.dashboard.labBillingCodes')}
               </h6>
-              <span className="badge rounded-pill" style={{ backgroundColor: '#6f42c1' }}>{labBillingCodes.length} panels</span>
+              <span className="badge rounded-pill" style={{ backgroundColor: '#6f42c1' }}>{t('billing.dashboard.panels', { count: labBillingCodes.length })}</span>
             </div>
             <div className="card-body p-0">
               <div className="table-responsive">
                 <table className="table table-hover mb-0 small">
                   <thead className="table-light">
                     <tr>
-                      <th>Lab Panel</th>
-                      <th>CPT Code</th>
-                      <th>Description</th>
-                      <th className="text-end">Standard Fee</th>
+                      <th>{t('billing.dashboard.labPanel')}</th>
+                      <th>{t('billing.dashboard.cptCode')}</th>
+                      <th>{t('billing.receipt.description')}</th>
+                      <th className="text-end">{t('billing.dashboard.standardFee')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -958,12 +963,12 @@ export default function BillingDashboardPage() {
                 {receipt.dateFormatted} · {receipt.timeFormatted}
               </div>
               <div className="badge bg-white text-dark mt-1" style={{ fontSize: '0.7rem' }}>
-                Receipt #: {receipt.receiptNumber}
+                {t('billing.receipt.number', { number: receipt.receiptNumber })}
               </div>
               {receipt.paidInFull && (
                 <div className="mt-2">
                   <span className="badge bg-success" style={{ fontSize: '0.85rem', letterSpacing: '1px' }}>
-                    <i className="bi bi-check-circle-fill me-1"></i>PAID IN FULL
+                    <i className="bi bi-check-circle-fill me-1"></i>{t('billing.receipt.paidInFull')}
                   </span>
                 </div>
               )}
@@ -972,17 +977,17 @@ export default function BillingDashboardPage() {
             {/* Patient Info */}
             <div className="p-3 border-bottom" style={{ fontSize: '0.82rem' }}>
               <div className="row">
-                <div className="col-6"><small className="text-muted">Patient:</small><br/><strong>{receipt.patient.name}</strong></div>
-                <div className="col-3"><small className="text-muted">PID:</small><br/><strong>{receipt.patient.pid}</strong></div>
-                <div className="col-3"><small className="text-muted">DOB:</small><br/><strong>{formatDateHuman(receipt.patient.dob)}</strong></div>
+                <div className="col-6"><small className="text-muted">{t('billing.receipt.patient')}</small><br/><strong>{receipt.patient.name}</strong></div>
+                <div className="col-3"><small className="text-muted">{t('billing.receipt.pid')}</small><br/><strong>{receipt.patient.pid}</strong></div>
+                <div className="col-3"><small className="text-muted">{t('billing.receipt.dob')}</small><br/><strong>{formatDateHuman(receipt.patient.dob)}</strong></div>
               </div>
             </div>
 
             {/* Services / Items */}
             <div className="p-3 border-bottom" style={{ fontSize: '0.78rem' }}>
-              <small className="text-muted text-uppercase fw-bold">Services Rendered</small>
+              <small className="text-muted text-uppercase fw-bold">{t('billing.receipt.servicesRendered')}</small>
               <table className="table table-sm small mt-1 mb-0">
-                <thead><tr className="text-muted"><th>Code</th><th>Description</th><th className="text-end">Qty</th><th className="text-end">Total</th></tr></thead>
+                <thead><tr className="text-muted"><th>{t('billing.receipt.code')}</th><th>{t('billing.receipt.description')}</th><th className="text-end">{t('billing.receipt.qty')}</th><th className="text-end">{t('billing.receipt.total')}</th></tr></thead>
                 <tbody>
                   {receipt.items.map((item, i) => (
                     <tr key={i}>
@@ -999,27 +1004,27 @@ export default function BillingDashboardPage() {
             {/* Summary */}
             <div className="p-3 border-bottom" style={{ fontSize: '0.82rem', backgroundColor: '#f9fafb' }}>
               <div className="d-flex justify-content-between mb-1">
-                <span>Subtotal:</span><span className="fw-semibold">{receipt.summary.subtotalLRD}</span>
+                <span>{t('billing.receipt.subtotal')}</span><span className="fw-semibold">{receipt.summary.subtotalLRD}</span>
               </div>
               <div className="d-flex justify-content-between mb-1">
-                <span>Insurance (60%):</span><span className="text-muted">{receipt.summary.insuranceCoveredLRD}</span>
+                <span>{t('billing.receipt.insurance')}</span><span className="text-muted">{receipt.summary.insuranceCoveredLRD}</span>
               </div>
               <div className="d-flex justify-content-between mb-2">
-                <span>Patient Obligation:</span><span className="fw-semibold">{receipt.summary.patientObligationLRD}</span>
+                <span>{t('billing.receipt.patientObligation')}</span><span className="fw-semibold">{receipt.summary.patientObligationLRD}</span>
               </div>
               <hr className="my-1" />
               <div className="d-flex justify-content-between fw-bold" style={{ color: '#C8102E', fontSize: '0.9rem' }}>
-                <span>Amount Paid:</span><span>{receipt.summary.amountPaidLRD}</span>
+                <span>{t('billing.receipt.amountPaid')}</span><span>{receipt.summary.amountPaidLRD}</span>
               </div>
               <div className="d-flex justify-content-between small">
-                <span>Method:</span><span>{receipt.payment.method}</span>
+                <span>{t('billing.receipt.method')}</span><span>{receipt.payment.method}</span>
               </div>
               <div className="d-flex justify-content-between small">
-                <span>Received By:</span><span>{receipt.payment.receivedBy}</span>
+                <span>{t('billing.receipt.receivedBy')}</span><span>{receipt.payment.receivedBy}</span>
               </div>
               {receipt.summary.balanceLRD !== 'L$0' && (
                 <div className="d-flex justify-content-between small text-danger mt-1">
-                  <span>Remaining Balance:</span><span className="fw-bold">{receipt.summary.balanceLRD}</span>
+                  <span>{t('billing.receipt.remainingBalance')}</span><span className="fw-bold">{receipt.summary.balanceLRD}</span>
                 </div>
               )}
             </div>
@@ -1031,18 +1036,18 @@ export default function BillingDashboardPage() {
               </div>
               <p className="mb-2">{receipt.footer}</p>
               <p className="mb-1 fw-bold" style={{ color: '#C8102E' }}>🇱🇷 {receipt.hospital}</p>
-              <p className="mb-0">{receipt.location} · All amounts in {receipt.currency}</p>
+              <p className="mb-0">{t('billing.receipt.allAmountsIn', { location: receipt.location, currency: receipt.currency })}</p>
             </div>
 
             {/* Actions */}
             <div className="p-2 border-top d-flex gap-2 justify-content-center">
               <button className="btn btn-sm rounded-pill px-4 text-white" style={{ backgroundColor: '#C8102E' }}
                 onClick={() => window.print()}>
-                <i className="bi bi-printer me-1"></i>Print Receipt
+                <i className="bi bi-printer me-1"></i>{t('billing.receipt.printReceipt')}
               </button>
               <button className="btn btn-outline-secondary btn-sm rounded-pill"
                 onClick={() => setReceipt(null)}>
-                Close
+                {t('billing.receipt.close')}
               </button>
             </div>
           </div>

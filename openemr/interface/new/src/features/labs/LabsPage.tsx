@@ -2,6 +2,7 @@
 import { useState, useMemo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { groupOrdersByPatient } from '../../utils/groupOrdersByPatient';
 import { canViewFinancials } from '../../utils/permissions';
@@ -138,21 +139,30 @@ const flagBadge = (f: string) =>
   : 'bg-secondary';
 
 /** Result-type-aware value control, shared by the single and bulk entry forms. */
-function valueControl(
-  t: any,
-  value: string,
-  onChange: (v: string) => void,
+function ValueControl({
+  test,
+  value,
+  onChange,
   width = '130px',
-) {
-  if (t?.result_type === 'POSITIVE_NEGATIVE') {
+}: {
+  test: any;
+  value: string;
+  onChange: (v: string) => void;
+  width?: string;
+}) {
+  const { t } = useTranslation();
+  if (test?.result_type === 'POSITIVE_NEGATIVE') {
     return (
       <select className="form-select form-select-sm" style={{ maxWidth: width }} value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">—</option>
-        <option>Negative</option><option>Positive</option><option>Non-Reactive</option><option>Reactive</option>
+        <option value="Negative">{t('labs.value.negative')}</option>
+        <option value="Positive">{t('labs.value.positive')}</option>
+        <option value="Non-Reactive">{t('labs.value.nonReactive')}</option>
+        <option value="Reactive">{t('labs.value.reactive')}</option>
       </select>
     );
   }
-  if (t?.result_type === 'BLOOD_GROUP') {
+  if (test?.result_type === 'BLOOD_GROUP') {
     return (
       <select className="form-select form-select-sm" style={{ maxWidth: width }} value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">—</option>
@@ -160,17 +170,17 @@ function valueControl(
       </select>
     );
   }
-  if (t?.result_type === 'SELECT' && t?.options) {
+  if (test?.result_type === 'SELECT' && test?.options) {
     return (
       <select className="form-select form-select-sm" style={{ maxWidth: width }} value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">—</option>
-        {String(t.options).split(',').map((o) => <option key={o}>{o.trim()}</option>)}
+        {String(test.options).split(',').map((o) => <option key={o}>{o.trim()}</option>)}
       </select>
     );
   }
   return (
     <input className="form-control form-control-sm" style={{ maxWidth: width }}
-      type={t?.result_type === 'NUMERIC' ? 'number' : 'text'} step="any"
+      type={test?.result_type === 'NUMERIC' ? 'number' : 'text'} step="any"
       value={value} onChange={(e) => onChange(e.target.value)} />
   );
 }
@@ -179,6 +189,7 @@ function valueControl(
 const testKey = (t: any) => String(t?.code || t?.id);
 
 export default function LabsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchPid, setSearchPid] = useState('');
@@ -190,6 +201,7 @@ export default function LabsPage() {
   const [bulkValues, setBulkValues] = useState<Record<string, string>>({});
   const [duplicateNotice, setDuplicateNotice] = useState('');
   const [validateNotice, setValidateNotice] = useState('');
+  const [validateOk, setValidateOk] = useState(true);
 
   const isLabTech = user?.role === 'lab_tech' || user?.role === 'admin';
 
@@ -229,7 +241,7 @@ export default function LabsPage() {
       queryClient.invalidateQueries({ queryKey: ['lab-orders'] });
       // Reset form for next result entry
       setResultForm(prev => ({ ...prev, result: '' }));
-      setDuplicateNotice(data?.duplicate ? 'Duplicate result skipped — this test already has a recorded result for this order.' : '');
+      setDuplicateNotice(data?.duplicate ? t('labs.notice.duplicateSkipped') : '');
     },
   });
 
@@ -253,10 +265,10 @@ export default function LabsPage() {
       queryClient.invalidateQueries({ queryKey: ['lab-results', selectedOrder] });
       queryClient.invalidateQueries({ queryKey: ['lab-orders'] });
       setBulkValues({});
-      setDuplicateNotice(`${n} result${n === 1 ? '' : 's'} added.`);
+      setDuplicateNotice(t('labs.notice.resultsAdded', { count: n }));
     },
     onError: (e: any) =>
-      setDuplicateNotice(e?.response?.data?.message || 'Could not add the results.'),
+      setDuplicateNotice(e?.response?.data?.message || t('labs.notice.addFailed')),
   });
 
   // Update order status (lab tech only)
@@ -273,11 +285,16 @@ export default function LabsPage() {
     mutationFn: (id: number) => nestClient.post(`/lab/orders/${id}/validate`),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['lab-orders'] });
-      setValidateNotice(
-        data?.validated
-          ? `Order #${data.orderId} validated — ${data.resultCount} result${data.resultCount !== 1 ? 's' : ''}${data.criticalCount ? `, ${data.criticalCount} critical` : ''}.`
-          : (data?.reason || 'Unable to validate order.'),
-      );
+      if (data?.validated) {
+        setValidateOk(true);
+        setValidateNotice(
+          t('labs.notice.orderValidated', { id: data.orderId, results: t('labtech.resultsCount', { count: data.resultCount }) }) +
+            (data.criticalCount ? t('labs.notice.criticalSuffix', { count: data.criticalCount }) : '') + '.',
+        );
+      } else {
+        setValidateOk(false);
+        setValidateNotice(data?.reason || t('labs.notice.unableValidate'));
+      }
     },
   });
 
@@ -290,12 +307,16 @@ export default function LabsPage() {
       queryClient.invalidateQueries({ queryKey: ['all-lab-orders'] });
       queryClient.invalidateQueries({ queryKey: ['provider-lab-orders'] });
       queryClient.invalidateQueries({ queryKey: ['provider-lab-notifications'] });
-      setValidateNotice(
-        d.validated
-          ? `Group validated — ${d.validated} order${d.validated !== 1 ? 's' : ''}, ${d.resultCount} result${d.resultCount !== 1 ? 's' : ''}. ` +
-            (d.notified ? `Provider #${d.provider} notified.` : 'No provider on file to notify.')
-          : (d.reason || 'Unable to validate group.'),
-      );
+      if (d.validated) {
+        setValidateOk(true);
+        setValidateNotice(
+          t('labs.notice.groupValidated', { orders: t('labs.orderCount', { count: d.validated }), results: t('labtech.resultsCount', { count: d.resultCount }) }) + ' ' +
+            (d.notified ? t('labs.notice.providerNotified', { id: d.provider }) : t('labs.notice.noProvider')),
+        );
+      } else {
+        setValidateOk(false);
+        setValidateNotice(d.reason || t('labs.notice.unableValidateGroup'));
+      }
     },
   });
 
@@ -337,17 +358,17 @@ export default function LabsPage() {
         <div className="position-relative">
           <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
-              <h3 className="mb-1 fw-bold"><i className="bi bi-flask me-2"></i>Laboratory Management</h3>
+              <h3 className="mb-1 fw-bold"><i className="bi bi-flask me-2"></i>{t('labs.title')}</h3>
               <p className="mb-0 text-white text-opacity-75 small">
-                All lab orders · Auto-refreshes every 15s
+                {t('labs.subtitle')}
               </p>
             </div>
           </div>
           <div className="row g-2 mt-3">
             {[
-              { v: allOrders.length, l: 'Total Orders', c: '#ffc107', i: 'bi-clipboard-check' },
-              { v: pendingCount, l: 'Pending / In Progress', c: '#fd7e14', i: 'bi-hourglass-split' },
-              { v: completedCount, l: 'Completed', c: '#198754', i: 'bi-check-circle' },
+              { v: allOrders.length, l: t('labs.statTotal'), c: '#ffc107', i: 'bi-clipboard-check' },
+              { v: pendingCount, l: t('labs.statPending'), c: '#fd7e14', i: 'bi-hourglass-split' },
+              { v: completedCount, l: t('labs.statCompleted'), c: '#198754', i: 'bi-check-circle' },
             ].map(s => (
               <div className="col-auto" key={s.l}>
                 <div className="d-flex align-items-center gap-2 bg-white bg-opacity-15 rounded-pill px-3 py-1">
@@ -365,17 +386,17 @@ export default function LabsPage() {
       <div className="d-flex gap-2 mb-3 flex-wrap">
         <div className="input-group" style={{ maxWidth: '300px' }}>
           <span className="input-group-text bg-white"><i className="bi bi-search"></i></span>
-          <input className="form-control form-control-sm" placeholder="Search by PID or patient name..."
+          <input className="form-control form-control-sm" placeholder={t('labs.searchPlaceholder')}
             value={searchPid} onChange={e => setSearchPid(e.target.value)} />
         </div>
         <div className="d-flex gap-1 flex-wrap">
           {[
-            { key: 'all', label: 'All', icon: 'bi-list', color: '#6c757d' },
-            { key: 'pending', label: 'Pending', icon: 'bi-hourglass-split', color: '#fd7e14' },
-            { key: 'collected', label: 'Collected', icon: 'bi-droplet', color: '#0dcaf0' },
-            { key: 'processing', label: 'Processing', icon: 'bi-cpu', color: '#6f42c1' },
-            { key: 'completed', label: 'Completed', icon: 'bi-check-circle', color: '#198754' },
-            { key: 'validated', label: 'Validated', icon: 'bi-shield-check', color: '#0d6efd' },
+            { key: 'all', label: t('labs.status.all'), icon: 'bi-list', color: '#6c757d' },
+            { key: 'pending', label: t('labs.status.pending'), icon: 'bi-hourglass-split', color: '#fd7e14' },
+            { key: 'collected', label: t('labs.status.collected'), icon: 'bi-droplet', color: '#0dcaf0' },
+            { key: 'processing', label: t('labs.status.processing'), icon: 'bi-cpu', color: '#6f42c1' },
+            { key: 'completed', label: t('labs.status.completed'), icon: 'bi-check-circle', color: '#198754' },
+            { key: 'validated', label: t('labs.status.validated'), icon: 'bi-shield-check', color: '#0d6efd' },
           ].map(f => {
             const count = f.key === 'all' ? allOrders.length : allOrders.filter((o: any) => o.orderStatus === f.key).length;
             return (
@@ -392,13 +413,13 @@ export default function LabsPage() {
           })}
         </div>
         <span className="badge bg-secondary rounded-pill ms-auto d-flex align-items-center">
-          {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+          {t('labs.orderCount', { count: filteredOrders.length })}
         </span>
       </div>
 
       {validateNotice && (
-        <div className={`alert py-2 small rounded-3 d-flex align-items-center gap-2 ${validateNotice.startsWith('Order') ? 'alert-success' : 'alert-warning'}`}>
-          <i className={`bi ${validateNotice.startsWith('Order') ? 'bi-check-circle' : 'bi-exclamation-triangle'}`}></i>
+        <div className={`alert py-2 small rounded-3 d-flex align-items-center gap-2 ${validateOk ? 'alert-success' : 'alert-warning'}`}>
+          <i className={`bi ${validateOk ? 'bi-check-circle' : 'bi-exclamation-triangle'}`}></i>
           <span>{validateNotice}</span>
           <button className="btn btn-link btn-sm p-0 ms-auto text-decoration-none" onClick={() => setValidateNotice('')}>✕</button>
         </div>
@@ -412,7 +433,7 @@ export default function LabsPage() {
               style={{ borderRadius: '16px 16px 0 0' }}>
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-clipboard-check me-2" style={{ color: '#198754' }}></i>
-                {statusFilter === 'all' ? 'All Lab Orders' : `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Orders`}
+                {statusFilter === 'all' ? t('labs.allLabOrders') : t('labs.statusOrders', { status: t(`labs.status.${statusFilter}`) })}
               </h6>
             </div>
             <div className="card-body p-0" style={{ maxHeight: '600px', overflowY: 'auto' }}>
@@ -422,8 +443,8 @@ export default function LabsPage() {
                 <table className="table table-hover small mb-0">
                   <thead className="table-light sticky-top">
                     <tr>
-                      <th>ID</th><th>Test / Order</th><th>Specimen</th><th>Date</th><th>Priority</th><th>Status</th><th>Billing</th>
-                      {isLabTech && <th>Action</th>}
+                      <th>{t('labs.thId')}</th><th>{t('labs.thTest')}</th><th>{t('labs.thSpecimen')}</th><th>{t('labs.thDate')}</th><th>{t('labs.thPriority')}</th><th>{t('labs.thStatus')}</th><th>{t('labs.thBilling')}</th>
+                      {isLabTech && <th>{t('labs.thAction')}</th>}
                       <th></th>
                     </tr>
                   </thead>
@@ -444,30 +465,30 @@ export default function LabsPage() {
                               </div>
                               <div className="flex-grow-1 min-w-0">
                                 <div className="fw-bold small text-truncate" style={{ color }}>{g.patientName}</div>
-                                <small className="text-muted">PID {g.patientPid ?? g.patientId} · {g.count} test{g.count !== 1 ? 's' : ''}</small>
+                                <small className="text-muted">{t('labtech.pidLine', { pid: g.patientPid ?? g.patientId, count: t('labtech.testsCount', { count: g.count }) })}</small>
                               </div>
                               {g.hasStat && (
                                 <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>
-                                  <i className="bi bi-exclamation-triangle me-1"></i>STAT
+                                  <i className="bi bi-exclamation-triangle me-1"></i>{t('labtech.statBadge')}
                                 </span>
                               )}
                               {g.pendingCount > 0 && (
-                                <span className="badge rounded-pill" style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.6rem' }}>{g.pendingCount} pending</span>
+                                <span className="badge rounded-pill" style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.6rem' }}>{t('labtech.pendingCount', { count: g.pendingCount })}</span>
                               )}
                               {readyToValidate(g).length > 0 && (
                                 <button
                                   className="btn btn-primary btn-sm rounded-pill py-0"
                                   style={{ fontSize: '0.65rem' }}
-                                  title="Preview and validate every ready order for this patient in one shot, then notify the provider"
+                                  title={t('labs.validateGroupTitle')}
                                   disabled={validateGroup.isPending || !canValidateGroup}
                                   onClick={() => validateGroup.mutate(g.patientPid ?? g.patientId)}>
                                   <i className="bi bi-check2-square me-1"></i>
-                                  Validate group ({readyToValidate(g).length})
+                                  {t('labs.validateGroup', { count: readyToValidate(g).length })}
                                 </button>
                               )}
                               {g.orders.some((o: any) => o.orderStatus === 'duplicate') && (
                                 <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>
-                                  <i className="bi bi-exclamation-octagon me-1"></i>DUPLICATE
+                                  <i className="bi bi-exclamation-octagon me-1"></i>{t('labs.duplicate')}
                                 </span>
                               )}
                             </div>
@@ -475,14 +496,14 @@ export default function LabsPage() {
                         </tr>
                         {g.orders.map((o: any) => {
                           const statusMap: Record<string, { label: string; color: string }> = {
-                            pending: { label: 'Pending', color: '#fd7e14' },
-                            collected: { label: 'Collected', color: '#0dcaf0' },
-                            processing: { label: 'Processing', color: '#6f42c1' },
-                            completed: { label: 'Completed', color: '#198754' },
-                            validated: { label: 'Validated', color: '#0d6efd' },
-                            rejected: { label: 'Rejected', color: '#dc3545' },
-                            referred: { label: 'Referred', color: '#ffc107' },
-                            duplicate: { label: 'Duplicate', color: '#dc3545' },
+                            pending: { label: t('labs.status.pending'), color: '#fd7e14' },
+                            collected: { label: t('labs.status.collected'), color: '#0dcaf0' },
+                            processing: { label: t('labs.status.processing'), color: '#6f42c1' },
+                            completed: { label: t('labs.status.completed'), color: '#198754' },
+                            validated: { label: t('labs.status.validated'), color: '#0d6efd' },
+                            rejected: { label: t('labs.status.rejected'), color: '#dc3545' },
+                            referred: { label: t('labs.status.referred'), color: '#ffc107' },
+                            duplicate: { label: t('labs.status.duplicate'), color: '#dc3545' },
                           };
                           const statusInfo = statusMap[String(o.orderStatus)] || { label: o.orderStatus, color: '#6c757d' };
 
@@ -494,7 +515,7 @@ export default function LabsPage() {
                               }}>
                               <td><code className="small">{o.id}</code></td>
                               <td>
-                                <small className="fw-semibold">{o.instructions || 'Lab test'}</small>
+                                <small className="fw-semibold">{o.instructions || t('labs.labTest')}</small>
                                 <br /><small className="text-muted" style={{ fontSize: '0.6rem' }}>{o.orderStatus}</small>
                               </td>
                               <td>
@@ -511,7 +532,7 @@ export default function LabsPage() {
                               <td>
                                 <span className={`badge rounded-pill ${o.orderPriority === 'stat' ? 'bg-danger' : o.orderPriority === 'fasting' ? 'bg-info' : 'bg-light text-dark'}`}
                                   style={{ fontSize: '0.65rem' }}>
-                                  {o.orderPriority || 'routine'}
+                                  {o.orderPriority || t('labtech.priorityRoutine')}
                                 </span>
                               </td>
                               <td>
@@ -529,9 +550,9 @@ export default function LabsPage() {
                                 ) : !o.patient_charges_usd ? (
                                   <span className="badge bg-light text-muted border" style={{ fontSize: '0.65rem' }}>—</span>
                                 ) : o.paid ? (
-                                  <span className="badge bg-success" style={{ fontSize: '0.65rem' }}><i className="bi bi-check-circle me-1"></i>Paid</span>
+                                  <span className="badge bg-success" style={{ fontSize: '0.65rem' }}><i className="bi bi-check-circle me-1"></i>{t('labs.paid')}</span>
                                 ) : (
-                                  <span className="badge bg-warning text-dark" style={{ fontSize: '0.65rem' }}>${Number(o.patient_balance_usd || 0).toFixed(2)} owed</span>
+                                  <span className="badge bg-warning text-dark" style={{ fontSize: '0.65rem' }}>{t('labs.owed', { amount: `$${Number(o.patient_balance_usd || 0).toFixed(2)}` })}</span>
                                 )}
                               </td>
                               {isLabTech && (
@@ -541,40 +562,40 @@ export default function LabsPage() {
                                       style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}
                                       onClick={() => updateStatus.mutate({ id: o.id, status: 'pending' })}
                                       disabled={updateStatus.isPending}
-                                      title="Keep this order — override duplicate">
-                                      <i className="bi bi-shield-check me-1"></i>Override (Keep)
+                                      title={t('labs.overrideTitle')}>
+                                      <i className="bi bi-shield-check me-1"></i>{t('labs.override')}
                                     </button>
                                   ) : o.orderStatus === 'completed' ? (
                                     <button className="btn btn-outline-primary btn-sm py-0 px-2 rounded-pill"
                                       style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}
                                       onClick={() => validateOrder.mutate(o.id)}
                                       disabled={validateOrder.isPending}
-                                      title="Run validation algorithm">
-                                      <i className="bi bi-shield-check me-1"></i>Validate
+                                      title={t('labs.validateTitle')}>
+                                      <i className="bi bi-shield-check me-1"></i>{t('labs.validate')}
                                     </button>
                                   ) : o.orderStatus === 'validated' ? (
                                     <button className="btn btn-outline-success btn-sm py-0 px-2 rounded-pill"
                                       style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}
                                       onClick={() => updateStatus.mutate({ id: o.id, status: 'completed' })}
                                       disabled={updateStatus.isPending}
-                                      title="Re-open this order for re-validation">
-                                      <i className="bi bi-arrow-counterclockwise me-1"></i>Re-open
+                                      title={t('labs.reopenTitle')}>
+                                      <i className="bi bi-arrow-counterclockwise me-1"></i>{t('labs.reopen')}
                                     </button>
                                   ) : o.orderStatus === 'pending' ? (
                                     <button className="btn btn-outline-info btn-sm py-0 px-2 rounded-pill"
                                       style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}
                                       onClick={() => updateStatus.mutate({ id: o.id, status: 'collected' })}
                                       disabled={updateStatus.isPending}
-                                      title="Mark sample as collected">
-                                      <i className="bi bi-droplet me-1"></i>Collect
+                                      title={t('labs.collectTitle')}>
+                                      <i className="bi bi-droplet me-1"></i>{t('labs.collect')}
                                     </button>
                                   ) : o.orderStatus === 'collected' ? (
                                     <button className="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill"
                                       style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}
                                       onClick={() => updateStatus.mutate({ id: o.id, status: 'processing' })}
                                       disabled={updateStatus.isPending}
-                                      title="Move to processing">
-                                      <i className="bi bi-cpu me-1"></i>Process
+                                      title={t('labs.processTitle')}>
+                                      <i className="bi bi-cpu me-1"></i>{t('labs.process')}
                                     </button>
                                   ) : null}
                                 </td>
@@ -583,7 +604,7 @@ export default function LabsPage() {
                                 <button className="btn btn-outline-primary btn-sm py-0 px-2 rounded-pill"
                                   style={{ fontSize: '0.65rem', whiteSpace: 'nowrap' }}
                                   onClick={() => setSelectedOrder(o.id === selectedOrder ? null : o.id)}>
-                                  {o.id === selectedOrder ? 'Hide' : isLabTech ? ((o.orderStatus === 'completed' || o.orderStatus === 'validated') ? 'View Results' : 'Enter Results') : 'View Results'}
+                                  {o.id === selectedOrder ? t('labs.hide') : (isLabTech && o.orderStatus !== 'completed' && o.orderStatus !== 'validated') ? t('labs.enterResults') : t('labs.viewResults')}
                                 </button>
                               </td>
                             </tr>
@@ -596,8 +617,8 @@ export default function LabsPage() {
                       <tr><td colSpan={isLabTech ? 9 : 8} className="text-center text-muted py-4">
                         <i className="bi bi-inbox me-1"></i>
                         {statusFilter !== 'all'
-                          ? `No ${statusFilter} orders found`
-                          : searchPid ? 'No orders match your search' : 'No lab orders yet'}
+                          ? t('labs.noStatusOrders', { status: t(`labs.status.${statusFilter}`) })
+                          : searchPid ? t('labs.noMatch') : t('labs.noOrders')}
                       </td></tr>
                     )}
                   </tbody>
@@ -615,7 +636,7 @@ export default function LabsPage() {
                 style={{ borderRadius: '16px 16px 0 0' }}>
                 <h6 className="mb-0 fw-bold">
                   <i className="bi bi-file-earmark-text me-2" style={{ color: '#6f42c1' }}></i>
-                  Results — Order #{selectedOrder}
+                  {t('labs.resultsOrder', { id: selectedOrder })}
                 </h6>
                 <button className="btn btn-outline-secondary btn-sm rounded-pill"
                   onClick={() => setSelectedOrder(null)}>
@@ -624,27 +645,27 @@ export default function LabsPage() {
               </div>
               <div className="card-body">
                 <div className="mb-3 small">
-                  <span className="text-muted">Status:</span>{' '}
+                  <span className="text-muted">{t('labs.statusLabel')}</span>{' '}
                   {(() => {
                     const order = allOrders.find((o: any) => o.id === selectedOrder);
                     return <span className="badge bg-secondary text-capitalize">{order?.orderStatus || '—'}</span>;
                   })()}
-                  {resultsLoading && <span className="badge bg-light text-dark ms-1">Loading…</span>}
+                  {resultsLoading && <span className="badge bg-light text-dark ms-1">{t('labs.loading')}</span>}
                   {results?.report?.date_collected && (
-                    <span className="text-muted ms-2">Collected: {results.report.date_collected?.split(' ')[0]}</span>
+                    <span className="text-muted ms-2">{t('labs.collected', { date: results.report.date_collected?.split(' ')[0] })}</span>
                   )}
                   {results?.results?.length > 0 && (
                     <span className="badge bg-success ms-1">
-                      <i className="bi bi-check-circle me-1"></i>{results.results.length} result{results.results.length !== 1 ? 's' : ''}
+                      <i className="bi bi-check-circle me-1"></i>{t('labtech.resultsCount', { count: results.results.length })}
                     </span>
                   )}
                 </div>
 
                 {results?.results?.length > 0 && (
                   <div className="mb-3">
-                    <small className="fw-bold text-muted text-uppercase">Results</small>
+                    <small className="fw-bold text-muted text-uppercase">{t('labs.resultsHeading')}</small>
                     <table className="table table-sm small mt-1">
-                      <thead><tr><th>Code</th><th>Name</th><th>Result</th><th>Units</th><th>Date</th></tr></thead>
+                      <thead><tr><th>{t('labs.thCode')}</th><th>{t('labs.thName')}</th><th>{t('labs.thResult')}</th><th>{t('labs.thUnits')}</th><th>{t('labs.thDate')}</th></tr></thead>
                       <tbody>
                         {results.results.map((r: any) => (
                           <tr key={r.id}>
@@ -674,10 +695,10 @@ export default function LabsPage() {
                   const bulkCount = panelTests.filter((t: any) => (bulkValues[testKey(t)] || '').trim() !== '').length;
                   return (
                   <div className="border-top pt-3">
-                    <small className="fw-bold text-muted text-uppercase">Enter Result</small>
+                    <small className="fw-bold text-muted text-uppercase">{t('labs.enterResultHeading')}</small>
                     <div className="row g-2 mt-1">
                       <div className="col-6">
-                        <label className="form-label small mb-0">Test *</label>
+                        <label className="form-label small mb-0">{t('labs.testLabel')}</label>
                         <select className="form-select form-select-sm" value={resultForm.result_code}
                           onChange={e => {
                             const t = (catalog as any[]).find((c: any) => String(c.code || c.id) === e.target.value);
@@ -689,7 +710,7 @@ export default function LabsPage() {
                               range: t ? refText(t) : '',
                             });
                           }}>
-                          <option value="">— Select Test —</option>
+                          <option value="">{t('labs.selectTest')}</option>
                           {treeSections.map(sec =>
                             sec.groups.map(g => {
                               const label = g.subsection ? `${sec.title} · ${g.subsection}` : sec.title;
@@ -705,12 +726,15 @@ export default function LabsPage() {
                         </select>
                       </div>
                       <div className="col-6">
-                        <label className="form-label small mb-0">Value *</label>
+                        <label className="form-label small mb-0">{t('labs.valueLabel')}</label>
                         {picked?.result_type === 'POSITIVE_NEGATIVE' ? (
                           <select className="form-select form-select-sm" value={resultForm.result}
                             onChange={e => setResultForm({ ...resultForm, result: e.target.value })}>
                             <option value="">—</option>
-                            <option>Negative</option><option>Positive</option><option>Non-Reactive</option><option>Reactive</option>
+                            <option value="Negative">{t('labs.value.negative')}</option>
+                            <option value="Positive">{t('labs.value.positive')}</option>
+                            <option value="Non-Reactive">{t('labs.value.nonReactive')}</option>
+                            <option value="Reactive">{t('labs.value.reactive')}</option>
                           </select>
                         ) : picked?.result_type === 'BLOOD_GROUP' ? (
                           <select className="form-select form-select-sm" value={resultForm.result}
@@ -730,16 +754,16 @@ export default function LabsPage() {
                         )}
                       </div>
                       <div className="col-3">
-                        <label className="form-label small mb-0">Units</label>
+                        <label className="form-label small mb-0">{t('labs.unitsLabel')}</label>
                         <input className="form-control form-control-sm" value={resultForm.units}
                           onChange={e => setResultForm({ ...resultForm, units: e.target.value })} />
                       </div>
                       <div className="col-4">
-                        <label className="form-label small mb-0">Normal value</label>
+                        <label className="form-label small mb-0">{t('labs.normalValue')}</label>
                         <div className="form-control form-control-sm bg-light small" style={{fontSize:'0.65rem'}}>{resultForm.range || '—'}</div>
                       </div>
                       <div className="col-2">
-                        <label className="form-label small mb-0">Flag</label>
+                        <label className="form-label small mb-0">{t('labs.flagLabel')}</label>
                         <div className="form-control form-control-sm bg-light small">
                           {picked ? <span className={`badge ${flagBadge(computeFlag(picked, resultForm.result))}`}>{computeFlag(picked, resultForm.result) || '—'}</span> : '—'}
                         </div>
@@ -749,7 +773,7 @@ export default function LabsPage() {
                         <button className="btn btn-success btn-sm w-100"
                           onClick={() => addResult.mutate(resultForm)}
                           disabled={addResult.isPending || !resultForm.result_text || !resultForm.result}>
-                          {addResult.isPending ? '...' : 'Add Result'}
+                          {addResult.isPending ? '...' : t('labs.addResult')}
                         </button>
                       </div>
                     </div>
@@ -758,7 +782,7 @@ export default function LabsPage() {
                         <button type="button" className="btn btn-sm btn-outline-primary rounded-pill"
                           onClick={() => setBulkOpen(v => !v)}>
                           <i className="bi bi-lightning-charge-fill me-1"></i>
-                          {bulkOpen ? 'Hide bulk entry' : `Enter all ${panelTests.length} ${panelLabel} results at once`}
+                          {bulkOpen ? t('labs.hideBulk') : t('labs.enterAll', { count: panelTests.length, panel: panelLabel })}
                         </button>
                         {bulkOpen && (
                           <div className="border rounded-3 p-2 mt-2 bg-white">
@@ -768,15 +792,15 @@ export default function LabsPage() {
                                   <span className="small flex-grow-1">
                                     {t.name} {t.unit ? <span className="text-muted">({t.unit})</span> : null}
                                   </span>
-                                  {valueControl(t, bulkValues[testKey(t)] || '', (v) =>
-                                    setBulkValues(prev => ({ ...prev, [testKey(t)]: v })))}
+                                  <ValueControl test={t} value={bulkValues[testKey(t)] || ''}
+                                    onChange={(v) => setBulkValues(prev => ({ ...prev, [testKey(t)]: v }))} />
                                 </div>
                               ))}
                             </div>
                             <button className="btn btn-success btn-sm w-100 mt-2"
                               onClick={() => addBulk.mutate(panelTests)}
                               disabled={addBulk.isPending || bulkCount === 0}>
-                              {addBulk.isPending ? 'Saving…' : `Add all results${bulkCount ? ` (${bulkCount})` : ''}`}
+                              {addBulk.isPending ? t('labs.saving') : (bulkCount ? t('labs.addAllResultsCount', { count: bulkCount }) : t('labs.addAllResults'))}
                             </button>
                           </div>
                         )}

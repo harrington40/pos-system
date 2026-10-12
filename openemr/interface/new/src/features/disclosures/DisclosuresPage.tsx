@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function DisclosuresPage() {
+  const { t } = useTranslation();
   const [disclosures, setDisclosures] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('disclosures') || '[]'); } catch { return []; }
   });
@@ -48,29 +50,29 @@ export default function DisclosuresPage() {
       <div className="rounded-4 p-4 mb-4 text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #6f42c1 0%, #0d6efd 60%, #00c9a7 100%)', zIndex: 1 }}>
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '6rem', transform: 'rotate(10deg) translate(20px,-10px)' }}><i className="bi bi-shield-lock"></i></div>
         <div className="position-relative">
-          <h3 className="mb-1 fw-bold"><i className="bi bi-shield-lock me-2"></i>PHI Disclosures</h3>
-          <p className="mb-0 text-white text-opacity-75 small">Track protected health information disclosures.</p>
+          <h3 className="mb-1 fw-bold"><i className="bi bi-shield-lock me-2"></i>{t('disclosures.title')}</h3>
+          <p className="mb-0 text-white text-opacity-75 small">{t('disclosures.subtitle')}</p>
         </div>
       </div>
       <div className="card shadow-sm mb-4">
-        <div className="card-header"><h5 className="mb-0">Record Disclosure</h5></div>
+        <div className="card-header"><h5 className="mb-0">{t('disclosures.recordDisclosure')}</h5></div>
         <div className="card-body">
           <div className="row g-2">
-            <div className="col-md-2"><input className="form-control form-control-sm" placeholder="Patient ID" value={form.patientId} onChange={e => setForm({...form, patientId: e.target.value})} /></div>
-            <div className="col-md-2"><input className="form-control form-control-sm" placeholder="Patient Name" value={form.patientName} onChange={e => setForm({...form, patientName: e.target.value})} /></div>
-            <div className="col-md-2"><input className="form-control form-control-sm" placeholder="Recipient" value={form.recipient} onChange={e => setForm({...form, recipient: e.target.value})} /></div>
-            <div className="col-md-2"><input className="form-control form-control-sm" placeholder="Purpose" value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})} /></div>
+            <div className="col-md-2"><input className="form-control form-control-sm" placeholder={t('disclosures.patientIdPlaceholder')} value={form.patientId} onChange={e => setForm({...form, patientId: e.target.value})} /></div>
+            <div className="col-md-2"><input className="form-control form-control-sm" placeholder={t('disclosures.patientNamePlaceholder')} value={form.patientName} onChange={e => setForm({...form, patientName: e.target.value})} /></div>
+            <div className="col-md-2"><input className="form-control form-control-sm" placeholder={t('disclosures.recipientPlaceholder')} value={form.recipient} onChange={e => setForm({...form, recipient: e.target.value})} /></div>
+            <div className="col-md-2"><input className="form-control form-control-sm" placeholder={t('disclosures.purposePlaceholder')} value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})} /></div>
             <div className="col-md-2"><input className="form-control form-control-sm" type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
-            <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addDisclosure} disabled={!form.patientId}>Record</button></div>
+            <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addDisclosure} disabled={!form.patientId}>{t('disclosures.record')}</button></div>
           </div>
         </div>
       </div>
       <div className="card shadow-sm">
         <div className="card-header"><h5 className="mb-0">Disclosure Log ({disclosures.length})</h5></div>
         <div className="card-body p-0">
-          <table className="table table-sm table-hover mb-0"><thead><tr><th>Date</th><th>Patient</th><th>Recipient</th><th>Purpose</th><th>Disclosure Date</th></tr></thead>
+          <table className="table table-sm table-hover mb-0"><thead><tr><th>{t('disclosures.cols.date')}</th><th>{t('disclosures.cols.patient')}</th><th>{t('disclosures.cols.recipient')}</th><th>{t('disclosures.cols.purpose')}</th><th>{t('disclosures.cols.disclosureDate')}</th></tr></thead>
             <tbody>{disclosures.map((d: any) => <tr key={d.id}><td>{new Date(d.created).toLocaleDateString()}</td><td>#{d.patientId} {d.patientName}</td><td>{d.recipient}</td><td>{d.purpose}</td><td>{d.date}</td></tr>)}
-              {!disclosures.length && <tr><td colSpan={5} className="text-muted text-center py-3">No disclosures recorded.</td></tr>}</tbody></table>
+              {!disclosures.length && <tr><td colSpan={5} className="text-muted text-center py-3">{t('disclosures.empty')}</td></tr>}</tbody></table>
         </div>
       </div>
     </div>

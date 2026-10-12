@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { searchPatients } from '../../api/endpoints/patients';
 import { createAppointment } from '../../api/endpoints/appointments';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function AppointmentCreateModal({ selectedDate, onClose }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [patientSearch, setPatientSearch] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
           <div className="modal-header">
             <h5 className="modal-title">
               <i className="bi bi-plus-circle me-2"></i>
-              New Appointment
+              {t('appointments.create.title')}
             </h5>
             <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
@@ -95,7 +97,7 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
             <div className="modal-body">
               {/* Patient search */}
               <div className="mb-3">
-                <label className="form-label">Patient</label>
+                <label className="form-label">{t('appointments.create.patient')}</label>
                 {selectedPatientId ? (
                   <div className="d-flex justify-content-between align-items-center">
                     <strong>{selectedPatientName}</strong>
@@ -108,7 +110,7 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
                         setPatientSearch('');
                       }}
                     >
-                      Change
+                      {t('appointments.create.change')}
                     </button>
                   </div>
                 ) : (
@@ -116,7 +118,7 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Search patient by name..."
+                      placeholder={t('appointments.create.searchPlaceholder')}
                       value={patientSearch}
                       onChange={(e) => setPatientSearch(e.target.value)}
                     />
@@ -137,7 +139,7 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
                           </button>
                         ))}
                         {patients.length === 0 && (
-                          <div className="list-group-item text-muted small">No patients found</div>
+                          <div className="list-group-item text-muted small">{t('appointments.create.noPatients')}</div>
                         )}
                       </div>
                     )}
@@ -148,7 +150,7 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
               {/* Open slots */}
               {openSlots.length > 0 && selectedPatientId && (
                 <div className="mb-3">
-                  <label className="form-label small">Available Time Slots</label>
+                  <label className="form-label small">{t('appointments.create.availableSlots')}</label>
                   <div className="d-flex flex-wrap gap-1">
                     {openSlots.map((s: any) => (
                       <button key={s.time} type="button" className={`btn btn-sm ${form.pc_startTime === s.time ? 'btn-primary' : 'btn-outline-secondary'}`}
@@ -161,11 +163,11 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
               {/* Date and time */}
               <div className="row">
                 <div className="col-md-4 mb-3">
-                  <label className="form-label">Date</label>
+                  <label className="form-label">{t('appointments.create.date')}</label>
                   <input type="date" className="form-control" value={selectedDate} disabled />
                 </div>
                 <div className="col-md-4 mb-3">
-                  <label className="form-label">Start Time</label>
+                  <label className="form-label">{t('appointments.create.startTime')}</label>
                   <input
                     type="time"
                     className="form-control"
@@ -174,7 +176,7 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
                   />
                 </div>
                 <div className="col-md-4 mb-3">
-                  <label className="form-label">Duration (min)</label>
+                  <label className="form-label">{t('appointments.create.duration')}</label>
                   <input
                     type="number"
                     className="form-control"
@@ -191,49 +193,49 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
                 <div className="col-md-4">
                   <div className="form-check">
                     <input className="form-check-input" type="checkbox" checked={recurring} onChange={e => setRecurring(e.target.checked)} id="recurring" />
-                    <label className="form-check-label small" htmlFor="recurring">Recurring weekly</label>
-                    {recurring && <input type="number" className="form-control form-control-sm mt-1" min={1} max={52} value={recurringWeeks} onChange={e => setRecurringWeeks(+e.target.value)} placeholder="Weeks" />}
+                    <label className="form-check-label small" htmlFor="recurring">{t('appointments.create.recurringWeekly')}</label>
+                    {recurring && <input type="number" className="form-control form-control-sm mt-1" min={1} max={52} value={recurringWeeks} onChange={e => setRecurringWeeks(+e.target.value)} placeholder={t('appointments.create.weeksPlaceholder')} />}
                   </div>
                 </div>
                 <div className="col-md-4">
-                  <div className="form-check"><input className="form-check-input" type="checkbox" checked={notifyEmail} onChange={e => setNotifyEmail(e.target.checked)} id="notifyEmail" /><label className="form-check-label small" htmlFor="notifyEmail">Email notification</label></div>
+                  <div className="form-check"><input className="form-check-input" type="checkbox" checked={notifyEmail} onChange={e => setNotifyEmail(e.target.checked)} id="notifyEmail" /><label className="form-check-label small" htmlFor="notifyEmail">{t('appointments.create.emailNotification')}</label></div>
                 </div>
                 <div className="col-md-4">
-                  <div className="form-check"><input className="form-check-input" type="checkbox" checked={notifySms} onChange={e => setNotifySms(e.target.checked)} id="notifySms" /><label className="form-check-label small" htmlFor="notifySms">SMS notification</label></div>
+                  <div className="form-check"><input className="form-check-input" type="checkbox" checked={notifySms} onChange={e => setNotifySms(e.target.checked)} id="notifySms" /><label className="form-check-label small" htmlFor="notifySms">{t('appointments.create.smsNotification')}</label></div>
                 </div>
               </div>
 
               {/* Title and status */}
               <div className="row">
                 <div className="col-md-8 mb-3">
-                  <label className="form-label">Title</label>
+                  <label className="form-label">{t('appointments.create.titleLabel')}</label>
                   <input
                     type="text"
                     className="form-control"
                     value={form.pc_title}
                     onChange={(e) => setForm({ ...form, pc_title: e.target.value })}
                     required
-                    placeholder="e.g., Office Visit, Follow-up"
+                    placeholder={t('appointments.create.titlePlaceholder')}
                   />
                 </div>
                 <div className="col-md-4 mb-3">
-                  <label className="form-label">Status</label>
+                  <label className="form-label">{t('common.status')}</label>
                   <select
                     className="form-select"
                     value={form.pc_apptstatus}
                     onChange={(e) => setForm({ ...form, pc_apptstatus: e.target.value })}
                   >
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Checked In">Checked In</option>
-                    <option value="Canceled">Canceled</option>
+                    <option value="Scheduled">{t('appointments.status.Scheduled')}</option>
+                    <option value="Pending">{t('appointments.status.Pending')}</option>
+                    <option value="Checked In">{t('appointments.status.Checked In')}</option>
+                    <option value="Canceled">{t('appointments.status.Canceled')}</option>
                   </select>
                 </div>
               </div>
 
               {/* Notes */}
               <div className="mb-3">
-                <label className="form-label">Notes</label>
+                <label className="form-label">{t('appointments.create.notes')}</label>
                 <textarea
                   className="form-control"
                   rows={3}
@@ -244,14 +246,14 @@ export default function AppointmentCreateModal({ selectedDate, onClose }: Props)
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onClose}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
                 className="btn btn-primary"
                 disabled={!selectedPatientId || mutation.isPending}
               >
-                {mutation.isPending ? 'Creating...' : 'Create Appointment'}
+                {mutation.isPending ? t('appointments.create.creating') : t('appointments.create.submit')}
               </button>
             </div>
           </form>

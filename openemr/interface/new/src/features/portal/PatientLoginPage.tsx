@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 
 export default function PatientLoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [pid, setPid] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +37,7 @@ export default function PatientLoginPage() {
         { replace: true },
       );
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Patient ID or password is incorrect.');
+      setError(err?.response?.data?.message || t('portal.login.invalid'));
     }
   };
 
@@ -47,31 +49,31 @@ export default function PatientLoginPage() {
         <div className="card-body p-4 text-center">
           <div className="mb-4">
             <i className="bi bi-heart-pulse text-success" style={{ fontSize: '3rem' }}></i>
-            <h2 className="mt-2">Patient Portal</h2>
-            <p className="text-muted">Access your health records</p>
+            <h2 className="mt-2">{t('portal.login.title')}</h2>
+            <p className="text-muted">{t('portal.login.subtitle')}</p>
           </div>
           {error && <div className="alert alert-danger py-2 small">{error}</div>}
           <form onSubmit={handleLogin}>
             <div className="mb-3 text-start">
-              <label className="form-label">Patient ID</label>
-              <input type="text" className="form-control" value={pid} onChange={e => setPid(e.target.value)} placeholder="e.g. RX-2608-00001" required autoComplete="username" />
+              <label className="form-label">{t('portal.login.patientId')}</label>
+              <input type="text" className="form-control" value={pid} onChange={e => setPid(e.target.value)} placeholder={t('portal.login.patientIdPlaceholder')} required autoComplete="username" />
             </div>
             <div className="mb-3 text-start">
-              <label className="form-label">Password</label>
-              <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your portal password" required autoComplete="current-password" />
+              <label className="form-label">{t('portal.login.password')}</label>
+              <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('portal.login.passwordPlaceholder')} required autoComplete="current-password" />
               <div className="form-text">
-                Given to you when you registered. You will be asked to choose your own on first sign-in.
+                {t('portal.login.pidHint')}
               </div>
             </div>
             <div className="mb-3 text-start">
-              <label className="form-label">Date of Birth <span className="text-muted fw-normal">(optional)</span></label>
+              <label className="form-label">{t('portal.login.dob')} <span className="text-muted fw-normal">{t('portal.login.optional')}</span></label>
               <input type="date" className="form-control" value={dob} onChange={e => setDob(e.target.value)} />
             </div>
-            <button type="submit" className="btn btn-success btn-lg w-100">Sign In</button>
+            <button type="submit" className="btn btn-success btn-lg w-100">{t('portal.login.signIn')}</button>
           </form>
           <div className="mt-3 d-flex justify-content-between">
-            <Link to="/portal/register" className="small text-success">New Patient? Register</Link>
-            <Link to="/login" className="small text-muted">Staff Login</Link>
+            <Link to="/portal/register" className="small text-success">{t('portal.login.register')}</Link>
+            <Link to="/login" className="small text-muted">{t('portal.login.staffLogin')}</Link>
           </div>
         </div>
       </div>

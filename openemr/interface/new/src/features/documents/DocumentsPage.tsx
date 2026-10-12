@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
@@ -34,6 +35,7 @@ const fm = (bytes: number) => bytes<1024?`${bytes}B`:bytes<1048576?`${(bytes/102
 const fd = (d: string) => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
 export default function DocumentsPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const fi = useRef<HTMLInputElement>(null);
   const [pid, setPid] = useState('');
@@ -121,13 +123,13 @@ export default function DocumentsPage() {
       <div className="rounded-4 p-4 mb-4 text-white position-relative" style={{background:'linear-gradient(135deg, #0d6efd 0%, #6610f2 50%, #6f42c1 100%)', zIndex: 1}}>
         <div className="d-flex justify-content-between align-items-start">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-cloud-upload me-2"></i>Secure Documents</h2>
-            <p className="mb-0 text-white text-opacity-75 small">Backblaze B2 · 4-digit codes · Smart Patient Linking</p>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-cloud-upload me-2"></i>{t('documents.title')}</h2>
+            <p className="mb-0 text-white text-opacity-75 small">{t('documents.subtitle')}</p>
           </div>
           <div className="btn-group btn-group-sm">
-            <button className={`btn ${view==='all'?'btn-light':'btn-outline-light'}`} onClick={()=>setView('all')}><i className="bi bi-list-ul me-1"></i>All</button>
-            <button className={`btn ${view==='my'?'btn-light':'btn-outline-light'}`} onClick={()=>setView('my')}><i className="bi bi-person-badge me-1"></i>Mine</button>
-            <button className={`btn ${view==='upload'?'btn-light':'btn-outline-light'}`} onClick={()=>setView('upload')}><i className="bi bi-cloud-arrow-up me-1"></i>Upload</button>
+            <button className={`btn ${view==='all'?'btn-light':'btn-outline-light'}`} onClick={()=>setView('all')}><i className="bi bi-list-ul me-1"></i>{t('documents.viewAll')}</button>
+            <button className={`btn ${view==='my'?'btn-light':'btn-outline-light'}`} onClick={()=>setView('my')}><i className="bi bi-person-badge me-1"></i>{t('documents.viewMine')}</button>
+            <button className={`btn ${view==='upload'?'btn-light':'btn-outline-light'}`} onClick={()=>setView('upload')}><i className="bi bi-cloud-arrow-up me-1"></i>{t('documents.viewUpload')}</button>
           </div>
         </div>
       </div>
@@ -135,10 +137,10 @@ export default function DocumentsPage() {
       {/* Smart Stats */}
       <div className="row g-3 mb-4">
         {[
-          {v:displayDocs.length,l:'Total Documents',c:'#0d6efd',i:'bi-folder2'},
-          {v:fm(totalSize),l:'Storage Used',c:'#6610f2',i:'bi-hdd'},
-          {v:Object.keys(byCat).length,l:'Categories',c:'#198754',i:'bi-tags'},
-          {v:displayDocs.filter((d:DocumentItem)=>d.status==='pending').length,l:'Pending Review',c:'#fd7e14',i:'bi-hourglass-split'},
+          {v:displayDocs.length,l:t('documents.stats.totalDocuments'),c:'#0d6efd',i:'bi-folder2'},
+          {v:fm(totalSize),l:t('documents.stats.storageUsed'),c:'#6610f2',i:'bi-hdd'},
+          {v:Object.keys(byCat).length,l:t('documents.stats.categories'),c:'#198754',i:'bi-tags'},
+          {v:displayDocs.filter((d:DocumentItem)=>d.status==='pending').length,l:t('documents.stats.pendingReview'),c:'#fd7e14',i:'bi-hourglass-split'},
         ].map((s,i)=>(
           <div className="col-md-3 col-sm-6" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{borderRadius:'16px'}}>
@@ -155,11 +157,11 @@ export default function DocumentsPage() {
 
       {/* Smart Category Pills */}
       <div className="d-flex flex-wrap gap-1 mb-3">
-        <button className={`btn btn-sm rounded-pill ${!catFilter?'btn-primary':'btn-outline-secondary'}`} onClick={()=>setCatFilter('')}>All</button>
+        <button className={`btn btn-sm rounded-pill ${!catFilter?'btn-primary':'btn-outline-secondary'}`} onClick={()=>setCatFilter('')}>{t('documents.filterAll')}</button>
         {CATEGORIES.map(c=>(
           <button key={c.value} className={`btn btn-sm rounded-pill ${catFilter===c.value?'btn-primary':'btn-outline-secondary'}`}
             onClick={()=>setCatFilter(catFilter===c.value?'':c.value)}>
-            <i className={`bi ${c.icon} me-1`}></i>{c.label}
+            <i className={`bi ${c.icon} me-1`}></i>{t('documents.categories.' + c.value, { defaultValue: c.label })}
             {byCat[c.value]>0 && <span className="badge bg-light text-dark ms-1">{byCat[c.value]}</span>}
           </button>
         ))}
@@ -167,7 +169,7 @@ export default function DocumentsPage() {
 
       {/* Patient ID Filter */}
       <div className="row g-2 mb-3">
-        <div className="col-md-3"><input className="form-control form-control-sm rounded-pill" placeholder="Filter by Patient ID" value={pid} onChange={e=>setPid(e.target.value)} /></div>
+        <div className="col-md-3"><input className="form-control form-control-sm rounded-pill" placeholder={t('documents.filterByPid')} value={pid} onChange={e=>setPid(e.target.value)} /></div>
       </div>
 
       {/* Upload View */}
@@ -175,40 +177,40 @@ export default function DocumentsPage() {
         <div className="row g-3">
           <div className="col-lg-7">
             <div className="card border-0 shadow-sm" style={{borderRadius:'16px'}}>
-              <div className="card-header bg-white py-3"><h6 className="mb-0 fw-bold"><i className="bi bi-file-earmark-arrow-up me-2"></i>Upload Document</h6></div>
+              <div className="card-header bg-white py-3"><h6 className="mb-0 fw-bold"><i className="bi bi-file-earmark-arrow-up me-2"></i>{t('documents.uploadTitle')}</h6></div>
               <div className="card-body">
                 {!uRes ? (<>
-                  <div className="mb-3"><label className="form-label small">Select File</label>
+                  <div className="mb-3"><label className="form-label small">{t('documents.selectFile')}</label>
                     <input ref={fi} type="file" className="form-control" onChange={e=>{const f=e.target.files?.[0]; if(f){setUf(f);setURes(null);}}} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dcm,.txt,.csv" />
                     {uf && <div className="mt-2 small text-muted"><i className="bi bi-paperclip me-1"></i>{uf.name} ({fm(uf.size)})</div>}
                   </div>
                   <div className="row g-2 mb-3">
-                    <div className="col-md-6"><label className="form-label small">Category</label>
+                    <div className="col-md-6"><label className="form-label small">{t('documents.category')}</label>
                       <select className="form-select form-select-sm" value={uCat} onChange={e=>setUCat(e.target.value)}>
-                        {CATEGORIES.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
+                        {CATEGORIES.map(c=><option key={c.value} value={c.value}>{t('documents.categories.' + c.value, { defaultValue: c.label })}</option>)}
                       </select></div>
-                    <div className="col-md-6"><label className="form-label small">Patient ID</label>
-                      <input className="form-control form-control-sm" placeholder="e.g. 1" value={uPid} onChange={e=>setUPid(e.target.value)} /></div>
+                    <div className="col-md-6"><label className="form-label small">{t('documents.patientId')}</label>
+                      <input className="form-control form-control-sm" placeholder={t('documents.pidPlaceholder')} value={uPid} onChange={e=>setUPid(e.target.value)} /></div>
                   </div>
-                  <div className="mb-3"><label className="form-label small">Notes</label><textarea className="form-control form-control-sm" rows={2} value={uNotes} onChange={e=>setUNotes(e.target.value)} /></div>
+                  <div className="mb-3"><label className="form-label small">{t('documents.notes')}</label><textarea className="form-control form-control-sm" rows={2} value={uNotes} onChange={e=>setUNotes(e.target.value)} /></div>
                   <button className="btn rounded-pill px-4 text-white" style={{background:'linear-gradient(135deg,#0d6efd,#6610f2)'}}
                     onClick={()=>uploadMut.mutate()} disabled={!uf||uploadMut.isPending}>
-                    {uploadMut.isPending?<><span className="spinner-border spinner-border-sm me-1"></span>Uploading...</>:<><i className="bi bi-cloud-upload me-1"></i>Upload & Secure</>}
+                    {uploadMut.isPending?<><span className="spinner-border spinner-border-sm me-1"></span>{t('documents.uploading')}</>:<><i className="bi bi-cloud-upload me-1"></i>{t('documents.uploadSecure')}</>}
                   </button>
                   {uErr && <div className="alert alert-danger small mt-2 mb-0">{uErr}</div>}
                 </>) : (
                   <div className="text-center py-3">
                     <i className="bi bi-check-circle text-success" style={{fontSize:'3rem'}}></i>
-                    <h5>Uploaded!</h5>
+                    <h5>{t('documents.uploaded')}</h5>
                     <p className="small text-muted">{uRes.originalName}</p>
                     <div className="card bg-primary bg-opacity-10 mx-auto mb-3" style={{maxWidth:'260px',borderRadius:'16px'}}>
                       <div className="card-body text-center py-3">
-                        <small className="text-muted">ACCESS CODE</small>
+                        <small className="text-muted">{t('documents.accessCode')}</small>
                         <span className="d-block fw-bold text-primary" style={{fontSize:'2.2rem',letterSpacing:'0.3em',fontFamily:'monospace'}}>{uRes.accessCode}</span>
                       </div>
                     </div>
-                    <button className="btn btn-outline-primary btn-sm me-2 rounded-pill" onClick={()=>navigator.clipboard.writeText(uRes.accessCode)}><i className="bi bi-clipboard me-1"></i>Copy</button>
-                    <button className="btn btn-primary btn-sm rounded-pill" onClick={()=>{setUf(null);setURes(null);if(fi.current)fi.current.value='';}}><i className="bi bi-plus-circle me-1"></i>Upload Another</button>
+                    <button className="btn btn-outline-primary btn-sm me-2 rounded-pill" onClick={()=>navigator.clipboard.writeText(uRes.accessCode)}><i className="bi bi-clipboard me-1"></i>{t('documents.copy')}</button>
+                    <button className="btn btn-primary btn-sm rounded-pill" onClick={()=>{setUf(null);setURes(null);if(fi.current)fi.current.value='';}}><i className="bi bi-plus-circle me-1"></i>{t('documents.uploadAnother')}</button>
                   </div>
                 )}
               </div>
@@ -216,16 +218,16 @@ export default function DocumentsPage() {
           </div>
           <div className="col-lg-5">
             <div className="card border-0 shadow-sm" style={{borderRadius:'16px'}}>
-              <div className="card-header bg-white py-3"><h6 className="mb-0 fw-bold"><i className="bi bi-cpu me-2 text-info"></i>Smart Document Links</h6></div>
+              <div className="card-header bg-white py-3"><h6 className="mb-0 fw-bold"><i className="bi bi-cpu me-2 text-info"></i>{t('documents.smartLinks')}</h6></div>
               <div className="card-body small">
-                <p className="text-muted mb-2">Link documents to patient workflows:</p>
+                <p className="text-muted mb-2">{t('documents.smartLinksHint')}</p>
                 {[
-                  {c:'registration',t:'Registration — Attach ID cards, consent forms'},
-                  {c:'lab',t:'Lab Results — CBC, metabolic panels, malaria tests'},
-                  {c:'billing',t:'Billing — Invoices, NHIS claims, receipts'},
-                  {c:'insurance',t:'Insurance — Policy documents, NHIS cards'},
-                  {c:'imaging',t:'Imaging — X-rays, ultrasound, DICOM'},
-                  {c:'prescription',t:'Prescriptions — eRx records, pharmacy orders'},
+                  {c:'registration',t:t('documents.links.registration')},
+                  {c:'lab',t:t('documents.links.lab')},
+                  {c:'billing',t:t('documents.links.billing')},
+                  {c:'insurance',t:t('documents.links.insurance')},
+                  {c:'imaging',t:t('documents.links.imaging')},
+                  {c:'prescription',t:t('documents.links.prescription')},
                 ].map((l,i)=>(
                   <div key={i} className="d-flex gap-2 mb-1 align-items-center">
                     <i className={`bi ${CATEGORIES.find(c=>c.value===l.c)?.icon||'bi-file'}`} style={{color:CATEGORIES.find(c=>c.value===l.c)?.color}}></i>
@@ -242,12 +244,12 @@ export default function DocumentsPage() {
       {view!=='upload' && (
         <div className="card border-0 shadow-sm" style={{borderRadius:'16px'}}>
           <div className="card-header bg-white d-flex justify-content-between py-3">
-            <h6 className="mb-0 fw-bold"><i className="bi bi-files me-2"></i>{view==='my'?'My Documents':'All Documents'}</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-files me-2"></i>{view==='my'?t('documents.myDocuments'):t('documents.allDocuments')}</h6>
             <span className="badge rounded-pill bg-primary">{filtered.length}</span>
           </div>
           <div className="card-body p-0">
             <table className="table table-hover mb-0 small">
-              <thead className="table-light"><tr><th>Document</th><th>Category</th><th>Patient</th><th>Status</th>{view==='my'&&<th>Code</th>}<th>Uploaded</th><th></th></tr></thead>
+              <thead className="table-light"><tr><th>{t('documents.cols.document')}</th><th>{t('documents.cols.category')}</th><th>{t('documents.cols.patient')}</th><th>{t('documents.cols.status')}</th>{view==='my'&&<th>{t('documents.cols.code')}</th>}<th>{t('documents.cols.uploaded')}</th><th></th></tr></thead>
               <tbody>
                 {filtered.map((doc:DocumentItem)=>{
                   const cat = CATEGORIES.find(c=>c.value===doc.category);
@@ -261,15 +263,15 @@ export default function DocumentsPage() {
                       </td>
                       <td><span className="badge small" style={{backgroundColor:`${cat?.color||'#6c757d'}20`,color:cat?.color,border:`1px solid ${cat?.color}`}}>{cat?.label||doc.category}</span></td>
                       <td>{doc.pid?<span>#{doc.pid}</span>:<span className="text-muted">—</span>}</td>
-                      <td><span className={`badge small rounded-pill ${STATUS_LABELS[doc.status]?.badge||'bg-secondary'}`}>{STATUS_LABELS[doc.status]?.label||doc.status}</span></td>
+                      <td><span className={`badge small rounded-pill ${STATUS_LABELS[doc.status]?.badge||'bg-secondary'}`}>{t('documents.status.' + doc.status, { defaultValue: STATUS_LABELS[doc.status]?.label || doc.status })}</span></td>
                       {view==='my'&&<td>{doc.plainCode?<span className="fw-bold text-primary" style={{fontFamily:'monospace',cursor:'pointer'}} onClick={()=>navigator.clipboard.writeText(doc.plainCode!)}>{doc.plainCode}</span>:<span className="text-muted">—</span>}</td>}
                       <td><small>{doc.uploadedBy||'—'}</small><br/><small className="text-muted">{fd(doc.createdAt)}</small></td>
-                      <td><button className="btn btn-outline-primary btn-sm rounded-pill" onClick={()=>{setSelDoc(doc);setAc('');setAcErr('');setAcOk('');}}><i className="bi bi-unlock me-1"></i>View</button></td>
+                      <td><button className="btn btn-outline-primary btn-sm rounded-pill" onClick={()=>{setSelDoc(doc);setAc('');setAcErr('');setAcOk('');}}><i className="bi bi-unlock me-1"></i>{t('documents.view')}</button></td>
                     </tr>
                   );
                 })}
                 {filtered.length===0 && <tr><td colSpan={view==='my'?7:6} className="text-center text-muted py-5">
-                  <i className="bi bi-cloud-upload fs-1 d-block mb-2 opacity-50"></i><p>No documents found</p>
+                  <i className="bi bi-cloud-upload fs-1 d-block mb-2 opacity-50"></i><p>{t('documents.noDocuments')}</p>
                   <button className="btn btn-primary btn-sm rounded-pill" onClick={()=>setView('upload')}><i className="bi bi-plus-circle me-1"></i>Upload</button>
                 </td></tr>}
               </tbody>
@@ -284,7 +286,7 @@ export default function DocumentsPage() {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow" style={{borderRadius:'16px'}}>
               <div className="modal-header text-white py-2" style={{background:'linear-gradient(135deg,#0d6efd,#6610f2)',borderRadius:'16px 16px 0 0'}}>
-                <h6 className="modal-title"><i className="bi bi-lock-fill me-2"></i>Secure Access</h6>
+                <h6 className="modal-title"><i className="bi bi-lock-fill me-2"></i>{t('documents.secureAccess')}</h6>
                 <button className="btn-close btn-close-white" onClick={()=>{setSelDoc(null);setAcErr('');setAcOk('');}}></button>
               </div>
               <div className="modal-body text-center py-4">
@@ -299,7 +301,7 @@ export default function DocumentsPage() {
                   {acErr && <div className="alert alert-danger small py-2">{acErr}</div>}
                   <button className="btn rounded-pill px-4 text-white" style={{background:'linear-gradient(135deg,#0d6efd,#6610f2)'}}
                     onClick={()=>verifyMut.mutate({id:selDoc.id,code:ac})} disabled={ac.length!==4||verifyMut.isPending}>
-                    {verifyMut.isPending?<><span className="spinner-border spinner-border-sm me-1"></span>Verifying...</>:<><i className="bi bi-unlock me-1"></i>Unlock</>}
+                    {verifyMut.isPending?<><span className="spinner-border spinner-border-sm me-1"></span>{t('documents.verifying')}</> : <><i className="bi bi-unlock me-1"></i>{t('documents.unlock')}</>}
                   </button>
                 </>}
               </div>

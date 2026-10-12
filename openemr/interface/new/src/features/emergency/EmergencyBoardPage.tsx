@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateTime } from '../../utils/date';
 import { patientChartPath } from '../../utils/patientChart';
-import { levelMeta, orderVisits, waitClock } from '../../utils/triage';
+import { levelMeta, levelMeaning, orderVisits, waitClock } from '../../utils/triage';
 import RegisterPatientModal from '../patients/components/RegisterPatientModal';
 import { LevelBadge, TriageLegend } from './components/LevelBadge';
 import { EMPTY_OBSERVATIONS, ObservationFields, ObservationValues, observationCompleteness, observationPayload } from './components/ObservationFields';
@@ -34,14 +35,16 @@ import {
 /** How often the board re-reads the department. */
 const REFRESH_MS = 20000;
 
-const CLOSE_ACTIONS: { status: string; label: string; icon: string; disposition: string; tone: string }[] = [
-  { status: 'admitted', label: 'Admit', icon: 'bi-hospital', disposition: 'Admitted to ward', tone: 'outline-primary' },
-  { status: 'discharged', label: 'Discharge', icon: 'bi-box-arrow-right', disposition: 'Discharged home', tone: 'outline-success' },
-  { status: 'transferred', label: 'Transfer', icon: 'bi-arrow-left-right', disposition: 'Transferred to another facility', tone: 'outline-secondary' },
-  { status: 'lwbs', label: 'Left before seen', icon: 'bi-person-walking', disposition: 'Left without being seen', tone: 'outline-danger' },
+/** Close-out actions, labelled from the catalogue by `status`. */
+const CLOSE_ACTIONS: { status: string; icon: string; disposition: string; tone: string }[] = [
+  { status: 'admitted', icon: 'bi-hospital', disposition: 'Admitted to ward', tone: 'outline-primary' },
+  { status: 'discharged', icon: 'bi-box-arrow-right', disposition: 'Discharged home', tone: 'outline-success' },
+  { status: 'transferred', icon: 'bi-arrow-left-right', disposition: 'Transferred to another facility', tone: 'outline-secondary' },
+  { status: 'lwbs', icon: 'bi-person-walking', disposition: 'Left without being seen', tone: 'outline-danger' },
 ];
 
 export default function EmergencyBoardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -79,7 +82,7 @@ export default function EmergencyBoardPage() {
 
   // Waiting clocks tick locally so the board does not freeze between refetches.
   useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 20000);
+    const timer = setInterval(() => setTick((n) => n + 1), 20000);
     return () => clearInterval(timer);
   }, []);
 
@@ -130,7 +133,7 @@ export default function EmergencyBoardPage() {
         const r = await nestClient.get(`/patients/${preselectedChartId}`);
         if (!cancelled && r.data) setChosen(r.data);
       } catch {
-        if (!cancelled) say('warning', `Could not load patient ${preselectedChartId}.`);
+        if (!cancelled) say('warning', t('emergency.toast.loadPatientFailed', { chart: preselectedChartId }));
       }
     })();
     return () => { cancelled = true; };
@@ -156,9 +159,9 @@ export default function EmergencyBoardPage() {
     try {
       const r = await nestClient.get(`/patients/${result.id}`);
       setChosen(r.data);
-      say('success', `${r.data.fname} ${r.data.lname} registered — chart ${result.publicId}. Record observations and triage.`);
+      say('success', t('emergency.toast.registeredTriaged', { name: `${r.data.fname} ${r.data.lname}`, chart: result.publicId }));
     } catch {
-      say('warning', `Registered as chart ${result.publicId}, but the record could not be re-read. Search for the name to triage.`);
+      say('warning', t('emergency.toast.registeredNoReread', { chart: result.publicId }));
     }
     // The register and the nurse dashboard both read patient lists.
     queryClient.invalidateQueries({ queryKey: ['patients'] });
@@ -196,7 +199,7 @@ export default function EmergencyBoardPage() {
   const preview = useMutation({
     mutationFn: () => previewTriage(chosen!.pid, triageBody()),
     onSuccess: (data) => setSuggestion(data),
-    onError: () => say('danger', 'Could not score this presentation.'),
+    onError: () => say('danger', t('emergency.toast.scoreFailed')),
   });
 
   const recordArrival = useMutation({
@@ -204,8 +207,13 @@ export default function EmergencyBoardPage() {
     onSuccess: (visit: any) => {
       say(
         visit.level <= 2 ? 'danger' : 'success',
-        `${visit.patientName}: level ${visit.level} ${visit.label} — seen within ${visit.targetMinutes === 0 ? 'now' : `${visit.targetMinutes} min`}.` +
-          (visit.assignment?.assignedNurseName ? ` Assigned to ${visit.assignment.assignedNurseName}.` : ''),
+        t('emergency.toast.arrivalRecorded', {
+          name: visit.patientName,
+          level: visit.level,
+          label: visit.label,
+          target: visit.targetMinutes === 0 ? t('emergency.toast.targetNow') : t('emergency.target.minutes', { count: visit.targetMinutes }),
+        }) +
+          (visit.assignment?.assignedNurseName ? ' ' + t('emergency.toast.assignedNurse', { name: visit.assignment.assignedNurseName }) : ''),
       );
       setChosen(null);
       setFindQuery('');
@@ -219,7 +227,7 @@ export default function EmergencyBoardPage() {
       setOpenVisit(visit.id);
       refresh();
     },
-    onError: (err: any) => say('danger', err?.response?.data?.message || 'Could not record the arrival.'),
+    onError: (err: any) => say('danger', err?.response?.data?.message || t('emergency.toast.arrivalFailed')),
   });
 
   const reassess = useMutation({
@@ -237,25 +245,31 @@ export default function EmergencyBoardPage() {
       say(
         moved && r.deEscalated ? 'warning' : moved ? 'danger' : 'success',
         moved
-          ? `${visit.patientName}: level ${r.levelBefore} → ${r.levelAfter}${r.escalatedForDelay ? ' (raised by the waiting-time check)' : ''}.`
-          : `${visit.patientName}: level unchanged at ${r.levelAfter}.`,
+          ? t('emergency.toast.reassessMoved', {
+              name: visit.patientName,
+              before: r.levelBefore,
+              after: r.levelAfter,
+              delay: r.escalatedForDelay ? t('emergency.toast.reassessMovedDelay') : '',
+            })
+          : t('emergency.toast.reassessUnchanged', { name: visit.patientName, level: r.levelAfter }),
       );
       setReassessFor(null);
       setReassessObs({ ...EMPTY_OBSERVATIONS });
       setReassessNote('');
       refresh();
     },
-    onError: (err: any) => say('warning', err?.response?.data?.message || 'Could not record the reassessment.'),
+    onError: (err: any) => say('warning', err?.response?.data?.message || t('emergency.toast.reassessFailed')),
   });
 
   const moveVisit = useMutation({
     mutationFn: ({ id, status, disposition, room }: { id: number; status: string; disposition?: string; room?: string }) =>
       updateVisitStatus(id, { status, disposition, room }),
     onSuccess: (visit: any) => {
-      say('success', `${visit.patientName} → ${visit.status}${visit.disposition ? ` (${visit.disposition})` : ''}`);
+      const disposition = visit.disposition ? t('emergency.toast.moveDisposition', { disposition: visit.disposition }) : '';
+      say('success', t('emergency.toast.moveSuccess', { name: visit.patientName, status: visit.status, disposition }));
       refresh();
     },
-    onError: () => say('danger', 'Could not move this patient along.'),
+    onError: () => say('danger', t('emergency.toast.moveFailed')),
   });
 
   const escalateNow = useMutation({
@@ -265,12 +279,12 @@ export default function EmergencyBoardPage() {
       say(
         list.length ? 'warning' : 'success',
         list.length
-          ? `${list.length} patient${list.length === 1 ? '' : 's'} escalated for waiting too long.`
-          : 'Everyone is inside their target.',
+          ? t('emergency.toast.escalatedCount', { count: list.length })
+          : t('emergency.toast.allInTarget'),
       );
       refresh();
     },
-    onError: () => say('danger', 'Could not run the escalation check.'),
+    onError: () => say('danger', t('emergency.toast.escalateFailed')),
   });
 
   /**
@@ -298,28 +312,28 @@ export default function EmergencyBoardPage() {
       {/* Header */}
       <div className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
-          <h4 className="fw-bold mb-1"><i className="bi bi-heart-pulse-fill me-2 text-danger"></i>Emergency Department</h4>
+          <h4 className="fw-bold mb-1"><i className="bi bi-heart-pulse-fill me-2 text-danger"></i>{t('emergency.title')}</h4>
           <div className="d-flex flex-wrap align-items-center gap-3">
             <TriageLegend />
-            <span className="text-muted small">{board?.generatedAt ? `updated ${formatDateTime(board.generatedAt)}` : 'loading…'}</span>
+            <span className="text-muted small">{board?.generatedAt ? t('emergency.updatedAt', { when: formatDateTime(board.generatedAt) }) : t('emergency.loadingBoard')}</span>
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
           <div className="btn-group">
             <button className={`btn btn-sm ${tab === 'board' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setTab('board')}>
-              <i className="bi bi-list-ul me-1"></i>Board
+              <i className="bi bi-list-ul me-1"></i>{t('emergency.tabBoard')}
             </button>
             <button className={`btn btn-sm ${tab === 'metrics' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setTab('metrics')}>
-              <i className="bi bi-graph-up me-1"></i>Metrics
+              <i className="bi bi-graph-up me-1"></i>{t('emergency.tabMetrics')}
             </button>
           </div>
           <button className="btn btn-sm btn-outline-secondary" onClick={refresh}>
-            <i className="bi bi-arrow-clockwise me-1"></i>Refresh
+            <i className="bi bi-arrow-clockwise me-1"></i>{t('emergency.refresh')}
           </button>
           {canEscalate && (
             <button className="btn btn-sm btn-outline-warning" onClick={() => escalateNow.mutate()} disabled={escalateNow.isPending}
-              title="Escalate anyone past their target now, instead of waiting for the scheduled check">
-              <i className="bi bi-lightning-charge me-1"></i>Check breaches
+              title={t('emergency.checkBreachesHint')}>
+              <i className="bi bi-lightning-charge me-1"></i>{t('emergency.checkBreaches')}
             </button>
           )}
         </div>
@@ -335,12 +349,12 @@ export default function EmergencyBoardPage() {
       {/* Counts */}
       <div className="row g-2 mb-3">
         {[
-          { v: counts.active ?? 0, l: 'In department', c: '#0d6efd', i: 'bi-people-fill' },
-          { v: counts.waiting ?? 0, l: 'Waiting', c: '#6f42c1', i: 'bi-hourglass' },
-          { v: counts.breached ?? 0, l: 'Past target', c: '#dc3545', i: 'bi-exclamation-octagon' },
-          { v: counts.reassessOverdue ?? 0, l: 'Reassessment due', c: '#fd7e14', i: 'bi-arrow-repeat' },
-          { v: counts.needsVitals ?? 0, l: 'Observations missing', c: '#198754', i: 'bi-thermometer-half' },
-          { v: counts.awaitingFirstReview ?? 0, l: 'Not yet seen', c: '#6c757d', i: 'bi-person-dash' },
+          { v: counts.active ?? 0, l: t('emergency.countInDepartment'), c: '#0d6efd', i: 'bi-people-fill' },
+          { v: counts.waiting ?? 0, l: t('emergency.countWaiting'), c: '#6f42c1', i: 'bi-hourglass' },
+          { v: counts.breached ?? 0, l: t('emergency.countBreached'), c: '#dc3545', i: 'bi-exclamation-octagon' },
+          { v: counts.reassessOverdue ?? 0, l: t('emergency.countReassessDue'), c: '#fd7e14', i: 'bi-arrow-repeat' },
+          { v: counts.needsVitals ?? 0, l: t('emergency.countNeedsVitals'), c: '#198754', i: 'bi-thermometer-half' },
+          { v: counts.awaitingFirstReview ?? 0, l: t('emergency.countNotSeen'), c: '#6c757d', i: 'bi-person-dash' },
         ].map((card) => (
           <div className="col-6 col-md-4 col-lg-2" key={card.l}>
             <div className="card border-0 shadow-sm h-100">
@@ -377,22 +391,22 @@ export default function EmergencyBoardPage() {
             <div className="card border-0 shadow-sm">
               <div className="card-header bg-white d-flex justify-content-between align-items-center py-3">
                 <div className="d-flex align-items-center gap-2">
-                  <span className="fw-semibold">Waiting room</span>
+                  <span className="fw-semibold">{t('emergency.waitingRoom')}</span>
                   <span className="badge bg-primary rounded-pill">{visits.length}</span>
                 </div>
-                <small className="text-muted">sickest first, then longest past their target</small>
+                <small className="text-muted">{t('emergency.sortingNote')}</small>
               </div>
               <div className="card-body p-0">
                 {isLoading && (
                   <div className="text-center text-muted py-5">
-                    <span className="spinner-border spinner-border-sm me-2"></span>Loading the department…
+                    <span className="spinner-border spinner-border-sm me-2"></span>{t('emergency.loadingDepartment')}
                   </div>
                 )}
                 {!isLoading && visits.length === 0 && (
                   <div className="text-center text-muted py-5">
                     <i className="bi bi-clipboard2-check fs-1 d-block mb-2 opacity-50"></i>
-                    <p className="mb-0">The department is empty.</p>
-                    <small>Record an arrival from the panel on the right.</small>
+                    <p className="mb-0">{t('emergency.emptyDepartment')}</p>
+                    <small>{t('emergency.emptyDepartmentHint')}</small>
                   </div>
                 )}
                 {visits.map((visit: any) => {
@@ -407,26 +421,26 @@ export default function EmergencyBoardPage() {
                         <LevelBadge level={visit.level} size="md" />
                         <div className="flex-grow-1 min-width-0">
                           <div className="d-flex flex-wrap align-items-center gap-2">
-                            <strong>{visit.patientName || `PID ${visit.pid}`}</strong>
+                            <strong>{visit.patientName || t('emergency.pidLabel', { pid: visit.pid })}</strong>
                             <small className="text-muted">
-                              {visit.ageYears !== null && visit.ageYears !== undefined ? `${visit.ageYears}y` : 'age unknown'}
+                              {visit.ageYears !== null && visit.ageYears !== undefined ? t('emergency.ageYears', { count: visit.ageYears }) : t('emergency.ageUnknown')}
                               {visit.sex ? ` · ${visit.sex}` : ''}
                               {visit.room ? ` · ${visit.room}` : ''}
                             </small>
-                            {visit.needsVitals && <span className="badge bg-success-subtle text-success">observations missing</span>}
-                            {visit.escalatedLevel !== null && <span className="badge bg-danger-subtle text-danger">escalated for delay</span>}
-                            {clock.reassessOverdue && <span className="badge bg-warning-subtle text-warning">reassess due</span>}
+                            {visit.needsVitals && <span className="badge bg-success-subtle text-success">{t('emergency.observationsMissing')}</span>}
+                            {visit.escalatedLevel !== null && <span className="badge bg-danger-subtle text-danger">{t('emergency.escalatedForDelay')}</span>}
+                            {clock.reassessOverdue && <span className="badge bg-warning-subtle text-warning">{t('emergency.reassessDue')}</span>}
                           </div>
-                          <div className="text-truncate small text-muted">{visit.chiefComplaint || 'no presenting complaint recorded'}</div>
+                          <div className="text-truncate small text-muted">{visit.chiefComplaint || t('emergency.noComplaint')}</div>
                           <div className="d-flex flex-wrap align-items-center gap-2 mt-1">
                             <span className={`badge ${clock.breached ? 'bg-danger' : 'bg-light text-dark'}`}>
                               <i className="bi bi-clock me-1"></i>{clock.text}
                               {clock.breached
-                                ? ` · ${clock.overByMinutes}m over the ${visit.targetMinutes}m target`
-                                : ` of the ${visit.targetMinutes}m target`}
+                                ? t('emergency.overTarget', { over: clock.overByMinutes, target: visit.targetMinutes })
+                                : t('emergency.ofTarget', { target: visit.targetMinutes })}
                             </span>
                             <span className="badge bg-light text-secondary">NEWS2 {visit.news2}</span>
-                            <span className="badge bg-light text-secondary">priority {visit.priority}</span>
+                            <span className="badge bg-light text-secondary">{t('emergency.priorityBadge', { count: visit.priority })}</span>
                             <span className="badge bg-light text-secondary">{visit.mode}</span>
                           </div>
                         </div>
@@ -438,8 +452,8 @@ export default function EmergencyBoardPage() {
                         <div className="px-3 pb-3">
                           <div className="small text-muted mb-2">
                             <i className="bi bi-lightbulb me-1"></i>
-                            {meta.meaning} · arrived {formatDateTime(visit.arrivedAt)}
-                            {visit.doorToProviderMinutes !== null ? ` · seen after ${visit.doorToProviderMinutes}m` : ''}
+                            {levelMeaning(visit.level)} · {t('emergency.arrivedAt', { when: formatDateTime(visit.arrivedAt) })}
+                            {visit.doorToProviderMinutes !== null ? t('emergency.seenAfter', { count: visit.doorToProviderMinutes }) : ''}
                           </div>
                           {visit.reasons?.length > 0 && (
                             <ul className="small mb-2 ps-3">
@@ -447,7 +461,7 @@ export default function EmergencyBoardPage() {
                             </ul>
                           )}
                           {visit.modifiers?.length > 0 && (
-                            <div className="small mb-2"><span className="text-muted">Risk factors:</span> {visit.modifiers.join(', ')}</div>
+                            <div className="small mb-2"><span className="text-muted">{t('emergency.riskFactors')}</span> {visit.modifiers.join(', ')}</div>
                           )}
                           {visit.escalatedReason && (
                             <div className="alert alert-warning py-2 small mb-2">
@@ -457,24 +471,24 @@ export default function EmergencyBoardPage() {
                           <div className="d-flex flex-wrap gap-2">
                             {canDispose && visit.status === 'waiting' && (
                               <button className="btn btn-sm btn-success" onClick={() => moveVisit.mutate({ id: visit.id, status: 'in_treatment' })}>
-                                <i className="bi bi-play-fill me-1"></i>Start treatment
+                                <i className="bi bi-play-fill me-1"></i>{t('emergency.startTreatment')}
                               </button>
                             )}
                             {canDispose && (
                               <button className="btn btn-sm btn-outline-primary"
                                 onClick={() => { setReassessFor(visit); setReassessObs({ ...EMPTY_OBSERVATIONS }); setReassessNote(''); }}>
-                                <i className="bi bi-arrow-repeat me-1"></i>Reassess
+                                <i className="bi bi-arrow-repeat me-1"></i>{t('emergency.reassess')}
                               </button>
                             )}
                             {canDispose && CLOSE_ACTIONS.map((action) => (
                               <button key={action.status} className={`btn btn-sm btn-${action.tone}`}
                                 onClick={() => moveVisit.mutate({ id: visit.id, status: action.status, disposition: action.disposition })}>
-                                <i className={`bi ${action.icon} me-1`}></i>{action.label}
+                                <i className={`bi ${action.icon} me-1`}></i>{t(`emergency.close.${action.status}`)}
                               </button>
                             ))}
                             {chartHref && (
                               <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate(chartHref)}>
-                                <i className="bi bi-person-vcard me-1"></i>Open chart
+                                <i className="bi bi-person-vcard me-1"></i>{t('emergency.openChart')}
                               </button>
                             )}
                           </div>
@@ -492,37 +506,36 @@ export default function EmergencyBoardPage() {
           <div className="col-lg-4">
             <div className="card border-0 shadow-sm mb-3">
               <div className="card-header bg-white py-3">
-                <span className="fw-semibold"><i className="bi bi-person-plus me-1"></i>Record an arrival</span>
+                <span className="fw-semibold"><i className="bi bi-person-plus me-1"></i>{t('emergency.arrival.title')}</span>
               </div>
               <div className="card-body">
                 {!canTriage ? (
-                  <p className="text-muted small mb-0">Your role cannot triage patients.</p>
+                  <p className="text-muted small mb-0">{t('emergency.arrival.noPermission')}</p>
                 ) : !chosen ? (
                   <>
-                    <input className="form-control form-control-sm mb-2" placeholder="Search the patient by name, ID or phone…"
+                    <input className="form-control form-control-sm mb-2" placeholder={t('emergency.arrival.searchPlaceholder')}
                       value={findQuery} onChange={(e) => setFindQuery(e.target.value)} />
                     {findQuery.trim().length >= 2 && (
                       <div className="border rounded-3" style={{ maxHeight: '220px', overflowY: 'auto' }}>
-                        {searchResults.length === 0 && <div className="text-muted small p-2">No patient matches “{findQuery}”.</div>}
+                        {searchResults.length === 0 && <div className="text-muted small p-2">{t('emergency.arrival.noMatch', { query: findQuery })}</div>}
                         {searchResults.map((p: any) => (
                           <button key={p.id} type="button" className="btn btn-link text-decoration-none text-start w-100 border-bottom py-2 px-3"
                             onClick={() => setChosen(p)}>
                             <span className="fw-semibold small">{p.lname}, {p.fname}</span>
                             <span className="text-muted small ms-2">
-                              {p.DOB ? `DOB ${String(p.DOB).slice(0, 10)}` : ''}{p.sex ? ` · ${p.sex}` : ''}
+                              {p.DOB ? t('emergency.arrival.dob', { date: String(p.DOB).slice(0, 10) }) : ''}{p.sex ? ` · ${p.sex}` : ''}
                             </span>
                           </button>
                         ))}
                       </div>
                     )}
                     <small className="text-muted d-block mt-2">
-                      Search the existing register — an attendance is filed against a real chart, never a placeholder, so it
-                      can be found again.
+                      {t('emergency.arrival.registerNote')}
                     </small>
                     <div className="d-flex align-items-center gap-2 mt-2 pt-2 border-top">
-                      <span className="small text-muted">Not registered here yet?</span>
+                      <span className="small text-muted">{t('emergency.arrival.notRegistered')}</span>
                       <button className="btn btn-sm btn-outline-success rounded-pill ms-auto" onClick={() => setRegisterOpen(true)}>
-                        <i className="bi bi-person-plus me-1"></i>Register the patient
+                        <i className="bi bi-person-plus me-1"></i>{t('emergency.arrival.registerPatient')}
                       </button>
                     </div>
                   </>
@@ -531,68 +544,68 @@ export default function EmergencyBoardPage() {
                     <div className="alert alert-primary py-2 d-flex align-items-center gap-2">
                       <i className="bi bi-person-check-fill"></i>
                       <span className="small">
-                        Triaging <strong>{chosen.fname} {chosen.lname}</strong>
-                        <span className="text-muted"> · pid {chosen.pid}</span>
-                        {chosen.public_id && <span className="text-muted"> · chart {chosen.public_id}</span>}
+                        {t('emergency.arrival.triaging', { name: `${chosen.fname} ${chosen.lname}` })}
+                        <span className="text-muted">{t('emergency.arrival.pid', { pid: chosen.pid })}</span>
+                        {chosen.public_id && <span className="text-muted">{t('emergency.arrival.chart', { chart: chosen.public_id })}</span>}
                       </span>
                       {(() => {
                         const href = patientChartPath(chosen.id, chosen.pid);
                         if (!href) return null;
                         return (
                           <button className="btn btn-sm btn-outline-primary rounded-pill ms-auto"
-                            title="Open the chart in a new view — it exists from the moment the patient is registered"
+                            title={t('emergency.arrival.openChartHint')}
                             onClick={() => navigate(href)}>
-                            <i className="bi bi-person-vcard me-1"></i>Chart
+                            <i className="bi bi-person-vcard me-1"></i>{t('emergency.arrival.chartButton')}
                           </button>
                         );
                       })()}
                       <button className="btn btn-sm btn-outline-secondary rounded-pill"
-                        onClick={() => { setChosen(null); setSuggestion(null); clearPreselection(); }}>Change</button>
+                        onClick={() => { setChosen(null); setSuggestion(null); clearPreselection(); }}>{t('emergency.arrival.change')}</button>
                     </div>
 
                     <div className="row g-2 mb-2">
                       <div className="col-7">
-                        <label className="form-label small mb-1">Presenting complaint</label>
-                        <input className="form-control form-control-sm" value={complaint} placeholder="e.g. chest pain since this morning"
+                        <label className="form-label small mb-1">{t('emergency.arrival.complaint')}</label>
+                        <input className="form-control form-control-sm" value={complaint} placeholder={t('emergency.arrival.complaintPlaceholder')}
                           onChange={(e) => setComplaint(e.target.value)} />
                       </div>
                       <div className="col-5">
-                        <label className="form-label small mb-1">Arrived by</label>
+                        <label className="form-label small mb-1">{t('emergency.arrival.arrivedBy')}</label>
                         <select className="form-select form-select-sm" value={arrivalMode} onChange={(e) => setArrivalMode(e.target.value)}>
-                          {['walk-in', 'ambulance', 'referral', 'police', 'transfer'].map((m) => <option key={m} value={m}>{m}</option>)}
+                          {['walk-in', 'ambulance', 'referral', 'police', 'transfer'].map((m) => <option key={m} value={m}>{t(`emergency.modes.${m}`)}</option>)}
                         </select>
                       </div>
                     </div>
 
-                    <label className="form-label small mb-1">Observations</label>
+                    <label className="form-label small mb-1">{t('emergency.arrival.observations')}</label>
                     <ObservationFields values={observations} onChange={setObservations} disabled={recordArrival.isPending} />
 
 
                     <div className="row g-2 mt-2">
                       <div className="col-6">
-                        <label className="form-label small mb-1">Resources expected</label>
+                        <label className="form-label small mb-1">{t('emergency.arrival.resources')}</label>
                         <select className="form-select form-select-sm" value={resources} onChange={(e) => setResources(e.target.value)}>
-                          <option value="">Not assessed</option>
-                          <option value="0">None</option>
-                          <option value="1">One (X-ray, sutures…)</option>
-                          <option value="2">Two</option>
-                          <option value="3">Three or more</option>
+                          <option value="">{t('emergency.arrival.resourcesNone')}</option>
+                          <option value="0">{t('emergency.arrival.resources0')}</option>
+                          <option value="1">{t('emergency.arrival.resources1')}</option>
+                          <option value="2">{t('emergency.arrival.resources2')}</option>
+                          <option value="3">{t('emergency.arrival.resources3')}</option>
                         </select>
                       </div>
                       <div className="col-6">
-                        <label className="form-label small mb-1">Gestation (if pregnant)</label>
-                        <input type="number" className="form-control form-control-sm" value={gestation} placeholder="weeks"
+                        <label className="form-label small mb-1">{t('emergency.arrival.gestation')}</label>
+                        <input type="number" className="form-control form-control-sm" value={gestation} placeholder={t('emergency.arrival.weeks')}
                           onChange={(e) => setGestation(e.target.value)} disabled={!flags.pregnant} />
                       </div>
                     </div>
 
                     <div className="d-flex flex-wrap gap-3 mt-2">
                       {([
-                        ['pregnant', 'Pregnant'],
-                        ['immunocompromised', 'Immunocompromised'],
-                        ['anticoagulated', 'Anticoagulated'],
-                        ['sickleCell', 'Sickle cell'],
-                      ] as const).map(([key, label]) => (
+                        ['pregnant', t('emergency.arrival.flagPregnant')],
+                        ['immunocompromised', t('emergency.arrival.flagImmuno')],
+                        ['anticoagulated', t('emergency.arrival.flagAnticoag')],
+                        ['sickleCell', t('emergency.arrival.flagSickle')],
+                      ] as [keyof typeof flags, string][]).map(([key, label]) => (
                         <div className="form-check form-switch" key={key}>
                           <input className="form-check-input" type="checkbox" id={`ed-flag-${key}`}
                             checked={flags[key]} onChange={(e) => setFlags({ ...flags, [key]: e.target.checked })} />
@@ -605,7 +618,7 @@ export default function EmergencyBoardPage() {
                       <input className="form-check-input" type="checkbox" id="ed-save-vitals" checked={saveToChart}
                         onChange={(e) => setSaveToChart(e.target.checked)} />
                       <label className="form-check-label small" htmlFor="ed-save-vitals">
-                        Save these observations to the chart's vitals
+                        {t('emergency.arrival.saveVitals')}
                       </label>
                     </div>
 
@@ -614,14 +627,18 @@ export default function EmergencyBoardPage() {
                         <div className="d-flex align-items-center gap-2 mb-1">
                           <LevelBadge level={suggestion.assessment.level} />
                           <span className="small text-muted">
-                            see within {suggestion.assessment.targetMinutes === 0 ? 'now' : `${suggestion.assessment.targetMinutes} min`}
+                            {t('emergency.arrival.seeWithin', {
+                              target: suggestion.assessment.targetMinutes === 0
+                                ? t('emergency.toast.targetNow')
+                                : t('emergency.target.minutes', { count: suggestion.assessment.targetMinutes }),
+                            })}
                           </span>
                         </div>
                         <ul className="small mb-1 ps-3">
                           {suggestion.assessment.reasons.map((reason: string, i: number) => <li key={i}>{reason}</li>)}
                         </ul>
                         {suggestion.assessment.modifiers?.length > 0 && (
-                          <div className="small text-muted">Factors: {suggestion.assessment.modifiers.join(', ')}</div>
+                          <div className="small text-muted">{t('emergency.arrival.factors', { list: suggestion.assessment.modifiers.join(', ') })}</div>
                         )}
                         {suggestion.band?.abnormal?.length > 0 && (
                           <div className="small mt-1" style={{ color: '#dc3545' }}>
@@ -634,7 +651,7 @@ export default function EmergencyBoardPage() {
                           </div>
                         )}
                         <div className="small text-muted mt-1">
-                          <i className="bi bi-shield-check me-1"></i>Advisory only — you assign the final level.
+                          <i className="bi bi-shield-check me-1"></i>{t('emergency.arrival.advisory')}
                         </div>
                       </div>
                     )}
@@ -645,19 +662,19 @@ export default function EmergencyBoardPage() {
                         {preview.isPending
                           ? <span className="spinner-border spinner-border-sm me-1"></span>
                           : <i className="bi bi-calculator me-1"></i>}
-                        Preview level
+                        {t('emergency.arrival.preview')}
                       </button>
                       <button className="btn btn-sm btn-danger" onClick={() => recordArrival.mutate()} disabled={recordArrival.isPending}>
                         {recordArrival.isPending
                           ? <span className="spinner-border spinner-border-sm me-1"></span>
                           : <i className="bi bi-check2-circle me-1"></i>}
-                        Record &amp; triage
+                        {t('emergency.arrival.record')}
                       </button>
                     </div>
                     {!completeness.complete && (
                       <div className="small text-muted mt-2">
                         <i className="bi bi-info-circle me-1"></i>
-                        Without the full observation set the level floors at Yellow — that is the rule, not a bug.
+                        {t('emergency.arrival.floorNote')}
                       </div>
                     )}
                   </>
@@ -671,26 +688,26 @@ export default function EmergencyBoardPage() {
             {reassessFor && (
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                  <span className="fw-semibold"><i className="bi bi-arrow-repeat me-1"></i>Reassess {reassessFor.patientName}</span>
+                  <span className="fw-semibold"><i className="bi bi-arrow-repeat me-1"></i>{t('emergency.reassessPanel.title', { name: reassessFor.patientName })}</span>
                   <button className="btn btn-sm btn-light" onClick={() => setReassessFor(null)}><i className="bi bi-x-lg"></i></button>
                 </div>
                 <div className="card-body">
                   <ObservationFields values={reassessObs} onChange={setReassessObs} disabled={reassess.isPending} />
                   <div className="mt-2">
                     <label className="form-label small mb-1">
-                      Clinical reason <span className="text-muted">(required to lower the level)</span>
+                      {t('emergency.reassessPanel.reason')} <span className="text-muted">{t('emergency.reassessPanel.reasonHint')}</span>
                     </label>
                     <input className="form-control form-control-sm" value={reassessNote} onChange={(e) => setReassessNote(e.target.value)}
-                      placeholder="e.g. findings explained by viral illness, safe to de-escalate" />
+                      placeholder={t('emergency.reassessPanel.reasonPlaceholder')} />
                   </div>
                   <div className="d-flex gap-2 mt-3">
                     <button className="btn btn-sm btn-primary" onClick={() => reassess.mutate()} disabled={reassess.isPending}>
                       {reassess.isPending
                         ? <span className="spinner-border spinner-border-sm me-1"></span>
                         : <i className="bi bi-save me-1"></i>}
-                      Save reassessment
+                      {t('emergency.reassessPanel.save')}
                     </button>
-                    <small className="text-muted align-self-center">Worse observations escalate automatically.</small>
+                    <small className="text-muted align-self-center">{t('emergency.reassessPanel.note')}</small>
                   </div>
                 </div>
               </div>
@@ -711,12 +728,12 @@ export default function EmergencyBoardPage() {
         onClose={() => setRegisterOpen(false)}
         onRegistered={handleRegistered}
         status="active"
-        title="Register an emergency patient"
-        submitLabel="Register & triage"
+        title={t('emergency.register.title')}
+        submitLabel={t('emergency.register.submit')}
         headerNote={
           <p className="text-muted small mb-0 mt-1">
             <i className="bi bi-info-circle me-1"></i>
-            This creates a normal patient record and chart. Record observations and the triage level next.
+            {t('emergency.register.note')}
           </p>
         }
       />
@@ -749,6 +766,7 @@ function MetricsPanel({
   onRetry: () => void;
   role?: string;
 }) {
+  const { t } = useTranslation();
   if (error && !stats) {
     const state = describeEmergencyError(error);
     return (
@@ -759,15 +777,15 @@ function MetricsPanel({
           <p className="text-muted small mb-3" style={{ maxWidth: '520px', margin: '0 auto' }}>{state.detail}</p>
           {state.canRetry ? (
             <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={onRetry}>
-              <i className="bi bi-arrow-clockwise me-1"></i>Try again
+              <i className="bi bi-arrow-clockwise me-1"></i>{t('emergency.metrics.tryAgain')}
             </button>
           ) : (
             <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => window.location.reload()}>
-              <i className="bi bi-arrow-clockwise me-1"></i>Reload the page
+              <i className="bi bi-arrow-clockwise me-1"></i>{t('emergency.metrics.reload')}
             </button>
           )}
           <div className="text-muted mt-3" style={{ fontSize: '0.72rem' }}>
-            {role ? `Signed in as ${role}` : ''}{state.status ? ` · HTTP ${state.status}` : ''}
+            {role ? t('emergency.metrics.signedInAs', { role }) : ''}{state.status ? t('emergency.metrics.httpStatus', { status: state.status }) : ''}
           </div>
         </div>
       </div>
@@ -777,7 +795,7 @@ function MetricsPanel({
   if (isLoading && !stats) {
     return (
       <div className="text-center text-muted py-5">
-        <span className="spinner-border spinner-border-sm me-2"></span>Loading departmental metrics…
+        <span className="spinner-border spinner-border-sm me-2"></span>{t('emergency.metrics.loading')}
       </div>
     );
   }
@@ -788,28 +806,28 @@ function MetricsPanel({
       <div className="card border-0 shadow-sm">
         <div className="card-body text-center py-5">
           <i className="bi bi-inbox fs-1 d-block mb-3 text-muted opacity-50"></i>
-          <h6 className="fw-bold mb-2">No metrics to show</h6>
-          <p className="text-muted small mb-3">The server returned no figures for this window.</p>
+          <h6 className="fw-bold mb-2">{t('emergency.metrics.noneTitle')}</h6>
+          <p className="text-muted small mb-3">{t('emergency.metrics.noneDetail')}</p>
           <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={onRetry}>
-            <i className="bi bi-arrow-clockwise me-1"></i>Try again
+            <i className="bi bi-arrow-clockwise me-1"></i>{t('emergency.metrics.tryAgain')}
           </button>
         </div>
       </div>
     );
   }
 
-  const minutes = (value: number | null) => (value === null || value === undefined ? '—' : `${value} min`);
+  const minutes = (value: number | null) => (value === null || value === undefined ? '—' : t('emergency.target.minutes', { count: value }));
 
   return (
     <>
       <div className="row g-3 mb-3">
         {[
-          { l: 'Attendances', v: stats.attendances, s: `last ${stats.windowDays} days`, c: '#0d6efd' },
-          { l: 'Door to triage', v: minutes(stats.doorToTriageMinutes), s: 'average', c: '#6f42c1' },
-          { l: 'Door to clinician', v: minutes(stats.doorToProviderMinutes), s: 'average', c: '#198754' },
-          { l: 'Length of stay', v: minutes(stats.lengthOfStayMinutes), s: 'average', c: '#0dcaf0' },
-          { l: 'Left without being seen', v: `${stats.lwbs} (${stats.lwbsRate}%)`, s: 'safety signal', c: '#dc3545' },
-          { l: 'Escalated for delay', v: stats.escalated, s: 'waited past target', c: '#fd7e14' },
+          { l: t('emergency.metrics.cardAttendances'), v: stats.attendances, s: t('emergency.metrics.lastDays', { count: stats.windowDays }), c: '#0d6efd' },
+          { l: t('emergency.metrics.cardDoorToTriage'), v: minutes(stats.doorToTriageMinutes), s: t('emergency.metrics.suffixAverage'), c: '#6f42c1' },
+          { l: t('emergency.metrics.cardDoorToClinician'), v: minutes(stats.doorToProviderMinutes), s: t('emergency.metrics.suffixAverage'), c: '#198754' },
+          { l: t('emergency.metrics.cardLengthOfStay'), v: minutes(stats.lengthOfStayMinutes), s: t('emergency.metrics.suffixAverage'), c: '#0dcaf0' },
+          { l: t('emergency.metrics.cardLwbs'), v: `${stats.lwbs} (${stats.lwbsRate}%)`, s: t('emergency.metrics.suffixSafety'), c: '#dc3545' },
+          { l: t('emergency.metrics.cardEscalated'), v: stats.escalated, s: t('emergency.metrics.suffixWaitedPast'), c: '#fd7e14' },
         ].map((card) => (
           <div className="col-6 col-lg-2" key={card.l}>
             <div className="card border-0 shadow-sm h-100">
@@ -827,11 +845,11 @@ function MetricsPanel({
       <div className="row g-3">
         <div className="col-lg-5">
           <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-white py-3"><span className="fw-semibold">Attendances by triage level</span></div>
+            <div className="card-header bg-white py-3"><span className="fw-semibold">{t('emergency.metrics.byLevel')}</span></div>
             <div className="card-body p-0">
               <table className="table table-sm mb-0">
                 <thead>
-                  <tr className="text-muted small"><th>Level</th><th className="text-end">Patients</th><th className="text-end">Breached target</th></tr>
+                  <tr className="text-muted small"><th>{t('emergency.metrics.thLevel')}</th><th className="text-end">{t('emergency.metrics.thPatients')}</th><th className="text-end">{t('emergency.metrics.thBreached')}</th></tr>
                 </thead>
                 <tbody>
                   {(stats.byLevel || []).map((row: any) => (
@@ -846,7 +864,7 @@ function MetricsPanel({
                     </tr>
                   ))}
                   {(!stats.byLevel || stats.byLevel.length === 0) && (
-                    <tr><td colSpan={3} className="text-center text-muted small py-3">No attendances in this window.</td></tr>
+                    <tr><td colSpan={3} className="text-center text-muted small py-3">{t('emergency.metrics.noAttendances')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -856,7 +874,7 @@ function MetricsPanel({
 
         <div className="col-lg-3">
           <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-white py-3"><span className="fw-semibold">Outcomes</span></div>
+            <div className="card-header bg-white py-3"><span className="fw-semibold">{t('emergency.metrics.outcomes')}</span></div>
             <div className="card-body p-0">
               <table className="table table-sm mb-0">
                 <tbody>
@@ -867,7 +885,7 @@ function MetricsPanel({
                     </tr>
                   ))}
                   {(!stats.byDisposition || stats.byDisposition.length === 0) && (
-                    <tr><td className="text-center text-muted small py-3">Nothing yet.</td></tr>
+                    <tr><td className="text-center text-muted small py-3">{t('emergency.metrics.nothingYet')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -878,10 +896,10 @@ function MetricsPanel({
         <div className="col-lg-4">
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-              <span className="fw-semibold">Escalations</span>
+              <span className="fw-semibold">{t('emergency.metrics.escalations')}</span>
               <small className="text-muted">
                 {stats.reassessment
-                  ? `${stats.reassessment.escalated} raised · ${stats.reassessment.deEscalated} lowered on reassessment`
+                  ? t('emergency.metrics.reassessmentSummary', { raised: stats.reassessment.escalated, lowered: stats.reassessment.deEscalated })
                   : ''}
               </small>
             </div>
@@ -893,7 +911,7 @@ function MetricsPanel({
                 </div>
               )}
               {!escalationsError && escalations.length === 0 && (
-                <div className="text-muted small p-3">No escalations in this window.</div>
+                <div className="text-muted small p-3">{t('emergency.metrics.noEscalations')}</div>
               )}
               {escalations.map((entry: any) => (
                 <div key={entry.id} className="border-bottom px-3 py-2">

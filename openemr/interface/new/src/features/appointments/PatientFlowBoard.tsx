@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getAppointments } from '../../api/endpoints/appointments';
@@ -35,6 +36,13 @@ const CATEGORY_COLORS: Record<number, string> = {
 };
 
 export default function PatientFlowBoard() {
+  const { t } = useTranslation();
+  /** Flow status codes are the values posted to the API, so the code stays the
+   *  value and only the label the reader sees is translated. */
+  const statusLabel = useCallback(
+    (status: string) => t(`appointments.status.${status}`, { defaultValue: status }),
+    [t],
+  );
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -88,7 +96,7 @@ export default function PatientFlowBoard() {
     const fromAppointments = appointments.map((a: Appointment): FeedItem => {
       const status = a.pc_apptstatus || 'Scheduled';
       const style = STATUS_STYLE[status] || STATUS_STYLE['Scheduled'];
-      const name = formatPatientNameLastFirst(a) || a.pc_title || `Appointment #${a.pc_eid}`;
+      const name = formatPatientNameLastFirst(a) || a.pc_title || t('appointments.flow.appointmentNumber', { id: a.pc_eid });
       const waited = a.wait_minutes ?? null;
       const provider = a.provider_name
         || `${a.pce_aid_fname || ''} ${a.pce_aid_lname || ''}`.trim()
@@ -97,7 +105,7 @@ export default function PatientFlowBoard() {
       return {
         id: a.pc_eid,
         title: name,
-        subtitle: [status, a.pc_startTime ? String(a.pc_startTime).slice(0, 5) : null].filter(Boolean).join(' · '),
+        subtitle: [statusLabel(status), a.pc_startTime ? String(a.pc_startTime).slice(0, 5) : null].filter(Boolean).join(' · '),
         summary: [a.pc_catname || a.pc_title, provider].filter(Boolean).join(' · '),
         at: a.checked_in_at || a.pc_eventDate,
         icon: style.icon,
@@ -105,66 +113,66 @@ export default function PatientFlowBoard() {
         status,
         unread: status === 'Checked In',
         link: patientChartPath(a.patient_id, a.pid, a.pc_pid) || undefined,
-        linkLabel: 'Open chart',
+        linkLabel: t('appointments.flow.openChart'),
         alerts: waited != null && waited > 30
-          ? [{ level: 'warning' as const, title: 'Long wait', lines: [`Waiting ${formatWait(waited)} — over the 30 minute target.`] }]
+          ? [{ level: 'warning' as const, title: t('appointments.flow.longWait'), lines: [t('appointments.flow.longWaitDetail', { wait: formatWait(waited) })] }]
           : status === 'No Show'
-            ? [{ level: 'danger' as const, title: 'No show', lines: ['Patient did not arrive for this slot.'] }]
+            ? [{ level: 'danger' as const, title: t('appointments.flow.noShow'), lines: [t('appointments.flow.noShowDetail')] }]
             : undefined,
         metrics: [
-          { label: 'Status', value: status, color: style.color },
-          { label: 'Wait', value: formatWait(waited) || '—', color: waited != null && waited > 30 ? '#dc3545' : '#198754' },
-          { label: 'Duration', value: a.pc_duration ? `${a.pc_duration} min` : '—', color: '#6f42c1' },
+          { label: t('appointments.flow.metricStatus'), value: statusLabel(status), color: style.color },
+          { label: t('appointments.flow.metricWait'), value: formatWait(waited) || '—', color: waited != null && waited > 30 ? '#dc3545' : '#198754' },
+          { label: t('appointments.flow.metricDuration'), value: a.pc_duration ? t('appointments.flow.durationMinutes', { count: a.pc_duration }) : '—', color: '#6f42c1' },
         ],
         fields: [
-          ['Patient', name],
-          ['Visit date', formatDateOnly(a.pc_eventDate)],
-          ['Start time', a.pc_startTime ? String(a.pc_startTime).slice(0, 5) : ''],
-          ['Visit type', a.pc_catname],
-          ['Provider', provider],
-          ['Checked in', a.checked_in_at ? formatDateTime(a.checked_in_at) : ''],
-          ['Status', status],
-          ['Reason', a.pc_hometext],
+          [t('appointments.flow.fieldPatient'), name],
+          [t('appointments.flow.fieldVisitDate'), formatDateOnly(a.pc_eventDate)],
+          [t('appointments.flow.fieldStartTime'), a.pc_startTime ? String(a.pc_startTime).slice(0, 5) : ''],
+          [t('appointments.flow.fieldVisitType'), a.pc_catname],
+          [t('appointments.flow.fieldProvider'), provider],
+          [t('appointments.flow.fieldCheckedIn'), a.checked_in_at ? formatDateTime(a.checked_in_at) : ''],
+          [t('appointments.flow.fieldStatus'), statusLabel(status)],
+          [t('appointments.flow.fieldReason'), a.pc_hometext],
         ],
-        lists: [{ title: 'Visit notes', lines: String(a.pc_hometext || '').split(/\r?\n/).filter(Boolean) }],
+        lists: [{ title: t('appointments.flow.visitNotes'), lines: String(a.pc_hometext || '').split(/\r?\n/).filter(Boolean) }],
       };
     });
 
     const fromWalkIns = walkIns.map((w: any): FeedItem => {
-      const name = formatPatientNameLastFirst(w) || `Patient #${w.pid}`;
+      const name = formatPatientNameLastFirst(w) || t('appointments.flow.patientNumber', { pid: w.pid });
       const waited = w.wait_minutes ?? null;
       return {
         id: `walk-${w.tracker_id ?? w.pid}`,
         title: name,
-        subtitle: ['Walk-in', w.checked_in_at ? formatDateTime(w.checked_in_at) : null].filter(Boolean).join(' · '),
-        summary: [w.provider_name, w.sex ? `Sex ${w.sex}` : null].filter(Boolean).join(' · '),
+        subtitle: [t('appointments.flow.walkIn'), w.checked_in_at ? formatDateTime(w.checked_in_at) : null].filter(Boolean).join(' · '),
+        summary: [w.provider_name, w.sex ? t('appointments.flow.walkInSex', { sex: w.sex }) : null].filter(Boolean).join(' · '),
         at: w.checked_in_at || selectedDate,
         icon: 'bi-person-plus',
         tone: '#ffc107',
         status: 'Walk-in',
         unread: true,
         link: patientChartPath(w.patient_id, w.id, w.pid) || undefined,
-        linkLabel: 'Open chart',
+        linkLabel: t('appointments.flow.openChart'),
         alerts: waited != null && waited > 30
-          ? [{ level: 'warning' as const, title: 'Long wait', lines: [`Waiting ${formatWait(waited)} — over the 30 minute target.`] }]
+          ? [{ level: 'warning' as const, title: t('appointments.flow.longWait'), lines: [t('appointments.flow.longWaitDetail', { wait: formatWait(waited) })] }]
           : undefined,
         metrics: [
-          { label: 'Status', value: 'Walk-in', color: '#ffc107' },
-          { label: 'Wait', value: formatWait(waited) || '—', color: waited != null && waited > 30 ? '#dc3545' : '#198754' },
+          { label: t('appointments.flow.metricStatus'), value: t('appointments.flow.walkIn'), color: '#ffc107' },
+          { label: t('appointments.flow.metricWait'), value: formatWait(waited) || '—', color: waited != null && waited > 30 ? '#dc3545' : '#198754' },
         ],
         fields: [
-          ['Patient', name],
-          ['Date of birth', formatDateOnly(w.DOB)],
-          ['Sex', w.sex],
-          ['Provider', w.provider_name],
-          ['Checked in', w.checked_in_at ? formatDateTime(w.checked_in_at) : ''],
-          ['Visit date', selectedDate],
+          [t('appointments.flow.fieldPatient'), name],
+          [t('appointments.flow.fieldDob'), formatDateOnly(w.DOB)],
+          [t('appointments.flow.fieldSex'), w.sex],
+          [t('appointments.flow.fieldProvider'), w.provider_name],
+          [t('appointments.flow.fieldCheckedIn'), w.checked_in_at ? formatDateTime(w.checked_in_at) : ''],
+          [t('appointments.flow.fieldVisitDate'), selectedDate],
         ],
       };
     });
 
     return [...fromWalkIns, ...fromAppointments];
-  }, [appointments, walkIns, selectedDate]);
+  }, [appointments, walkIns, selectedDate, t, statusLabel]);
 
   return (
     <div className="glass-page position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh', padding: '16px' }}>
@@ -205,16 +213,16 @@ export default function PatientFlowBoard() {
         <div className="position-relative">
           <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
-              <h2 className="mb-1 fw-bold"><i className="bi bi-kanban me-2"></i>Patient Flow Board</h2>
-              <p className="mb-0 text-white text-opacity-75 small">{totalPatients} patients today</p>
+              <h2 className="mb-1 fw-bold"><i className="bi bi-kanban me-2"></i>{t('appointments.flow.title')}</h2>
+              <p className="mb-0 text-white text-opacity-75 small">{t('appointments.flow.patientsToday', { count: totalPatients })}</p>
             </div>
             <div className="d-flex align-items-center gap-2">
               <div className="d-flex gap-2">
                 {[
-                  { v: scheduled, l: 'Scheduled', c: '#0d6efd' },
-                  { v: checkedIn, l: 'In Progress', c: '#0dcaf0' },
-                  { v: completed, l: 'Completed', c: '#198754' },
-                  { v: walkIns.length, l: 'Walk-ins', c: '#ffc107' },
+                  { v: scheduled, l: t('appointments.flow.statScheduled'), c: '#0d6efd' },
+                  { v: checkedIn, l: t('appointments.flow.statInProgress'), c: '#0dcaf0' },
+                  { v: completed, l: t('appointments.flow.statCompleted'), c: '#198754' },
+                  { v: walkIns.length, l: t('appointments.flow.statWalkIns'), c: '#ffc107' },
                 ].map(s => (
                   <div key={s.l} className="text-center bg-white bg-opacity-15 rounded-3 px-3 py-2" style={{ minWidth: '70px' }}>
                     <div className="fw-bold fs-5 lh-1">{s.v}</div>
@@ -223,7 +231,7 @@ export default function PatientFlowBoard() {
                 ))}
               </div>
               <div className="vr opacity-25 mx-1"></div>
-              <label className="form-label mb-0 small text-white text-opacity-75">Date:</label>
+              <label className="form-label mb-0 small text-white text-opacity-75">{t('appointments.flow.date')}</label>
               <input type="date" className="form-control form-control-sm rounded-pill" style={{ width: 'auto' }}
                 value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
             </div>
@@ -233,11 +241,11 @@ export default function PatientFlowBoard() {
 
       {/* Flow notifications — same card + modal viewers used across the app */}
       <NotificationFeedCard
-        title="Patient Flow Notifications"
+        title={t('appointments.flow.notifications')}
         icon="bi-diagram-3-fill"
         tone="#0dcaf0"
         items={flowFeed}
-        emptyText="No patients on the board for this date"
+        emptyText={t('appointments.flow.noPatientsForDate')}
         onOpen={(item) => setOpenFeed(item)}
         max={5}
       />
@@ -248,8 +256,8 @@ export default function PatientFlowBoard() {
           <div style={{ height: '4px', background: 'linear-gradient(90deg, #ffc107, #fd7e14)' }}></div>
           <div className="card-header bg-white d-flex justify-content-between align-items-center py-3">
             <h6 className="mb-0 fw-bold">
-              <i className="bi bi-person-plus me-2 text-warning"></i>Walk-In Patients
-              <small className="text-muted ms-2 fw-normal">Quick Assigned</small>
+              <i className="bi bi-person-plus me-2 text-warning"></i>{t('appointments.flow.walkInPatients')}
+              <small className="text-muted ms-2 fw-normal">{t('appointments.flow.quickAssigned')}</small>
             </h6>
             <span className="badge bg-warning text-dark rounded-pill">{walkIns.length}</span>
           </div>
@@ -267,7 +275,7 @@ export default function PatientFlowBoard() {
                         </div>
                         <div className="min-w-0">
                           <div className="fw-bold small text-truncate">{formatPatientNameLastFirst(w)}</div>
-                          <small className="text-muted">DOB: {formatDateOnly(w.DOB)} · {w.sex}</small>
+                          <small className="text-muted">{t('appointments.flow.fieldDobShort')} {formatDateOnly(w.DOB)} · {w.sex}</small>
                         </div>
                       </div>
                       {w.provider_name && (
@@ -301,7 +309,7 @@ export default function PatientFlowBoard() {
       {isLoading ? (
         <div className="text-center py-5">
           <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }}></div>
-          <p className="text-muted mt-2">Loading flow board...</p>
+          <p className="text-muted mt-2">{t('appointments.flow.loading')}</p>
         </div>
       ) : (
         <div className="row g-3 flex-nowrap overflow-auto pb-3" style={{ minHeight: '60vh' }}>
@@ -316,7 +324,7 @@ export default function PatientFlowBoard() {
                     style={{ background: `linear-gradient(135deg, ${style.color}, ${style.color}cc)` }}>
                     <h6 className="mb-0 fw-bold d-flex align-items-center gap-2">
                       <i className={`bi ${style.icon}`}></i>
-                      {status}
+                      {statusLabel(status)}
                     </h6>
                     <span className="badge bg-white bg-opacity-25 rounded-pill">{items.length}</span>
                   </div>
@@ -326,7 +334,7 @@ export default function PatientFlowBoard() {
                     {items.length === 0 ? (
                       <div className="text-center py-4 text-muted opacity-50">
                         <i className="bi bi-inbox fs-3 d-block mb-1"></i>
-                        <small>No patients</small>
+                        <small>{t('appointments.flow.noPatients')}</small>
                       </div>
                     ) : (
                       items.map((apt) => {
@@ -351,8 +359,8 @@ export default function PatientFlowBoard() {
                                 </div>
                                 <div className="min-w-0">
                                   <div className="fw-semibold small text-truncate">{apt.fname ? formatPatientNameLastFirst(apt) : `#${apt.pc_pid}`}</div>
-                                  <div className="text-muted" style={{ fontSize: '0.7rem' }}>{apt.pc_title || 'Visit'}</div>
-                                  {apt.patient_public_id && <div className="text-primary" style={{ fontSize: '0.68rem' }}>Chart #: {apt.patient_public_id}</div>}
+                                  <div className="text-muted" style={{ fontSize: '0.7rem' }}>{apt.pc_title || t('appointments.flow.titleFallback')}</div>
+                                  {apt.patient_public_id && <div className="text-primary" style={{ fontSize: '0.68rem' }}>{t('appointments.flow.chartNumber', { id: apt.patient_public_id })}</div>}
                                 </div>
                               </div>
 
@@ -394,7 +402,7 @@ export default function PatientFlowBoard() {
                                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = nsStyle.color; }}
                                         onClick={() => statusMutation.mutate({ eid: apt.pc_eid, status: ns })}
                                         disabled={statusMutation.isPending}>
-                                        {ns}
+                                        {statusLabel(ns)}
                                       </button>
                                     );
                                   })}

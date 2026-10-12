@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useDebounce } from '../../hooks/useDebounce';
 import { searchPatients, createPatient } from '../../api/endpoints/patients';
 import nestClient from '../../api/nest-client';
@@ -15,6 +16,7 @@ import { chartPatientId } from '../../utils/patientChart';
 const emptyForm = { fname: '', lname: '', mname: '', DOB: '', sex: '', email: '', phone_contact: '', street: '', city: '', providerID: '' };
 
 export default function PatientSearchPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,7 +59,7 @@ export default function PatientSearchPage() {
       if (cid) navigate(`/patients/${cid}`);
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || 'Unknown error';
+      const msg = err?.response?.data?.message || err?.message || t('patients.register.unknownError');
       console.error('Patient registration failed:', msg, err);
     },
   });
@@ -132,11 +134,11 @@ export default function PatientSearchPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{background:'linear-gradient(135deg, #198754 0%, #0d6efd 50%, #6610f2 100%)'}}>
         <div className="d-flex justify-content-between align-items-start">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-people me-2"></i>Patient Management</h2>
-            <p className="mb-0 text-white text-opacity-75 small">Search, register, and manage patient records</p>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-people me-2"></i>{t('patients.search.title')}</h2>
+            <p className="mb-0 text-white text-opacity-75 small">{t('patients.search.subtitle')}</p>
           </div>
           <button className="btn btn-light rounded-pill" onClick={openModal}>
-            <i className="bi bi-person-plus me-1"></i>Add Patient
+            <i className="bi bi-person-plus me-1"></i>{t('patients.search.addPatient')}
           </button>
         </div>
       </div>
@@ -146,7 +148,7 @@ export default function PatientSearchPage() {
         <div className="card-body py-3">
           <div className="input-group">
             <span className="input-group-text bg-white border-end-0 rounded-pill-start"><i className="bi bi-search text-muted"></i></span>
-            <input type="text" className="form-control border-start-0 rounded-pill-end" placeholder="Search by name, phone, or date of birth..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} autoFocus />
+            <input type="text" className="form-control border-start-0 rounded-pill-end" placeholder={t('patients.search.searchPlaceholder')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} autoFocus />
             {searchTerm && <button className="btn btn-outline-secondary border-start-0" onClick={() => setSearchTerm('')}><i className="bi bi-x-lg"></i></button>}
           </div>
         </div>
@@ -156,8 +158,8 @@ export default function PatientSearchPage() {
       {debouncedSearch.length >= 2 && (
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white d-flex justify-content-between align-items-center py-3">
-            <span className="fw-semibold">Search Results</span>
-            {patients && <span className="badge bg-primary rounded-pill px-3">{patients.length} patient{patients.length !== 1 ? 's' : ''}</span>}
+            <span className="fw-semibold">{t('patients.search.searchResults')}</span>
+            {patients && <span className="badge bg-primary rounded-pill px-3">{t('patients.search.count', { count: patients.length })}</span>}
           </div>
           <div className="card-body p-0">
             {isLoading ? (
@@ -165,19 +167,19 @@ export default function PatientSearchPage() {
             ) : patients && patients.length > 0 ? (
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light"><tr><th>Name</th><th>DOB</th><th>Sex</th><th>Phone</th><th>ID</th><th></th></tr></thead>
+                  <thead className="table-light"><tr><th>{t('patients.search.thName')}</th><th>{t('patients.search.thDob')}</th><th>{t('patients.search.thSex')}</th><th>{t('patients.search.thPhone')}</th><th>{t('patients.search.thId')}</th><th></th></tr></thead>
                   <tbody>
                     {patients.map((patient) => (
                       <tr key={(patient as any).id || patient.uuid} onClick={() => handleSelectPatient(patient)} style={{ cursor: 'pointer' }}>
                         <td><strong>{formatPatientNameLastFirst(patient)}</strong></td>
                         <td>{formatDateOnly(patient.dob)}</td><td>{patient.sex || '—'}</td><td>{patient.phone || '—'}</td><td><code className="bg-light px-2 py-1 rounded">{patient.public_id || patient.pubpid || '—'}</code></td>
-                        <td><button className="btn btn-sm btn-outline-primary rounded-pill px-3" onClick={(e) => { e.stopPropagation(); handleSelectPatient(patient); }}>Open <i className="bi bi-arrow-right ms-1"></i></button></td>
+                        <td><button className="btn btn-sm btn-outline-primary rounded-pill px-3" onClick={(e) => { e.stopPropagation(); handleSelectPatient(patient); }}>{t('patients.search.open')} <i className="bi bi-arrow-right ms-1"></i></button></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : <div className="text-center py-5 text-muted">No patients found.</div>}
+            ) : <div className="text-center py-5 text-muted">{t('patients.search.noPatientsFound')}</div>}
           </div>
         </div>
       )}
@@ -187,8 +189,8 @@ export default function PatientSearchPage() {
           <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '80px', height: '80px' }}>
             <i className="bi bi-search text-muted" style={{ fontSize: '2rem' }}></i>
           </div>
-          <h5 className="text-muted">Search for a Patient</h5>
-          <p className="text-muted small">Type a name, phone number, or date of birth above</p>
+          <h5 className="text-muted">{t('patients.search.searchForPatient')}</h5>
+          <p className="text-muted small">{t('patients.search.searchHint')}</p>
         </div>
       )}
 
@@ -201,8 +203,8 @@ export default function PatientSearchPage() {
           <div className="modal-content shadow-lg border-0 rounded-4">
             <div className="modal-header border-0 pb-0">
               <div>
-                <h4 className="modal-title"><i className="bi bi-person-plus me-2 text-success"></i>Register New Patient</h4>
-                <p className="text-muted small mb-0 mt-1">Step {step} of 2 — {step === 1 ? 'Personal Information' : 'Contact & Address'}</p>
+                <h4 className="modal-title"><i className="bi bi-person-plus me-2 text-success"></i>{t('patients.register.title')}</h4>
+                <p className="text-muted small mb-0 mt-1">{t('patients.search.step', { step, label: step === 1 ? t('patients.search.stepPersonal') : t('patients.search.stepContact') })}</p>
               </div>
               <button className="btn-close" onClick={() => setShowModal(false)}></button>
             </div>
@@ -219,40 +221,40 @@ export default function PatientSearchPage() {
 
               {step === 1 && (
                 <div onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }}>
-                  <h6 className="text-muted text-uppercase small mb-3">Personal Information</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionPersonal')}</h6>
                   <div className="row g-3">
-                    <div className="col-md-4"><label className="form-label small fw-semibold">First Name *</label><input ref={firstRef} className="form-control" value={form.fname} onChange={e => update('fname', e.target.value)} placeholder="John" /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Last Name *</label><input className="form-control" value={form.lname} onChange={e => update('lname', e.target.value)} placeholder="Doe" /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Middle Name</label><input className="form-control" value={form.mname} onChange={e => update('mname', e.target.value)} placeholder="A." /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Date of Birth</label><input className="form-control" type="date" value={form.DOB} onChange={e => update('DOB', e.target.value)} /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Sex</label><select className="form-select" value={form.sex} onChange={e => update('sex', e.target.value)}><option value="">— Select —</option><option>Male</option><option>Female</option></select></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lFirstName')}</label><input ref={firstRef} className="form-control" value={form.fname} onChange={e => update('fname', e.target.value)} placeholder={t('patients.register.phFirstName')} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lLastName')}</label><input className="form-control" value={form.lname} onChange={e => update('lname', e.target.value)} placeholder={t('patients.register.phLastName')} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lMiddleName')}</label><input className="form-control" value={form.mname} onChange={e => update('mname', e.target.value)} placeholder={t('patients.register.phMiddleName')} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lDob')}</label><input className="form-control" type="date" value={form.DOB} onChange={e => update('DOB', e.target.value)} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lSex')}</label><select className="form-select" value={form.sex} onChange={e => update('sex', e.target.value)}><option value="">{t('patients.register.select')}</option><option>Male</option><option>Female</option></select></div>
                   </div>
                 </div>
               )}
 
               {step === 2 && (
                 <div>
-                  <h6 className="text-muted text-uppercase small mb-3">Contact Information</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionContact')}</h6>
                   <div className="row g-3 mb-4">
-                    <div className="col-md-6"><label className="form-label small fw-semibold">Email</label><input className="form-control" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="patient@email.com" /></div>
-                    <div className="col-md-6"><label className="form-label small fw-semibold">Phone</label><PhoneInput value={form.phone_contact} onChange={(v) => update('phone_contact', v)} /></div>
+                    <div className="col-md-6"><label className="form-label small fw-semibold">{t('patients.register.lEmail')}</label><input className="form-control" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="patient@email.com" /></div>
+                    <div className="col-md-6"><label className="form-label small fw-semibold">{t('patients.register.lPhone')}</label><PhoneInput value={form.phone_contact} onChange={(v) => update('phone_contact', v)} /></div>
                   </div>
-                  <h6 className="text-muted text-uppercase small mb-3">Provider Assignment</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionProvider')}</h6>
                   <div className="row g-3 mb-4">
                     <div className="col-md-6">
-                      <label className="form-label small fw-semibold">Primary Care Provider</label>
+                      <label className="form-label small fw-semibold">{t('patients.register.lProvider')}</label>
                       <select className="form-select" value={form.providerID} onChange={e => update('providerID', e.target.value)}>
-                        <option value="">— Select Provider —</option>
+                        <option value="">{t('patients.register.selectProvider')}</option>
                         {providers.filter((p: any) => p.active).map((p: any) => (
                           <option key={p.id} value={p.id}>{p.title ? `${p.title} ` : ''}{p.fname} {p.lname}{p.specialty ? ` (${p.specialty})` : ''}</option>
                         ))}
                       </select>
                     </div>
                   </div>
-                  <h6 className="text-muted text-uppercase small mb-3">Address</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionAddress')}</h6>
                   <div className="row g-3">
-                    <div className="col-12"><label className="form-label small fw-semibold">Street</label><input className="form-control" value={form.street} onChange={e => update('street', e.target.value)} placeholder="123 Main Street" /></div>
-                    <div className="col-md-12"><label className="form-label small fw-semibold">City</label><CitySelect value={form.city} onChange={(v) => update('city', v)} /></div>
+                    <div className="col-12"><label className="form-label small fw-semibold">{t('patients.register.lStreet')}</label><input className="form-control" value={form.street} onChange={e => update('street', e.target.value)} placeholder={t('patients.register.phStreet')} /></div>
+                    <div className="col-md-12"><label className="form-label small fw-semibold">{t('patients.register.lCity')}</label><CitySelect value={form.city} onChange={(v) => update('city', v)} /></div>
                   </div>
                 </div>
               )}
@@ -260,7 +262,7 @@ export default function PatientSearchPage() {
               {checkingDup && (
                 <div className="alert alert-light border d-flex align-items-center gap-2 small">
                   <span className="spinner-border spinner-border-sm text-primary"></span>
-                  Checking for an existing patient record…
+                  {t('patients.register.checkingDuplicate')}
                 </div>
               )}
 
@@ -268,17 +270,17 @@ export default function PatientSearchPage() {
                 <div className="alert alert-warning p-3 rounded-3">
                   <div className="fw-semibold mb-2">
                     <i className="bi bi-shield-exclamation me-1"></i>
-                    Registration blocked — this patient may already be on file
+                    {t('patients.register.blocked')}
                   </div>
                   {duplicates.map((d: any) => (
                     <div key={d.id} className="d-flex align-items-center justify-content-between border-bottom py-2 small">
                       <div>
                         <strong>{formatPatientName(d)}</strong>
-                        <div className="text-muted">DOB: {d.DOB || '—'} · Phone: {d.phone_contact || '—'}</div>
+                        <div className="text-muted">{t('patients.register.dobPhone', { dob: d.DOB || '—', phone: d.phone_contact || '—' })}</div>
                       </div>
                       <button className="btn btn-sm btn-outline-primary rounded-pill px-3"
                         onClick={() => { setShowModal(false); setDuplicates([]); const cid = chartPatientId(d.id, d.pid); if (cid) navigate(`/patients/${cid}`); }}>
-                        Use Existing <i className="bi bi-arrow-right ms-1"></i>
+                        {t('patients.register.useExisting')} <i className="bi bi-arrow-right ms-1"></i>
                       </button>
                     </div>
                   ))}
@@ -287,28 +289,26 @@ export default function PatientSearchPage() {
                       id="override-duplicate" checked={overrideDuplicate}
                       onChange={(e) => setOverrideDuplicate(e.target.checked)} />
                     <label className="form-check-label small fw-semibold" htmlFor="override-duplicate">
-                      Override — register as a new patient anyway
+                      {t('patients.register.override')}
                     </label>
                   </div>
                   <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                    Only use the override when you are sure this is a different person
-                    (for example a shared phone number or a common name). Leave it off to
-                    open the existing chart instead of creating a duplicate.
+                    {t('patients.register.overrideHint')}
                   </div>
                 </div>
               )}
             </div>
 
             <div className="modal-footer border-0 pt-0">
-              {step === 2 && <button className="btn btn-outline-secondary" onClick={prevStep}><i className="bi bi-arrow-left me-1"></i>Back</button>}
+              {step === 2 && <button className="btn btn-outline-secondary" onClick={prevStep}><i className="bi bi-arrow-left me-1"></i>{t('patients.register.back')}</button>}
               <div className="flex-grow-1"></div>
-              {step === 1 && <button className="btn btn-primary px-4" onClick={nextStep} disabled={!form.fname || !form.lname}>Next <i className="bi bi-arrow-right ms-1"></i></button>}
+              {step === 1 && <button className="btn btn-primary px-4" onClick={nextStep} disabled={!form.fname || !form.lname}>{t('patients.register.next')} <i className="bi bi-arrow-right ms-1"></i></button>}
               {step === 2 && (
                 <button className="btn btn-success px-4" onClick={handleSubmit} disabled={newPatient.isPending || checkingDup}>
-                  {newPatient.isPending ? <><span className="spinner-border spinner-border-sm me-2"/>Registering...</> : <><i className="bi bi-check-lg me-1"></i>Register New Patient</>}
+                  {newPatient.isPending ? <><span className="spinner-border spinner-border-sm me-2"/>{t('patients.register.registering')}</> : <><i className="bi bi-check-lg me-1"></i>{t('patients.register.submit')}</>}
                 </button>
               )}
-              {newPatient.isError && <small className="text-danger">Registration failed. Please try again.</small>}
+              {newPatient.isError && <small className="text-danger">{t('patients.register.failed')}</small>}
             </div>
           </div>
         </div>

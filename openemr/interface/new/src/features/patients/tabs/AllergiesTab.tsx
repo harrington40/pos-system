@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { createAllergy, deleteAllergy } from '../../../api/endpoints/allergies';
 import nestClient from '../../../api/nest-client';
 
@@ -28,6 +29,7 @@ const KNOWN_ALLERGENS = [
 ];
 
 export default function AllergiesTab({ patientId, allergies, enriched = [], readOnly = false }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [allergen, setAllergen] = useState('');
   const [reaction, setReaction] = useState('');
@@ -81,7 +83,7 @@ export default function AllergiesTab({ patientId, allergies, enriched = [], read
   return (
     <div className="card">
       <div className="card-header d-flex justify-content-between align-items-center">
-        <h5 className="mb-0"><i className="bi bi-exclamation-triangle me-2"></i>Allergies</h5>
+        <h5 className="mb-0"><i className="bi bi-exclamation-triangle me-2"></i>{t('patients.tabs.allergies.title')}</h5>
       </div>
       <div className="card-body">
         {!readOnly && (
@@ -91,7 +93,7 @@ export default function AllergiesTab({ patientId, allergies, enriched = [], read
                 <input
                   className="form-control form-control-sm"
                   list="allergen-options"
-                  placeholder="Search allergen (e.g. Penicillin)"
+                  placeholder={t('patients.tabs.allergies.searchPlaceholder')}
                   value={allergen}
                   onChange={e => setAllergen(e.target.value)}
                 />
@@ -100,11 +102,11 @@ export default function AllergiesTab({ patientId, allergies, enriched = [], read
                 </datalist>
               </div>
               <div className="col-md-5">
-                <input className="form-control form-control-sm" placeholder="Reaction (e.g. Hives)" value={reaction} onChange={e => setReaction(e.target.value)} />
+                <input className="form-control form-control-sm" placeholder={t('patients.tabs.allergies.reactionPlaceholder')} value={reaction} onChange={e => setReaction(e.target.value)} />
               </div>
               <div className="col-md-2">
                 <button className="btn btn-primary btn-sm w-100" onClick={handleAdd} disabled={adding || !allergen.trim()}>
-                  {adding ? <span className="spinner-border spinner-border-sm"/> : 'Add'}
+                  {adding ? <span className="spinner-border spinner-border-sm"/> : t('patients.common.add')}
                 </button>
               </div>
             </div>
@@ -113,7 +115,7 @@ export default function AllergiesTab({ patientId, allergies, enriched = [], read
               <div className="mb-3">
                 <div className="small text-muted mb-1">
                   <i className="bi bi-lightbulb me-1"></i>
-                  Suggested from drug classes & FDA / RxNorm — click to select:
+                  {t('patients.tabs.allergies.suggested')}
                 </div>
                 <div className="d-flex flex-wrap gap-1">
                   {suggestions.map(s => (
@@ -135,7 +137,7 @@ export default function AllergiesTab({ patientId, allergies, enriched = [], read
 
         {enriched.filter((a: any) => a.source && a.source !== 'recorded').length > 0 && (
           <div className="mb-3">
-            <div className="small text-muted mb-1"><i className="bi bi-magic me-1"></i>Auto-detected from clinical notes & medications</div>
+            <div className="small text-muted mb-1"><i className="bi bi-magic me-1"></i>{t('patients.tabs.allergies.autoDetected')}</div>
             <div className="d-flex flex-wrap gap-1">
               {enriched.filter((a: any) => a.source && a.source !== 'recorded').map((a: any, i: number) => (
                 <span key={i} className="badge bg-warning bg-opacity-10 text-dark border" title={a.reaction || ''}>
@@ -146,11 +148,11 @@ export default function AllergiesTab({ patientId, allergies, enriched = [], read
           </div>
         )}
         {allergies.length === 0 ? (
-          <p className="text-muted text-center mb-0">No allergies recorded.</p>
+          <p className="text-muted text-center mb-0">{t('patients.tabs.allergies.none')}</p>
         ) : (
           <div className="table-responsive">
             <table className="table table-sm table-hover mb-0">
-              <thead><tr><th>Allergen</th><th>Reaction</th><th>Date</th><th></th></tr></thead>
+              <thead><tr><th>{t('patients.tabs.allergies.thAllergen')}</th><th>{t('patients.tabs.allergies.thReaction')}</th><th>{t('patients.tabs.allergies.thDate')}</th><th></th></tr></thead>
               <tbody>
                 {allergies.map((a: any) => (
                   <tr key={a.id}><td><strong>{a.allergen || a.title}</strong></td><td>{a.reaction || '—'}</td><td>{a.date || '—'}</td>

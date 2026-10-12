@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ImagingUpload from '../../components/common/ImagingUpload';
+import StudyThumbnail from './StudyThumbnail';
+import type { StudyRef } from './StudyThumbnail';
 import nestClient from '../../api/nest-client';
 
 declare global {
@@ -65,6 +68,7 @@ function axisLabel(dir: number[]): string {
 }
 
 export default function DicomViewerPage() {
+  const { t } = useTranslation();
   const viewportRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +80,11 @@ export default function DicomViewerPage() {
   const anglePtsRef = useRef<Pt[]>([]);
   const previewRef = useRef<Measurement | null>(null);
   const cacheRef = useRef<Map<number, string>>(new Map());
+  // Study bytes and parsed data sets, cached per study id so the thumbnail
+  // filmstrip, prefetching and the main viewer share one download + parse.
+  const fileRef = useRef<Map<number, File>>(new Map());
+  const dsRef = useRef<Map<number, unknown>>(new Map());
+  const stripRef = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
 
   const [loaded, setLoaded] = useState(false);
@@ -269,19 +278,49 @@ export default function DicomViewerPage() {
     }
   }, [renderImage, showRaster, applyDataSet]);
 
-  /** Fetch a stored study's bytes through the backend proxy → imageId (cached). */
-  const fetchStudyImageId = useCallback(async (item: ImagingItem): Promise<string | null> => {
-    const cached = cacheRef.current.get(item.id);
+  /** Whether a stored study is a DICOM file the viewer can render. */
+  const isDicomStudy = useCallback((item: StudyRef, file: File): boolean =>
+    /\.(dcm|dicom)$/i.test(item.originalName) || /dicom/i.test(file.type || item.mimeType || ''), []);
+
+  /** Fetch a stored study's bytes through the backend proxy (cached). */
+  const fetchStudyFile = useCallback(async (item: StudyRef): Promise<File> => {
+    const cached = fileRef.current.get(item.id);
     if (cached) return cached;
     const r = await nestClient.get(`/imaging/${item.id}/file`, { responseType: 'arraybuffer' });
     const blob = new Blob([r.data], { type: item.mimeType || 'application/dicom' });
     const file = new File([blob], item.originalName, { type: blob.type });
-    if (!/\.(dcm|dicom)$/i.test(item.originalName) && !/dicom/i.test(blob.type)) return null;
-    try { applyDataSet(window.dicomParser.parseDicom(new Uint8Array(await file.arrayBuffer()))); } catch { /* best-effort */ }
+    fileRef.current.set(item.id, file);
+    return file;
+  }, []);
+
+  /**
+   * Resolve a stored study to a Cornerstone imageId (cached, side-effect-free).
+   * Returns null for non-DICOM studies. Deliberately does NOT touch the metadata
+   * panel, so prefetching / the filmstrip can call it freely.
+   */
+  const fetchStudyImageId = useCallback(async (item: StudyRef): Promise<string | null> => {
+    const cached = cacheRef.current.get(item.id);
+    if (cached) return cached;
+    const file = await fetchStudyFile(item);
+    if (!isDicomStudy(item, file)) return null;
     const imageId = window.cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
     cacheRef.current.set(item.id, imageId);
     return imageId;
-  }, [applyDataSet]);
+  }, [fetchStudyFile, isDicomStudy]);
+
+  /** Parsed DICOM data set for a study (cached) — feeds the tag / study panels. */
+  const fetchStudyDataSet = useCallback(async (item: StudyRef): Promise<unknown> => {
+    if (dsRef.current.has(item.id)) return dsRef.current.get(item.id);
+    const file = await fetchStudyFile(item);
+    if (!isDicomStudy(item, file)) return null;
+    try {
+      const ds = window.dicomParser.parseDicom(new Uint8Array(await file.arrayBuffer()));
+      dsRef.current.set(item.id, ds);
+      return ds;
+    } catch {
+      return null; // tags stay best-effort; the image can still render
+    }
+  }, [fetchStudyFile, isDicomStudy]);
 
   /** Open a stored study (fetch + display). */
   const openStudy = useCallback(async (item: ImagingItem) => {
@@ -289,7 +328,15 @@ export default function DicomViewerPage() {
     try {
       const imageId = await fetchStudyImageId(item);
       if (!imageId) { setError('This study is not a DICOM image.'); return; }
+      // Populate tags/header for THIS study here (never during prefetch), so
+      // preloading a neighbour can't clobber the displayed study's metadata.
+      const ds = await fetchStudyDataSet(item);
+      if (ds) applyDataSet(ds);
       await renderImage(imageId, item.id);
+      // Name the visible study so the toolbar / overlays enable for server
+      // studies too — previously only locally-opened files set this, which left
+      // the viewer showing the "Select a study" placeholder with tools disabled.
+      setFileName(item.originalName);
       measurementsRef.current = []; previewRef.current = null; setMeasurements([]);
       const idx = studies.findIndex((s) => s.id === item.id);
       if (idx >= 0) setSliceIndex(idx);
@@ -299,7 +346,7 @@ export default function DicomViewerPage() {
     } finally {
       setLoadingStudy(false);
     }
-  }, [fetchStudyImageId, renderImage, studies]);
+  }, [fetchStudyImageId, fetchStudyDataSet, applyDataSet, renderImage, studies]);
 
   /** Jump to a slice (study) by index — used by wheel / keys / slider / cine. */
   const goToSlice = useCallback((idx: number) => {
@@ -308,6 +355,40 @@ export default function DicomViewerPage() {
     setSliceIndex(i);
     if (studies[i]?.id !== selectedId) void openStudy(studies[i]);
   }, [studies, selectedId, openStudy]);
+
+  /** Warm a study's bytes + imageId (and optionally decode it) ahead of use. */
+  const prefetchStudy = useCallback(async (item: ImagingItem, decode: boolean) => {
+    if (!loaded) return;
+    try {
+      const imageId = await fetchStudyImageId(item);
+      // Decoding now puts the image in Cornerstone's cache, so stepping onto it
+      // (arrow / wheel / cine) swaps frames instantly instead of stalling.
+      if (imageId && decode) await window.cornerstone?.loadAndCacheImage?.(imageId);
+    } catch {
+      /* not DICOM / offline — the viewer still loads it on demand */
+    }
+  }, [loaded, fetchStudyImageId]);
+
+  // Preload a window around the current slice. The immediate neighbours are also
+  // decoded; the rest are just cached so browsing stays instant without holding
+  // a whole study series in memory.
+  useEffect(() => {
+    if (!loaded || studies.length < 2) return;
+    const WINDOW = 3;
+    for (let i = sliceIndex - WINDOW; i <= sliceIndex + WINDOW; i++) {
+      if (i < 0 || i >= studies.length || i === sliceIndex) continue;
+      void prefetchStudy(studies[i], Math.abs(i - sliceIndex) === 1);
+    }
+  }, [loaded, studies, sliceIndex, prefetchStudy]);
+
+  // Keep the active thumbnail in view as slices change (wheel / keys / cine).
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || selectedId == null) return;
+    const idx = studies.findIndex((s) => s.id === selectedId);
+    const cell = idx >= 0 ? (strip.children[idx] as HTMLElement | undefined) : undefined;
+    cell?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }, [selectedId, studies]);
 
   const applyWindowLevel = (ww: number, wc: number) => {
     setWindowWidth(Math.round(ww)); setWindowCenter(Math.round(wc));
@@ -504,17 +585,17 @@ export default function DicomViewerPage() {
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600 }}><i className="bi bi-image me-2"></i>DICOM / CT / X-Ray Viewer</div>
+              <div style={{ fontWeight: 600 }}><i className="bi bi-image me-2"></i>{t('dicom.title')}</div>
               <div style={{ fontSize: 12, opacity: 0.7 }} className="text-truncate">
-                {info.patientName || fileName || 'No study loaded'}
-                {info.patientId ? ` · ID ${info.patientId}` : ''}
+                {info.patientName || fileName || t('dicom.noStudy')}
+                {info.patientId ? t('dicom.idSuffix', { id: info.patientId }) : ''}
                 {info.modality ? ` · ${info.modality}` : ''}
                 {info.studyDescription ? ` · ${info.studyDescription}` : ''}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input className="form-control form-control-sm" style={{ width: 90 }} placeholder="Patient ID" value={viewerPid} onChange={(e) => setViewerPid(e.target.value)} />
-              <button className="btn btn-sm btn-outline-light" onClick={() => fileInputRef.current?.click()}><i className="bi bi-folder2-open me-1"></i>Open</button>
+              <input className="form-control form-control-sm" style={{ width: 90 }} placeholder={t('dicom.patientId')} value={viewerPid} onChange={(e) => setViewerPid(e.target.value)} />
+              <button className="btn btn-sm btn-outline-light" onClick={() => fileInputRef.current?.click()}><i className="bi bi-folder2-open me-1"></i>{t('dicom.open')}</button>
               <input ref={fileInputRef} type="file" accept=".dcm,.dicom" className="d-none" onChange={(e) => { const f = e.target.files?.[0]; if (f) loadDicomFile(f); }} />
             </div>
           </div>
@@ -564,8 +645,8 @@ export default function DicomViewerPage() {
             {!fileName && !loadingStudy && loaded && (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
                 <i className="bi bi-images" style={{ fontSize: '2.5rem' }}></i>
-                <p className="mt-2 mb-2">Select a study on the right, or open a .dcm file</p>
-                <button className="btn btn-outline-light btn-sm" onClick={() => fileInputRef.current?.click()}>Open DICOM File</button>
+                <p className="mt-2 mb-2">{t('dicom.selectStudy')}</p>
+                <button className="btn btn-outline-light btn-sm" onClick={() => fileInputRef.current?.click()}>{t('dicom.openFile')}</button>
               </div>
             )}
           </div>
@@ -574,47 +655,92 @@ export default function DicomViewerPage() {
             <button className="btn btn-sm btn-outline-light" disabled={sliceIndex <= 0} onClick={() => goToSlice(sliceIndex - 1)}><i className="bi bi-chevron-left"></i></button>
             <input type="range" min={0} max={Math.max(0, sliceCount - 1)} value={Math.min(sliceIndex, Math.max(0, sliceCount - 1))} onChange={(e) => goToSlice(+e.target.value)} disabled={sliceCount < 2} style={{ flex: 1 }} />
             <button className="btn btn-sm btn-outline-light" disabled={sliceIndex >= sliceCount - 1} onClick={() => goToSlice(sliceIndex + 1)}><i className="bi bi-chevron-right"></i></button>
-            <button className={`btn btn-sm ${cine ? 'btn-primary' : 'btn-outline-light'}`} disabled={sliceCount < 2} onClick={() => setCine((c) => !c)}><i className={`bi ${cine ? 'bi-pause-fill' : 'bi-play-fill'} me-1`}></i>Cine</button>
-            <span style={{ fontFamily: 'monospace', fontSize: 12, minWidth: 96, textAlign: 'center' }}>Slice {sliceCount ? sliceIndex + 1 : 0} / {sliceCount}</span>
+            <button className={`btn btn-sm ${cine ? 'btn-primary' : 'btn-outline-light'}`} disabled={sliceCount < 2} onClick={() => setCine((c) => !c)}><i className={`bi ${cine ? 'bi-pause-fill' : 'bi-play-fill'} me-1`}></i>{t('dicom.cine')}</button>
+            <span style={{ fontFamily: 'monospace', fontSize: 12, minWidth: 96, textAlign: 'center' }}>{t('dicom.slice', { index: sliceCount ? sliceIndex + 1 : 0, total: sliceCount })}</span>
+          </div>
+
+          {/* Multi-image filmstrip — every stored study as a clickable thumbnail.
+              Clicking one loads it straight into the viewer above; neighbours are
+              pre-decoded so browsing a study set feels immediate. */}
+          <div style={{ ...panel, marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 11, opacity: 0.65 }}>
+                <i className="bi bi-film me-1"></i>STUDY FILMSTRIP ({studies.length})
+              </div>
+              {studies.length > 0 && (
+                <span style={{ fontSize: 10, opacity: 0.55 }}>
+                  Click a thumbnail to load it into the viewer · {sliceCount} image{sliceCount === 1 ? '' : 's'} ready to review
+                </span>
+              )}
+              <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+                <button className="btn btn-sm btn-outline-light" disabled={!studies.length} title={t('dicom.scrollLeft')}
+                  onClick={() => stripRef.current?.scrollBy({ left: -260, behavior: 'smooth' })}>
+                  <i className="bi bi-chevron-left"></i>
+                </button>
+                <button className="btn btn-sm btn-outline-light" disabled={!studies.length} title={t('dicom.scrollRight')}
+                  onClick={() => stripRef.current?.scrollBy({ left: 260, behavior: 'smooth' })}>
+                  <i className="bi bi-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+            {studies.length === 0 ? (
+              <div style={{ fontSize: 12, opacity: 0.5 }}>
+                No studies stored for patient {viewerPid}. Upload one below to review it here.
+              </div>
+            ) : (
+              <div ref={stripRef} style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 2px 6px' }}>
+                {studies.map((s, i) => (
+                  <StudyThumbnail
+                    key={s.id}
+                    study={s}
+                    index={i}
+                    active={selectedId === s.id}
+                    ready={loaded}
+                    getImageId={fetchStudyImageId}
+                    onClick={() => goToSlice(i)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={panel}>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>TOOLS</div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>{t('dicom.toolsLabel')}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {TOOLS.map((t) => (
-                <button key={t.name} className={`btn btn-sm ${tool === t.name ? 'btn-primary' : 'btn-outline-light'}`} title={t.title} disabled={!fileName} onClick={() => setTool(t.name)}>
-                  <i className={`bi ${t.icon} me-1`}></i>{t.label}
+              {TOOLS.map((toolItem) => (
+                <button key={toolItem.name} className={`btn btn-sm ${tool === toolItem.name ? 'btn-primary' : 'btn-outline-light'}`} title={t('dicom.toolTitles.' + toolItem.name, { defaultValue: toolItem.title })} disabled={!fileName} onClick={() => setTool(toolItem.name)}>
+                  <i className={`bi ${toolItem.icon} me-1`}></i>{t('dicom.tools.' + toolItem.name, { defaultValue: toolItem.label })}
                 </button>
               ))}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginTop: 8 }}>
-              <button className="btn btn-sm btn-outline-light" title="Rotate -90" disabled={!fileName} onClick={() => rotateBy(-90)}><i className="bi bi-arrow-counterclockwise"></i></button>
-              <button className="btn btn-sm btn-outline-light" title="Rotate +90" disabled={!fileName} onClick={() => rotateBy(90)}><i className="bi bi-arrow-clockwise"></i></button>
-              <button className="btn btn-sm btn-outline-light" title="Flip horizontal" disabled={!fileName} onClick={flipH}><i className="bi bi-arrow-left-right"></i></button>
-              <button className="btn btn-sm btn-outline-light" title="Flip vertical" disabled={!fileName} onClick={flipV}><i className="bi bi-arrow-up-down"></i></button>
+              <button className="btn btn-sm btn-outline-light" title={t('dicom.rotateLeft')} disabled={!fileName} onClick={() => rotateBy(-90)}><i className="bi bi-arrow-counterclockwise"></i></button>
+              <button className="btn btn-sm btn-outline-light" title={t('dicom.rotateRight')} disabled={!fileName} onClick={() => rotateBy(90)}><i className="bi bi-arrow-clockwise"></i></button>
+              <button className="btn btn-sm btn-outline-light" title={t('dicom.flipH')} disabled={!fileName} onClick={flipH}><i className="bi bi-arrow-left-right"></i></button>
+              <button className="btn btn-sm btn-outline-light" title={t('dicom.flipV')} disabled={!fileName} onClick={flipV}><i className="bi bi-arrow-up-down"></i></button>
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button className="btn btn-sm btn-outline-light flex-grow-1" disabled={!fileName} onClick={resetViewport}><i className="bi bi-arrow-repeat me-1"></i>Reset</button>
-              <button className={`btn btn-sm ${crosshair ? 'btn-primary' : 'btn-outline-light'} flex-grow-1`} disabled={!fileName} onClick={() => setCrosshair((c) => !c)}><i className="bi bi-plus-lg me-1"></i>Cross</button>
-              <button className="btn btn-sm btn-outline-light" title="Clear measurements" disabled={!fileName || measurements.length === 0} onClick={() => { measurementsRef.current = []; previewRef.current = null; setMeasurements([]); redrawOverlay(); }}><i className="bi bi-trash"></i></button>
+              <button className="btn btn-sm btn-outline-light flex-grow-1" disabled={!fileName} onClick={resetViewport}><i className="bi bi-arrow-repeat me-1"></i>{t('dicom.reset')}</button>
+              <button className={`btn btn-sm ${crosshair ? 'btn-primary' : 'btn-outline-light'} flex-grow-1`} disabled={!fileName} onClick={() => setCrosshair((c) => !c)}><i className="bi bi-plus-lg me-1"></i>{t('dicom.cross')}</button>
+              <button className="btn btn-sm btn-outline-light" title={t('dicom.clearMeasurements')} disabled={!fileName || measurements.length === 0} onClick={() => { measurementsRef.current = []; previewRef.current = null; setMeasurements([]); redrawOverlay(); }}><i className="bi bi-trash"></i></button>
             </div>
           </div>
 
           <div style={panel}>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>WINDOW / LEVEL</div>
-            <label style={{ fontSize: 11 }}>Width {windowWidth}</label>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>{t('dicom.windowLevelLabel')}</div>
+            <label style={{ fontSize: 11 }}>{t('dicom.width', { value: windowWidth })}</label>
             <input type="range" min={1} max={4000} value={windowWidth} onChange={(e) => applyWindowLevel(+e.target.value, windowCenter)} style={{ width: '100%' }} />
-            <label style={{ fontSize: 11 }}>Center {windowCenter}</label>
+            <label style={{ fontSize: 11 }}>{t('dicom.center', { value: windowCenter })}</label>
             <input type="range" min={-1024} max={3072} value={windowCenter} onChange={(e) => applyWindowLevel(windowWidth, +e.target.value)} style={{ width: '100%' }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-              {presets.map((p) => (<button key={p.label} className="btn btn-sm btn-outline-info" onClick={() => applyWindowLevel(p.ww, p.wc)}>{p.label}</button>))}
+              {presets.map((p) => (<button key={p.label} className="btn btn-sm btn-outline-info" onClick={() => applyWindowLevel(p.ww, p.wc)}>{t('dicom.presets.' + p.label.toLowerCase(), { defaultValue: p.label })}</button>))}
             </div>
           </div>
 
           <div style={{ ...panel, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 11, opacity: 0.6 }}>ZOOM</span>
+            <span style={{ fontSize: 11, opacity: 0.6 }}>{t('dicom.zoomLabel')}</span>
             <button className="btn btn-sm btn-outline-light" onClick={() => applyZoom(Math.max(0.1, zoom - 0.2))}>-</button>
             <span style={{ fontFamily: 'monospace', fontSize: 12, flex: 1, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
             <button className="btn btn-sm btn-outline-light" onClick={() => applyZoom(zoom + 0.2)}>+</button>
@@ -622,9 +748,9 @@ export default function DicomViewerPage() {
           </div>
 
           <div style={{ ...panel, overflow: 'auto', maxHeight: 190 }}>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>SERIES / STUDIES ({sliceCount})</div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>{t('dicom.seriesStudies', { count: sliceCount })}</div>
             {sliceCount === 0 ? (
-              <div style={{ fontSize: 12, opacity: 0.5 }}>No studies for patient {viewerPid}.</div>
+              <div style={{ fontSize: 12, opacity: 0.5 }}>{t('dicom.noStudies', { pid: viewerPid })}</div>
             ) : studies.map((s, i) => (
               <button key={s.id} onClick={() => goToSlice(i)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', borderRadius: 6, border: `1px solid ${selectedId === s.id ? '#3b82f6' : 'transparent'}`, background: selectedId === s.id ? '#1e3a8a' : 'transparent', color: 'inherit', fontSize: 12, marginBottom: 4 }}>
                 <span style={{ opacity: 0.6, marginRight: 6 }}>{i + 1}.</span>{s.originalName}
@@ -633,9 +759,9 @@ export default function DicomViewerPage() {
           </div>
 
           <div style={{ ...panel, overflow: 'auto', maxHeight: 240 }}>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>DICOM TAGS</div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>{t('dicom.dicomTags')}</div>
             {metadata.length === 0 ? (
-              <div style={{ fontSize: 12, opacity: 0.5 }}>No metadata.</div>
+              <div style={{ fontSize: 12, opacity: 0.5 }}>{t('dicom.noMetadata')}</div>
             ) : (
               <table style={{ width: '100%', fontSize: 11 }}><tbody>
                 {metadata.map(([k, v]) => (<tr key={k}><td style={{ opacity: 0.55, paddingRight: 6, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{k}</td><td>{v}</td></tr>))}
@@ -646,7 +772,7 @@ export default function DicomViewerPage() {
       </div>
 
       <div style={{ ...panel, marginTop: 12 }}>
-        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}><i className="bi bi-cloud-upload me-1"></i>Upload X-Ray / DICOM to Backblaze B2 (Patient {viewerPid || '1'})</div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}><i className="bi bi-cloud-upload me-1"></i>{t('dicom.uploadTitle', { pid: viewerPid || '1' })}</div>
         <ImagingUpload type="xray" pid={parseInt(viewerPid, 10) || 1} onFileSelected={(f) => loadDicomFile(f)} onSuccess={() => qc.invalidateQueries({ queryKey: ['imaging', viewerPid] })} />
       </div>
     </div>

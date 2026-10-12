@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import { formatPatientNameLastFirst } from '../../utils/patientName';
@@ -32,6 +33,7 @@ function BarChart({ data, height = 120 }: { data: { label: string; value: number
 
 /** Simple donut ring using SVG */
 function DonutRing({ segments, size = 100 }: { segments: { label: string; value: number; color: string }[]; size?: number }) {
+  const { t } = useTranslation();
   const total = segments.reduce((s, d) => s + d.value, 0) || 1;
   const cx = size / 2;
   const cy = size / 2;
@@ -44,7 +46,7 @@ function DonutRing({ segments, size = 100 }: { segments: { label: string; value:
     return (
       <svg width={size} height={size} className="d-block mx-auto">
         <circle cx={cx} cy={cy} r={r - strokeW / 2} fill="none" stroke="#e9ecef" strokeWidth={strokeW} />
-        <text x={cx} y={cy + 4} textAnchor="middle" fontSize="13" fill="#6c757d">No data</text>
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize="13" fill="#6c757d">{t('registrar.noData')}</text>
       </svg>
     );
   }
@@ -70,7 +72,7 @@ function DonutRing({ segments, size = 100 }: { segments: { label: string; value:
           );
         })}
         <text x={cx} y={cy - 2} textAnchor="middle" fontSize="18" fontWeight="bold" fill="#212529">{total}</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="#6c757d">total</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="#6c757d">{t('registrar.total')}</text>
       </svg>
       <div className="small">
         {segments.map(s => (
@@ -112,6 +114,7 @@ function LiveClock({ timezone, label, offsetLabel }: { timezone: string; label: 
 }
 
 export default function RegistrarDashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -171,15 +174,17 @@ export default function RegistrarDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['registrar', 'appointments'] });
       setLastApproval(
         data?.appointment
-          ? `Approved · intake scheduled with ${data.providerName || 'provider'} at ${data.appointment.startTime}`
-          : `Approved${data?.providerName ? ` · assigned ${data.providerName}` : ''}`,
+          ? t('registrar.approvedScheduled', { provider: data.providerName || t('registrar.providerFallback'), time: data.appointment.startTime })
+          : data?.providerName
+            ? t('registrar.approvedAssigned', { provider: data.providerName })
+            : t('registrar.approved'),
       );
     },
   });
 
   const formatWaitTime = (minutes: number | null) => {
     if (!minutes && minutes !== 0) return '—';
-    if (minutes < 1) return 'Just now';
+    if (minutes < 1) return t('registrar.justNow');
     if (minutes < 60) return `${minutes}m`;
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -195,15 +200,15 @@ export default function RegistrarDashboardPage() {
 
   // Chart data: appointment status distribution
   const apptStatusData = [
-    { label: 'Checked In', value: checkedIn, color: '#0dcaf0' },
-    { label: 'Completed', value: completed, color: '#198754' },
-    { label: 'Scheduled', value: appointments.length - checkedIn - completed, color: '#6c757d' },
+    { label: t('registrar.apptCheckedIn'), value: checkedIn, color: '#0dcaf0' },
+    { label: t('registrar.apptCompleted'), value: completed, color: '#198754' },
+    { label: t('registrar.apptScheduled'), value: appointments.length - checkedIn - completed, color: '#6c757d' },
   ];
 
   // Chart data: pending vitals breakdown
   const vitalsData = [
-    { label: 'Vitals Recorded', value: withVitals, color: '#198754' },
-    { label: 'No Vitals Yet', value: pendingCount - withVitals, color: '#dc3545' },
+    { label: t('registrar.vitalsRecorded'), value: withVitals, color: '#198754' },
+    { label: t('registrar.noVitalsYet'), value: pendingCount - withVitals, color: '#dc3545' },
   ];
 
   // Provider workload
@@ -250,26 +255,26 @@ export default function RegistrarDashboardPage() {
           <div>
             <h2 className="mb-1 fw-bold">
               <i className="bi bi-clipboard-check me-2"></i>
-              Registrar Dashboard
+              {t('registrar.title')}
             </h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              Welcome, {user?.displayName || 'Registrar'} — Patient Approval Queue
+              {t('registrar.welcome', { name: user?.displayName || t('registrar.roleFallback') })}
             </p>
           </div>
           <div className="d-flex align-items-center gap-2">
-            <LiveClock timezone="Africa/Monrovia" label="Monrovia" offsetLabel="GMT+0" />
+            <LiveClock timezone="Africa/Monrovia" label={t('midwife.clockMonrovia')} offsetLabel="GMT+0" />
             <div className="vr opacity-50"></div>
-            <LiveClock timezone="America/New_York" label="Florida (US)" offsetLabel="GMT-4" />
+            <LiveClock timezone="America/New_York" label={t('midwife.clockFlorida')} offsetLabel="GMT-4" />
           </div>
           <div className="d-flex gap-2">
             <button className="btn btn-light btn-sm rounded-pill" onClick={() => navigate('/patients')}>
-              <i className="bi bi-search me-1"></i>All Patients
+              <i className="bi bi-search me-1"></i>{t('registrar.allPatients')}
             </button>
             <button className="btn btn-warning btn-sm rounded-pill" onClick={() => navigate('/bookings')}>
-              <i className="bi bi-qr-code me-1"></i>Bookings & QR
+              <i className="bi bi-qr-code me-1"></i>{t('registrar.bookingsQr')}
             </button>
             <button className="btn btn-outline-light btn-sm rounded-pill" onClick={() => navigate('/providers')}>
-              <i className="bi bi-person-badge me-1"></i>Providers
+              <i className="bi bi-person-badge me-1"></i>{t('registrar.providers')}
             </button>
           </div>
         </div>
@@ -278,10 +283,10 @@ export default function RegistrarDashboardPage() {
       {/* Stats Row */}
       <div className="row g-3 mb-4">
         {[
-          { v: pendingCount, l: 'Pending Approval', c: '#dc3545', i: 'bi-hourglass-split', sub: `${withVitals} with vitals` },
-          { v: appointments.length, l: "Today's Appts", c: '#198754', i: 'bi-calendar-check', sub: `${checkedIn} checked in` },
-          { v: activeProviders, l: 'Active Providers', c: '#0d6efd', i: 'bi-person-badge', sub: 'On staff' },
-          { v: longWait, l: 'Long Wait', c: '#fd7e14', i: 'bi-exclamation-triangle', sub: '>30 min' },
+          { v: pendingCount, l: t('registrar.statPending'), c: '#dc3545', i: 'bi-hourglass-split', sub: t('registrar.statPendingSub', { count: withVitals }) },
+          { v: appointments.length, l: t('registrar.statTodayAppts'), c: '#198754', i: 'bi-calendar-check', sub: t('registrar.statTodayApptsSub', { count: checkedIn }) },
+          { v: activeProviders, l: t('registrar.statActiveProviders'), c: '#0d6efd', i: 'bi-person-badge', sub: t('registrar.statActiveProvidersSub') },
+          { v: longWait, l: t('registrar.statLongWait'), c: '#fd7e14', i: 'bi-exclamation-triangle', sub: t('registrar.statLongWaitSub') },
         ].map((s, i) => (
           <div className="col-md-3 col-sm-6" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
@@ -304,7 +309,7 @@ export default function RegistrarDashboardPage() {
         <div className="col-lg-4">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-bar-chart me-2 text-primary"></i>Appointment Status</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-bar-chart me-2 text-primary"></i>{t('registrar.chartApptStatus')}</h6>
             </div>
             <div className="card-body d-flex justify-content-center py-2">
               <BarChart data={apptStatusData} height={110} />
@@ -314,7 +319,7 @@ export default function RegistrarDashboardPage() {
         <div className="col-lg-4">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-success"></i>Vitals Status</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-success"></i>{t('registrar.chartVitalsStatus')}</h6>
             </div>
             <div className="card-body d-flex justify-content-center py-2">
               <DonutRing segments={vitalsData} size={110} />
@@ -324,13 +329,13 @@ export default function RegistrarDashboardPage() {
         <div className="col-lg-4">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-people me-2 text-info"></i>Provider Workload</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-people me-2 text-info"></i>{t('registrar.chartProviderWorkload')}</h6>
             </div>
             <div className="card-body d-flex justify-content-center py-2">
               {providerWorkload.length > 0 ? (
                 <BarChart data={providerWorkload} height={110} />
               ) : (
-                <div className="text-center text-muted py-3 small">No appointments assigned yet</div>
+                <div className="text-center text-muted py-3 small">{t('registrar.noAppointmentsAssigned')}</div>
               )}
             </div>
           </div>
@@ -343,9 +348,9 @@ export default function RegistrarDashboardPage() {
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
               <h6 className="mb-0 fw-bold">
-                <i className="bi bi-calendar-event me-2 text-primary"></i>Today's Schedule
+                <i className="bi bi-calendar-event me-2 text-primary"></i>{t('registrar.todaysSchedule')}
               </h6>
-              <span className="badge bg-primary rounded-pill">{appointments.length} appts</span>
+              <span className="badge bg-primary rounded-pill">{t('registrar.apptCount', { count: appointments.length })}</span>
             </div>
             <div className="card-body p-0">
               {appointments.length > 0 ? (
@@ -353,11 +358,11 @@ export default function RegistrarDashboardPage() {
                   <table className="table table-hover mb-0 small">
                     <thead className="table-light">
                       <tr>
-                        <th>Time</th>
-                        <th>Patient</th>
-                        <th>Provider</th>
-                        <th>Type</th>
-                        <th>Status</th>
+                        <th>{t('registrar.thTime')}</th>
+                        <th>{t('registrar.thPatient')}</th>
+                        <th>{t('registrar.thProvider')}</th>
+                        <th>{t('registrar.thType')}</th>
+                        <th>{t('registrar.thStatus')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -384,7 +389,7 @@ export default function RegistrarDashboardPage() {
                             <td>{a.pc_title || a.pc_catname || '—'}</td>
                             <td>
                               <span className={`badge rounded-pill ${a.pc_apptstatus === 'Checked In' ? 'bg-info' : a.pc_apptstatus === 'Checkout' ? 'bg-success' : 'bg-secondary'}`}>
-                                {a.pc_apptstatus || 'Scheduled'}
+                                {a.pc_apptstatus || t('registrar.apptScheduled')}
                               </span>
                             </td>
                           </tr>
@@ -396,7 +401,7 @@ export default function RegistrarDashboardPage() {
               ) : (
                 <div className="text-center text-muted py-4">
                   <i className="bi bi-calendar-x fs-3 d-block mb-2 opacity-50"></i>
-                  No appointments today
+                  {t('registrar.noAppointmentsToday')}
                 </div>
               )}
             </div>
@@ -409,9 +414,9 @@ export default function RegistrarDashboardPage() {
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
               <h6 className="mb-0 fw-bold">
-                <i className="bi bi-person-check me-2 text-success"></i>Provider Assignments Today
+                <i className="bi bi-person-check me-2 text-success"></i>{t('registrar.providerAssignments')}
               </h6>
-              <span className="badge bg-success rounded-pill">{checkedIn} checked in</span>
+              <span className="badge bg-success rounded-pill">{t('registrar.checkedInCount', { count: checkedIn })}</span>
             </div>
             <div className="card-body p-0">
               {activeProviders > 0 ? (
@@ -430,10 +435,10 @@ export default function RegistrarDashboardPage() {
                       <div className="flex-grow-1">
                         <small className="fw-semibold">{p.title ? `${p.title} ` : ''}{p.fname} {p.lname}</small>
                         <br />
-                        <small className="text-muted">{p.specialty || 'General'} · {providerAppts.length} appt{providerAppts.length !== 1 ? 's' : ''}</small>
+                        <small className="text-muted">{p.specialty || t('registrar.general')} · {t('registrar.apptCountShort', { count: providerAppts.length })}</small>
                       </div>
                       {checkedInCount > 0 && (
-                        <span className="badge bg-info rounded-pill">{checkedInCount} in</span>
+                        <span className="badge bg-info rounded-pill">{t('registrar.inCount', { count: checkedInCount })}</span>
                       )}
                       <i className="bi bi-chevron-right text-muted small"></i>
                     </div>
@@ -441,7 +446,7 @@ export default function RegistrarDashboardPage() {
                 })
               ) : (
                 <div className="text-center text-muted py-3">
-                  <small>No active providers</small>
+                  <small>{t('registrar.noActiveProviders')}</small>
                 </div>
               )}
             </div>
@@ -452,9 +457,9 @@ export default function RegistrarDashboardPage() {
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-list-check me-2 text-danger"></i>
-                Pending Patient Approvals
+                {t('registrar.pendingApprovals')}
               </h6>
-              <span className="badge bg-danger rounded-pill">{pendingCount} pending</span>
+              <span className="badge bg-danger rounded-pill">{t('registrar.pendingCount', { count: pendingCount })}</span>
             </div>
             <div className="card-body p-0">
               {lastApproval && (
@@ -470,7 +475,7 @@ export default function RegistrarDashboardPage() {
               ) : pendingPatients.length === 0 ? (
                 <div className="text-center py-4 text-muted">
                   <i className="bi bi-check-circle fs-1 d-block mb-2 text-success opacity-50"></i>
-                  <p className="small">No pending patients awaiting approval.</p>
+                  <p className="small">{t('registrar.noPending')}</p>
                 </div>
               ) : (
                 pendingPatients.slice(0, 6).map((p: any) => {
@@ -494,24 +499,24 @@ export default function RegistrarDashboardPage() {
                           <span
                             className="badge bg-warning text-dark rounded-pill ms-1"
                             style={{ fontSize: '0.62rem' }}
-                            title={missing.length ? `Still needed: ${missing.join(', ')}` : 'Chart not yet completed'}
+                            title={missing.length ? t('registrar.stillNeeded', { list: missing.join(', ') }) : t('registrar.chartNotComplete')}
                           >
                             <i className="bi bi-exclamation-triangle-fill me-1"></i>
-                            Chart incomplete{missing.length ? ` · ${missing.length} missing` : ''}
+                            {t('registrar.chartIncomplete')}{missing.length ? t('registrar.missingCount', { count: missing.length }) : ''}
                           </span>
                         )}
                         <br />
                         <small className="text-muted">
-                          {p.created_by || '—'} · {hasVitals ? `${p.vitals_count} vitals` : 'No vitals'} ·{' '}
+                          {p.created_by || '—'} · {hasVitals ? t('registrar.vitalsCount', { count: p.vitals_count }) : t('registrar.noVitals')} ·{' '}
                           <span className={isLongWait ? 'text-danger fw-semibold' : ''}>
-                            {formatWaitTime(p.minutes_waiting)}{isLongWait ? ' (long wait)' : ''}
+                            {formatWaitTime(p.minutes_waiting)}{isLongWait ? t('registrar.longWaitSuffix') : ''}
                           </span>
                         </small>
                         {isIncomplete && missing.length > 0 && (
                           <>
                             <br />
                             <small className="text-muted" style={{ fontSize: '0.68rem' }}>
-                              Still needed: {missing.join(', ')}
+                              {t('registrar.stillNeeded', { list: missing.join(', ') })}
                             </small>
                           </>
                         )}
@@ -522,7 +527,7 @@ export default function RegistrarDashboardPage() {
                         value={assignProvider[p.id] || ''}
                         onChange={(e) => setAssignProvider((prev) => ({ ...prev, [p.id]: e.target.value }))}
                       >
-                        <option value="">Assign provider…</option>
+                        <option value="">{t('registrar.assignProvider')}</option>
                         {providers.filter((pr: any) => pr.main_menu_role === 'standard').map((pr: any) => (
                           <option key={pr.id} value={pr.id}>Dr. {pr.fname} {pr.lname}</option>
                         ))}
@@ -533,10 +538,10 @@ export default function RegistrarDashboardPage() {
                         style={{ width: '140px', fontSize: '0.72rem' }}
                         value={coverage[p.id]?.type || 'self_pay'}
                         onChange={(e) => setCoverage((prev) => ({ ...prev, [p.id]: { type: e.target.value, percent: prev[p.id]?.percent || '40' } }))}
-                        title="Billing coverage"
+                        title={t('registrar.billingCoverage')}
                       >
-                        <option value="self_pay">No insurance</option>
-                        <option value="insured">Insured</option>
+                        <option value="self_pay">{t('registrar.noInsurance')}</option>
+                        <option value="insured">{t('registrar.insured')}</option>
                       </select>
                       {(coverage[p.id]?.type === 'insured') && (
                         <div className="input-group input-group-sm" style={{ width: '110px' }}>
@@ -545,9 +550,9 @@ export default function RegistrarDashboardPage() {
                             className="form-control form-control-sm text-end"
                             value={coverage[p.id]?.percent ?? '40'}
                             onChange={(e) => setCoverage((prev) => ({ ...prev, [p.id]: { type: 'insured', percent: e.target.value } }))}
-                            title="Patient responsibility %"
+                            title={t('registrar.patientResponsibility')}
                           />
-                          <span className="input-group-text px-1" style={{ fontSize: '0.7rem' }}>% pt</span>
+                          <span className="input-group-text px-1" style={{ fontSize: '0.7rem' }}>{t('registrar.percentPt')}</span>
                         </div>
                       )}
                       <button
@@ -559,7 +564,7 @@ export default function RegistrarDashboardPage() {
                           patientPercent: Number(coverage[p.id]?.percent ?? 40),
                         })}
                         disabled={approveMutation.isPending}
-                        title="Approve & assign provider"
+                        title={t('registrar.approveAssign')}
                       >
                         {approveMutation.isPending ? (
                           <span className="spinner-border spinner-border-sm"></span>
@@ -573,7 +578,7 @@ export default function RegistrarDashboardPage() {
               )}
               {pendingPatients.length > 6 && (
                 <div className="text-center py-2">
-                  <small className="text-muted">+{pendingPatients.length - 6} more pending</small>
+                  <small className="text-muted">{t('registrar.morePending', { count: pendingPatients.length - 6 })}</small>
                 </div>
               )}
             </div>
@@ -583,9 +588,9 @@ export default function RegistrarDashboardPage() {
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
               <h6 className="mb-0 fw-bold">
-                <i className="bi bi-calendar2-plus me-2 text-primary"></i>Provider Day Schedule
+                <i className="bi bi-calendar2-plus me-2 text-primary"></i>{t('registrar.providerDaySchedule')}
               </h6>
-              <span className="badge bg-primary rounded-pill">{providerSchedule.filter((p: any) => p.onSchedule).length} on schedule</span>
+              <span className="badge bg-primary rounded-pill">{t('registrar.onScheduleCount', { count: providerSchedule.filter((p: any) => p.onSchedule).length })}</span>
             </div>
             <div className="card-body">
               {providerSchedule.map((p: any) => (
@@ -597,11 +602,11 @@ export default function RegistrarDashboardPage() {
                     <small className="text-muted">
                       {p.onSchedule
                         ? p.blocks.map((b: any) => `${b.pc_startTime?.substring(0, 5)}–${b.pc_endTime?.substring(0, 5)}`).join(', ')
-                        : 'Not on schedule'}
+                        : t('registrar.notOnSchedule')}
                     </small>
                   </div>
                   {p.onSchedule && user?.role === 'admin' && (
-                    <button className="btn btn-outline-danger btn-sm py-0 px-1" title="Remove from schedule"
+                    <button className="btn btn-outline-danger btn-sm py-0 px-1" title={t('registrar.removeFromSchedule')}
                       onClick={() => p.blocks.forEach((b: any) => removeScheduleMutation.mutate(b.pc_eid))}>
                       <i className="bi bi-x-lg"></i>
                     </button>
@@ -609,10 +614,10 @@ export default function RegistrarDashboardPage() {
                 </div>
               ))}
               <hr className="my-2" />
-              <div className="small fw-semibold text-muted mb-1">Add provider to today's schedule</div>
+              <div className="small fw-semibold text-muted mb-1">{t('registrar.addProviderHeading')}</div>
               <div className="d-flex gap-2 flex-wrap">
                 <select className="form-select form-select-sm" style={{ flex: '1 1 140px' }} value={scheduleProviderId} onChange={(e) => setScheduleProviderId(e.target.value)}>
-                  <option value="">Provider…</option>
+                  <option value="">{t('registrar.providerOption')}</option>
                   {providerSchedule.filter((p: any) => !p.onSchedule).map((p: any) => (
                     <option key={p.id} value={p.id}>{p.fname} {p.lname}</option>
                   ))}
@@ -620,7 +625,7 @@ export default function RegistrarDashboardPage() {
                 <input type="time" className="form-control form-control-sm" style={{ width: '110px' }} value={scheduleStart} onChange={(e) => setScheduleStart(e.target.value)} />
                 <input type="time" className="form-control form-control-sm" style={{ width: '110px' }} value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)} />
                 <button className="btn btn-primary btn-sm rounded-pill" onClick={() => addScheduleMutation.mutate()} disabled={!scheduleProviderId || addScheduleMutation.isPending}>
-                  {addScheduleMutation.isPending ? 'Adding…' : <><i className="bi bi-plus-lg me-1"></i>Add</>}
+                  {addScheduleMutation.isPending ? t('registrar.adding') : <><i className="bi bi-plus-lg me-1"></i>{t('registrar.add')}</>}
                 </button>
               </div>
             </div>

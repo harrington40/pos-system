@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../../api/nest-client';
 import { createPatient } from '../../../api/endpoints/patients';
 import PhoneInput from '../../../components/shared/PhoneInput';
@@ -81,8 +82,8 @@ export default function RegisterPatientModal({
   open,
   onClose,
   onRegistered,
-  title = 'Register New Patient',
-  submitLabel = 'Register New Patient',
+  title,
+  submitLabel,
   status,
   defaultProviderId,
   headerNote,
@@ -102,7 +103,12 @@ export default function RegisterPatientModal({
   /** When `open` the form may fall back to an existing chart instead. */
   onUseExisting?: (patient: any) => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // Callers (e.g. the emergency board) pass their own wording; fall back to the
+  // standard registration copy so the modal is usable on its own.
+  const modalTitle = title ?? t('patients.register.title');
+  const modalSubmitLabel = submitLabel ?? t('patients.register.submit');
   const [form, setForm] = useState<RegistrationForm>({ ...EMPTY_REGISTRATION, providerID: defaultProviderId || '' });
   const [step, setStep] = useState(1);
   const [duplicates, setDuplicates] = useState<any[]>([]);
@@ -201,8 +207,8 @@ export default function RegisterPatientModal({
           <div className="modal-content shadow-lg border-0 rounded-4">
             <div className="modal-header border-0 pb-0">
               <div>
-                <h4 className="modal-title"><i className="bi bi-person-plus me-2 text-success"></i>{title}</h4>
-                <p className="text-muted small mb-0 mt-1">Step {step} of 2 — {step === 1 ? 'Personal Information' : 'Contact & Address'}</p>
+                <h4 className="modal-title"><i className="bi bi-person-plus me-2 text-success"></i>{modalTitle}</h4>
+                <p className="text-muted small mb-0 mt-1">{t('patients.search.step', { step, label: step === 1 ? t('patients.search.stepPersonal') : t('patients.search.stepContact') })}</p>
                 {headerNote}
               </div>
               <button className="btn-close" onClick={onClose}></button>
@@ -220,13 +226,13 @@ export default function RegisterPatientModal({
 
               {step === 1 && (
                 <div onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }}>
-                  <h6 className="text-muted text-uppercase small mb-3">Personal Information</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionPersonal')}</h6>
                   <div className="row g-3">
-                    <div className="col-md-4"><label className="form-label small fw-semibold">First Name *</label><input ref={firstRef} className="form-control" value={form.fname} onChange={e => update('fname', e.target.value)} placeholder="John" /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Last Name *</label><input className="form-control" value={form.lname} onChange={e => update('lname', e.target.value)} placeholder="Doe" /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Middle Name</label><input className="form-control" value={form.mname} onChange={e => update('mname', e.target.value)} placeholder="A." /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Date of Birth</label><input className="form-control" type="date" value={form.DOB} onChange={e => update('DOB', e.target.value)} /></div>
-                    <div className="col-md-4"><label className="form-label small fw-semibold">Sex</label><select className="form-select" value={form.sex} onChange={e => update('sex', e.target.value)}><option value="">— Select —</option><option>Male</option><option>Female</option></select></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lFirstName')}</label><input ref={firstRef} className="form-control" value={form.fname} onChange={e => update('fname', e.target.value)} placeholder={t('patients.register.phFirstName')} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lLastName')}</label><input className="form-control" value={form.lname} onChange={e => update('lname', e.target.value)} placeholder={t('patients.register.phLastName')} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lMiddleName')}</label><input className="form-control" value={form.mname} onChange={e => update('mname', e.target.value)} placeholder={t('patients.register.phMiddleName')} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lDob')}</label><input className="form-control" type="date" value={form.DOB} onChange={e => update('DOB', e.target.value)} /></div>
+                    <div className="col-md-4"><label className="form-label small fw-semibold">{t('patients.register.lSex')}</label><select className="form-select" value={form.sex} onChange={e => update('sex', e.target.value)}><option value="">{t('patients.register.select')}</option><option>Male</option><option>Female</option></select></div>
                   </div>
                 </div>
               )}
@@ -234,27 +240,27 @@ export default function RegisterPatientModal({
 
               {step === 2 && (
                 <div>
-                  <h6 className="text-muted text-uppercase small mb-3">Contact Information</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionContact')}</h6>
                   <div className="row g-3 mb-4">
-                    <div className="col-md-6"><label className="form-label small fw-semibold">Email</label><input className="form-control" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="patient@email.com" /></div>
-                    <div className="col-md-6"><label className="form-label small fw-semibold">Phone</label><PhoneInput value={form.phone_contact} onChange={(v) => update('phone_contact', v)} /></div>
+                    <div className="col-md-6"><label className="form-label small fw-semibold">{t('patients.register.lEmail')}</label><input className="form-control" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="patient@email.com" /></div>
+                    <div className="col-md-6"><label className="form-label small fw-semibold">{t('patients.register.lPhone')}</label><PhoneInput value={form.phone_contact} onChange={(v) => update('phone_contact', v)} /></div>
                   </div>
-                  <h6 className="text-muted text-uppercase small mb-3">Provider Assignment</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionProvider')}</h6>
                   <div className="row g-3 mb-4">
                     <div className="col-md-6">
-                      <label className="form-label small fw-semibold">Primary Care Provider</label>
+                      <label className="form-label small fw-semibold">{t('patients.register.lProvider')}</label>
                       <select className="form-select" value={form.providerID} onChange={e => update('providerID', e.target.value)}>
-                        <option value="">— Select Provider —</option>
+                        <option value="">{t('patients.register.selectProvider')}</option>
                         {providers.filter((p: any) => p.active).map((p: any) => (
                           <option key={p.id} value={p.id}>{p.title ? `${p.title} ` : ''}{p.fname} {p.lname}{p.specialty ? ` (${p.specialty})` : ''}</option>
                         ))}
                       </select>
                     </div>
                   </div>
-                  <h6 className="text-muted text-uppercase small mb-3">Address</h6>
+                  <h6 className="text-muted text-uppercase small mb-3">{t('patients.register.sectionAddress')}</h6>
                   <div className="row g-3">
-                    <div className="col-12"><label className="form-label small fw-semibold">Street</label><input className="form-control" value={form.street} onChange={e => update('street', e.target.value)} placeholder="123 Main Street" /></div>
-                    <div className="col-md-12"><label className="form-label small fw-semibold">City</label><CitySelect value={form.city} onChange={(v) => update('city', v)} /></div>
+                    <div className="col-12"><label className="form-label small fw-semibold">{t('patients.register.lStreet')}</label><input className="form-control" value={form.street} onChange={e => update('street', e.target.value)} placeholder={t('patients.register.phStreet')} /></div>
+                    <div className="col-md-12"><label className="form-label small fw-semibold">{t('patients.register.lCity')}</label><CitySelect value={form.city} onChange={(v) => update('city', v)} /></div>
                   </div>
                 </div>
               )}
@@ -262,7 +268,7 @@ export default function RegisterPatientModal({
               {checkingDup && (
                 <div className="alert alert-light border d-flex align-items-center gap-2 small">
                   <span className="spinner-border spinner-border-sm text-primary"></span>
-                  Checking for an existing patient record…
+                  {t('patients.register.checkingDuplicate')}
                 </div>
               )}
 
@@ -270,17 +276,17 @@ export default function RegisterPatientModal({
                 <div className="alert alert-warning p-3 rounded-3">
                   <div className="fw-semibold mb-2">
                     <i className="bi bi-shield-exclamation me-1"></i>
-                    Registration blocked — this patient may already be on file
+                    {t('patients.register.blocked')}
                   </div>
                   {duplicates.map((d: any) => (
                     <div key={d.id} className="d-flex align-items-center justify-content-between border-bottom py-2 small">
                       <div>
                         <strong>{formatPatientName(d)}</strong>
-                        <div className="text-muted">DOB: {d.DOB || '—'} · Phone: {d.phone_contact || '—'}</div>
+                        <div className="text-muted">{t('patients.register.dobPhone', { dob: d.DOB || '—', phone: d.phone_contact || '—' })}</div>
                       </div>
                       <button className="btn btn-sm btn-outline-primary rounded-pill px-3"
                         onClick={() => { setDuplicates([]); onUseExisting?.(d); }}>
-                        Use Existing <i className="bi bi-arrow-right ms-1"></i>
+                        {t('patients.register.useExisting')} <i className="bi bi-arrow-right ms-1"></i>
                       </button>
                     </div>
                   ))}
@@ -289,28 +295,26 @@ export default function RegisterPatientModal({
                       id="override-duplicate" checked={overrideDuplicate}
                       onChange={(e) => setOverrideDuplicate(e.target.checked)} />
                     <label className="form-check-label small fw-semibold" htmlFor="override-duplicate">
-                      Override — register as a new patient anyway
+                      {t('patients.register.override')}
                     </label>
                   </div>
                   <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                    Only use the override when you are sure this is a different person
-                    (for example a shared phone number or a common name). Leave it off to
-                    open the existing chart instead of creating a duplicate.
+                    {t('patients.register.overrideHint')}
                   </div>
                 </div>
               )}
             </div>
 
             <div className="modal-footer border-0 pt-0">
-              {step === 2 && <button className="btn btn-outline-secondary" onClick={() => setStep(1)}><i className="bi bi-arrow-left me-1"></i>Back</button>}
+              {step === 2 && <button className="btn btn-outline-secondary" onClick={() => setStep(1)}><i className="bi bi-arrow-left me-1"></i>{t('patients.register.back')}</button>}
               <div className="flex-grow-1"></div>
-              {step === 1 && <button className="btn btn-primary px-4" onClick={nextStep} disabled={!canAdvance(form)}>Next <i className="bi bi-arrow-right ms-1"></i></button>}
+              {step === 1 && <button className="btn btn-primary px-4" onClick={nextStep} disabled={!canAdvance(form)}>{t('patients.register.next')} <i className="bi bi-arrow-right ms-1"></i></button>}
               {step === 2 && (
                 <button className="btn btn-success px-4" onClick={handleSubmit} disabled={create.isPending || checkingDup}>
-                  {create.isPending ? <><span className="spinner-border spinner-border-sm me-2" />Registering...</> : <><i className="bi bi-check-lg me-1"></i>{submitLabel}</>}
+                  {create.isPending ? <><span className="spinner-border spinner-border-sm me-2" />{t('patients.register.registering')}</> : <><i className="bi bi-check-lg me-1"></i>{modalSubmitLabel}</>}
                 </button>
               )}
-              {create.isError && <small className="text-danger">Registration failed. Please try again.</small>}
+              {create.isError && <small className="text-danger">{t('patients.register.failed')}</small>}
             </div>
           </div>
         </div>

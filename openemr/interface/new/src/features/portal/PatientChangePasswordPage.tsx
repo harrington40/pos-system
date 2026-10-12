@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 
@@ -9,15 +10,16 @@ import nestClient from '../../api/nest-client';
  * authority. Kept deliberately small so there is less to drift out of step
  * with the backend policy than a full re-implementation would.
  */
-const RULES: { label: string; test: (v: string) => boolean }[] = [
-  { label: 'At least 12 characters', test: v => v.length >= 12 },
-  { label: 'An uppercase letter', test: v => /[A-Z]/.test(v) },
-  { label: 'A lowercase letter', test: v => /[a-z]/.test(v) },
-  { label: 'A number', test: v => /[0-9]/.test(v) },
-  { label: 'A symbol', test: v => /[^A-Za-z0-9]/.test(v) },
+const RULES: { key: string; label: string; test: (v: string) => boolean }[] = [
+  { key: 'ruleLength', label: 'At least 12 characters', test: v => v.length >= 12 },
+  { key: 'ruleUpper', label: 'An uppercase letter', test: v => /[A-Z]/.test(v) },
+  { key: 'ruleLower', label: 'A lowercase letter', test: v => /[a-z]/.test(v) },
+  { key: 'ruleNumber', label: 'A number', test: v => /[0-9]/.test(v) },
+  { key: 'ruleSymbol', label: 'A symbol', test: v => /[^A-Za-z0-9]/.test(v) },
 ];
 
 export default function PatientChangePasswordPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -61,8 +63,8 @@ export default function PatientChangePasswordPage() {
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
         <div className="text-center">
-          <p className="text-muted">Your session has ended. Please sign in again.</p>
-          <Link to="/portal/login" className="btn btn-success">Back to sign in</Link>
+          <p className="text-muted">{t('portal.password.sessionEnded')}</p>
+          <Link to="/portal/login" className="btn btn-success">{t('portal.password.backToSignIn')}</Link>
         </div>
       </div>
     );
@@ -74,7 +76,7 @@ export default function PatientChangePasswordPage() {
         <div className="card-body p-4">
           <div className="text-center mb-4">
             <i className="bi bi-shield-lock text-success" style={{ fontSize: '2.5rem' }}></i>
-            <h4 className="mt-2 mb-1">Choose your password</h4>
+            <h4 className="mt-2 mb-1">{t('portal.password.choose')}</h4>
             <p className="text-muted small mb-0">
               The password you were given is for one sign-in only. Please pick your own.
             </p>
@@ -82,7 +84,7 @@ export default function PatientChangePasswordPage() {
 
           {done ? (
             <div className="text-center">
-              <div className="alert alert-success py-2 small">Your password has been updated.</div>
+              <div className="alert alert-success py-2 small">{t('portal.password.updated')}</div>
               <button className="btn btn-success w-100" onClick={() => navigate('/portal/dashboard', { replace: true })}>
                 Continue to my records
               </button>
@@ -98,12 +100,12 @@ export default function PatientChangePasswordPage() {
               )}
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
-                  <label className="form-label">Current password</label>
+                  <label className="form-label">{t('portal.password.current')}</label>
                   <input type="password" className="form-control" value={current}
                     onChange={e => setCurrent(e.target.value)} required autoComplete="current-password" />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label">New password</label>
+                  <label className="form-label">{t('portal.password.new')}</label>
                   <input type="password" className="form-control" value={next}
                     onChange={e => setNext(e.target.value)} required autoComplete="new-password" />
                 </div>
@@ -113,17 +115,17 @@ export default function PatientChangePasswordPage() {
                     return (
                       <li key={rule.label} className={met ? 'text-success' : 'text-muted'}>
                         <i className={`bi ${met ? 'bi-check-circle-fill' : 'bi-circle'} me-1`}></i>
-                        {rule.label}
+                        {t('portal.password.' + rule.key, { defaultValue: rule.label })}
                       </li>
                     );
                   })}
                 </ul>
                 <div className="mb-3">
-                  <label className="form-label">Confirm new password</label>
+                  <label className="form-label">{t('portal.password.confirm')}</label>
                   <input type="password" className="form-control" value={confirm}
                     onChange={e => setConfirm(e.target.value)} required autoComplete="new-password" />
                 </div>
-                <button type="submit" className="btn btn-success w-100">Update password</button>
+                <button type="submit" className="btn btn-success w-100">{t('portal.password.update')}</button>
               </form>
             </>
           )}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
@@ -18,6 +19,7 @@ interface ColumnInfo {
 }
 
 export default function DbAdminPage() {
+  const { t } = useTranslation();
   const [selectedTable, setSelectedTable] = useState('');
   const [sqlQuery, setSqlQuery] = useState('');
   const [queryResult, setQueryResult] = useState<any>(null);
@@ -64,7 +66,7 @@ export default function DbAdminPage() {
         setQueryError('');
       }
     } catch (err: any) {
-      setQueryError(err.response?.data?.error || 'Query failed');
+      setQueryError(err.response?.data?.error || t('admin.db.queryFailed'));
     }
     setQueryRunning(false);
   };
@@ -75,7 +77,7 @@ export default function DbAdminPage() {
     <div>
       <h3 className="mb-3">
         <i className="bi bi-database me-2 text-primary"></i>
-        Database Admin
+        {t('admin.db.title')}
       </h3>
 
       {/* Stats */}
@@ -84,7 +86,7 @@ export default function DbAdminPage() {
           <div className="card bg-primary bg-opacity-10 border-primary text-center">
             <div className="card-body py-3">
               <div className="fs-3 fw-bold text-primary">{tables.length}</div>
-              <small className="text-muted">Tables</small>
+              <small className="text-muted">{t('admin.db.tables')}</small>
             </div>
           </div>
         </div>
@@ -92,7 +94,7 @@ export default function DbAdminPage() {
           <div className="card bg-success bg-opacity-10 border-success text-center">
             <div className="card-body py-3">
               <div className="fs-3 fw-bold text-success">{totalRows.toLocaleString()}</div>
-              <small className="text-muted">Total Rows</small>
+              <small className="text-muted">{t('admin.db.totalRows')}</small>
             </div>
           </div>
         </div>
@@ -103,24 +105,24 @@ export default function DbAdminPage() {
         <div className="col-md-4">
           <div className="card shadow-sm">
             <div className="card-header bg-white">
-              <h6 className="mb-0"><i className="bi bi-list me-2"></i>Tables</h6>
+              <h6 className="mb-0"><i className="bi bi-list me-2"></i>{t('admin.db.tables')}</h6>
             </div>
             <div className="card-body p-0" style={{ maxHeight: '500px', overflow: 'auto' }}>
               <table className="table table-sm table-hover mb-0">
-                <thead><tr><th>Table</th><th className="text-end">Rows</th></tr></thead>
+                <thead><tr><th>{t('admin.db.tableCol')}</th><th className="text-end">{t('admin.db.rowsCol')}</th></tr></thead>
                 <tbody>
-                  {tables.map((t) => (
+                  {tables.map((tbl) => (
                     <tr
-                      key={t.name}
-                      className={selectedTable === t.name ? 'table-active' : ''}
+                      key={tbl.name}
+                      className={selectedTable === tbl.name ? 'table-active' : ''}
                       style={{ cursor: 'pointer' }}
-                      onClick={() => setSelectedTable(t.name)}
+                      onClick={() => setSelectedTable(tbl.name)}
                     >
                       <td className="small">
                         <i className="bi bi-table me-1 text-muted"></i>
-                        {t.name}
+                        {tbl.name}
                       </td>
-                      <td className="text-end small text-muted">{t.rows.toLocaleString()}</td>
+                      <td className="text-end small text-muted">{tbl.rows.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -140,13 +142,13 @@ export default function DbAdminPage() {
                     <i className="bi bi-table me-2"></i>
                     {selectedTable}
                   </h6>
-                  <small className="text-muted">{columns.length} columns</small>
+                  <small className="text-muted">{t('admin.db.columns', { count: columns.length })}</small>
                 </div>
                 <div className="card-body p-0" style={{ maxHeight: '200px', overflow: 'auto' }}>
                   <table className="table table-sm mb-0 small">
                     <thead>
                       <tr>
-                        <th>Column</th><th>Type</th><th>Null</th><th>Key</th><th>Default</th>
+                        <th>{t('admin.db.columnCol')}</th><th>{t('admin.db.typeCol')}</th><th>{t('admin.db.nullCol')}</th><th>{t('admin.db.keyCol')}</th><th>{t('admin.db.defaultCol')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -167,7 +169,7 @@ export default function DbAdminPage() {
               {/* Data Rows */}
               <div className="card shadow-sm">
                 <div className="card-header bg-white">
-                  <h6 className="mb-0"><i className="bi bi-database me-2"></i>Data (last 100 rows)</h6>
+                  <h6 className="mb-0"><i className="bi bi-database me-2"></i>{t('admin.db.dataTitle')}</h6>
                 </div>
                 <div className="card-body p-0" style={{ maxHeight: '300px', overflow: 'auto' }}>
                   {rows.length > 0 ? (
@@ -192,7 +194,7 @@ export default function DbAdminPage() {
                       </tbody>
                     </table>
                   ) : (
-                    <div className="text-center py-4 text-muted small">No rows</div>
+                    <div className="text-center py-4 text-muted small">{t('admin.db.noRows')}</div>
                   )}
                 </div>
               </div>
@@ -201,7 +203,7 @@ export default function DbAdminPage() {
             <div className="card shadow-sm">
               <div className="card-body text-center py-5 text-muted">
                 <i className="bi bi-arrow-left-circle" style={{ fontSize: '2rem' }}></i>
-                <p className="mt-2">Select a table to view its schema and data</p>
+                <p className="mt-2">{t('admin.db.noSelection')}</p>
               </div>
             </div>
           )}
@@ -212,8 +214,8 @@ export default function DbAdminPage() {
       <div className="card shadow-sm mt-4">
         <div className="card-header bg-dark text-white">
           <h6 className="mb-0">
-            <i className="bi bi-terminal me-2"></i>SQL Console
-            <small className="text-white-50 ms-2">(SELECT, SHOW, DESCRIBE only)</small>
+            <i className="bi bi-terminal me-2"></i>{t('admin.db.sqlConsole')}
+            <small className="text-white-50 ms-2">{t('admin.db.sqlHint')}</small>
           </h6>
         </div>
         <div className="card-body">
@@ -223,7 +225,7 @@ export default function DbAdminPage() {
                 className="form-control form-control-sm"
                 style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
                 rows={3}
-                placeholder="SELECT * FROM patient_data LIMIT 10"
+                placeholder={t('admin.db.sqlPlaceholder')}
                 value={sqlQuery}
                 onChange={(e) => setSqlQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -237,7 +239,7 @@ export default function DbAdminPage() {
                 onClick={runQuery}
                 disabled={queryRunning || !sqlQuery.trim()}
               >
-                {queryRunning ? '...' : 'Run (Ctrl+Enter)'}
+                {queryRunning ? '...' : t('admin.db.run')}
               </button>
             </div>
           </div>
@@ -250,7 +252,7 @@ export default function DbAdminPage() {
 
           {queryResult && (
             <div className="mt-3">
-              <small className="text-muted">{queryResult.count} rows</small>
+              <small className="text-muted">{t('admin.db.resultRows', { count: queryResult.count })}</small>
               <div style={{ maxHeight: '300px', overflow: 'auto' }}>
                 <table className="table table-sm small mt-1 mb-0">
                   <thead>

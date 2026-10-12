@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAppointments } from '../../api/endpoints/appointments';
@@ -93,6 +94,7 @@ function Panel({ title, icon, actions, children }: {
 }
 
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { currency, exchangeRate } = useCurrency();
 
@@ -219,10 +221,10 @@ export default function ReportsPage() {
         </div>
         <div className="position-relative d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-graph-up-arrow me-2"></i>Reports &amp; Analytics</h2>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-graph-up-arrow me-2"></i>{t('reports.title')}</h2>
             <p className="mb-0 text-white text-opacity-75 small">
               <i className="bi bi-calendar-range me-1"></i>
-              {formatDateHuman(dateFrom)} — {formatDateHuman(dateTo)} · {daysInPeriod} day{daysInPeriod === 1 ? '' : 's'}
+              {t('reports.rangeSummary', { from: formatDateHuman(dateFrom), to: formatDateHuman(dateTo), days: t('reports.dayCount', { count: daysInPeriod }) })}
             </p>
           </div>
           <div className="bg-white bg-opacity-15 rounded-3 p-1"><CurrencySwitcher /></div>
@@ -237,15 +239,15 @@ export default function ReportsPage() {
               <button key={r.key} type="button"
                 className={`btn ${rangeKey === r.key ? 'btn-primary' : 'btn-outline-primary'}`}
                 onClick={() => applyRange(r.key)}>
-                {r.label}
+                {t('reports.range.' + r.key, { defaultValue: r.label })}
               </button>
             ))}
           </div>
           <div className="d-flex align-items-center gap-2">
-            <label className="small text-muted mb-0">From</label>
+            <label className="small text-muted mb-0">{t('reports.from')}</label>
             <input type="date" className="form-control form-control-sm" style={{ width: '150px' }}
               value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setRangeKey('custom'); }} />
-            <label className="small text-muted mb-0">To</label>
+            <label className="small text-muted mb-0">{t('reports.to')}</label>
             <input type="date" className="form-control form-control-sm" style={{ width: '150px' }}
               value={dateTo} onChange={(e) => { setDateTo(e.target.value); setRangeKey('custom'); }} />
           </div>
@@ -255,14 +257,14 @@ export default function ReportsPage() {
       {/* Tabs */}
       <ul className="nav nav-pills gap-2 mb-3">
         {([
-          { id: 'appointments' as ReportTab, label: 'Appointments', icon: 'bi-calendar-check' },
-          { id: 'patients' as ReportTab, label: 'Patients', icon: 'bi-people' },
-          { id: 'financial' as ReportTab, label: 'Financial', icon: 'bi-cash-stack' },
-        ]).map((t) => (
-          <li className="nav-item" key={t.id}>
-            <button className={`nav-link rounded-pill ${activeTab === t.id ? 'active' : 'text-dark bg-white'}`}
-              onClick={() => setActiveTab(t.id)}>
-              <i className={`bi ${t.icon} me-1`}></i>{t.label}
+          { id: 'appointments' as ReportTab, label: t('reports.tabs.appointments'), icon: 'bi-calendar-check' },
+          { id: 'patients' as ReportTab, label: t('reports.tabs.patients'), icon: 'bi-people' },
+          { id: 'financial' as ReportTab, label: t('reports.tabs.financial'), icon: 'bi-cash-stack' },
+        ]).map((tab) => (
+          <li className="nav-item" key={tab.id}>
+            <button className={`nav-link rounded-pill ${activeTab === tab.id ? 'active' : 'text-dark bg-white'}`}
+              onClick={() => setActiveTab(tab.id)}>
+              <i className={`bi ${tab.icon} me-1`}></i>{tab.label}
             </button>
           </li>
         ))}
@@ -272,16 +274,16 @@ export default function ReportsPage() {
       {activeTab === 'appointments' && (
         <>
           <div className="row g-3 mb-3">
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-calendar-check" color="#0d6efd" label="Appointments" value={totalAppointments} sub="in range" /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-people" color="#198754" label="Unique patients" value={uniquePatients} sub="distinct" /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-calendar-range" color="#0dcaf0" label="Days in period" value={daysInPeriod} /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-speedometer" color="#fd7e14" label="Avg per day" value={avgPerDay} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-calendar-check" color="#0d6efd" label={t('reports.kpi.appointments')} value={totalAppointments} sub={t('reports.kpi.inRange')} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-people" color="#198754" label={t('reports.kpi.uniquePatients')} value={uniquePatients} sub={t('reports.kpi.distinct')} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-calendar-range" color="#0dcaf0" label={t('reports.kpi.daysInPeriod')} value={daysInPeriod} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-speedometer" color="#fd7e14" label={t('reports.kpi.avgPerDay')} value={avgPerDay} /></div>
           </div>
 
           <div className="row g-3">
             <div className="col-lg-4">
-              <Panel title="Status breakdown" icon="bi-pie-chart">
-                {statusCounts.length === 0 && <div className="text-muted small text-center py-3">No appointments in this range</div>}
+              <Panel title={t('reports.panels.statusBreakdown')} icon="bi-pie-chart">
+                {statusCounts.length === 0 && <div className="text-muted small text-center py-3">{t('reports.panels.noAppointments')}</div>}
                 {statusCounts.map(([status, count]) => (
                   <BarRow key={status} label={status} value={count} total={totalAppointments}
                     color={statusColor(status)} right={`${count} · ${pct(count, totalAppointments)}%`} />
@@ -289,18 +291,18 @@ export default function ReportsPage() {
               </Panel>
             </div>
             <div className="col-lg-8">
-              <Panel title="Appointment details" icon="bi-list-check"
+              <Panel title={t('reports.panels.appointmentDetails')} icon="bi-list-check"
                 actions={<span className="badge bg-primary rounded-pill">{totalAppointments}</span>}>
                 <div className="table-responsive" style={{ maxHeight: '460px' }}>
                   <table className="table table-sm table-hover align-middle mb-0">
                     <thead className="table-light sticky-top">
-                      <tr><th>Date</th><th>Time</th><th>Patient</th><th>Reason</th><th>Provider</th><th>Status</th></tr>
+                      <tr><th>{t('reports.cols.date')}</th><th>{t('reports.cols.time')}</th><th>{t('reports.cols.patient')}</th><th>{t('reports.cols.reason')}</th><th>{t('reports.cols.provider')}</th><th>{t('reports.cols.status')}</th></tr>
                     </thead>
                     <tbody>
                       {loadingAppointments ? (
                         <tr><td colSpan={6} className="text-center py-3"><div className="spinner-border spinner-border-sm"></div></td></tr>
                       ) : appointments.length === 0 ? (
-                        <tr><td colSpan={6} className="text-center text-muted py-4">No appointments in this range</td></tr>
+                        <tr><td colSpan={6} className="text-center text-muted py-4">{t('reports.panels.noAppointments')}</td></tr>
                       ) : appointments.map((apt) => (
                         <tr key={apt.pc_eid} style={{ cursor: 'pointer' }}
                           onClick={() => openChart(apt.patient_id, apt.pc_pid)}>
@@ -329,16 +331,16 @@ export default function ReportsPage() {
       {activeTab === 'patients' && (
         <>
           <div className="row g-3 mb-3">
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-people" color="#0d6efd" label="Total patients" value={pTotal} /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-person-check" color="#198754" label="Active" value={pActive} sub={`${pct(pActive, pTotal)}% of total`} /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-person-plus" color="#0dcaf0" label="New (30 days)" value={pNew} /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-calendar3" color="#6f42c1" label="Registered this year" value={pThisYear} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-people" color="#0d6efd" label={t('reports.kpi.totalPatients')} value={pTotal} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-person-check" color="#198754" label={t('reports.kpi.active')} value={pActive} sub={t('reports.kpi.ofTotal', { percent: pct(pActive, pTotal) })} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-person-plus" color="#0dcaf0" label={t('reports.kpi.new30')} value={pNew} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-calendar3" color="#6f42c1" label={t('reports.kpi.registeredThisYear')} value={pThisYear} /></div>
           </div>
 
           <div className="row g-3 mb-3">
             <div className="col-lg-4">
-              <Panel title="By sex" icon="bi-gender-ambiguous">
-                {pSex.length === 0 && <div className="text-muted small text-center py-3">No data</div>}
+              <Panel title={t('reports.panels.bySex')} icon="bi-gender-ambiguous">
+                {pSex.length === 0 && <div className="text-muted small text-center py-3">{t('reports.panels.noData')}</div>}
                 {pSex.map((r, i) => (
                   <BarRow key={r.label} label={r.label} value={Number(r.count)} total={sexTotal}
                     color={['#0d6efd', '#e83e8c', '#6c757d', '#00c9a7'][i % 4]}
@@ -347,8 +349,8 @@ export default function ReportsPage() {
               </Panel>
             </div>
             <div className="col-lg-4">
-              <Panel title="By age band" icon="bi-bar-chart-steps">
-                {pAges.length === 0 && <div className="text-muted small text-center py-3">No data</div>}
+              <Panel title={t('reports.panels.byAgeBand')} icon="bi-bar-chart-steps">
+                {pAges.length === 0 && <div className="text-muted small text-center py-3">{t('reports.panels.noData')}</div>}
                 {pAges.map((r, i) => (
                   <BarRow key={r.label} label={r.label} value={Number(r.count)} total={ageTotal}
                     color={['#0dcaf0', '#00c9a7', '#198754', '#fd7e14', '#dc3545', '#6c757d'][i % 6]}
@@ -357,8 +359,8 @@ export default function ReportsPage() {
               </Panel>
             </div>
             <div className="col-lg-4">
-              <Panel title="By status" icon="bi-clipboard-check">
-                {pStatus.length === 0 && <div className="text-muted small text-center py-3">No data</div>}
+              <Panel title={t('reports.panels.byStatus')} icon="bi-clipboard-check">
+                {pStatus.length === 0 && <div className="text-muted small text-center py-3">{t('reports.panels.noData')}</div>}
                 {pStatus.map((r) => (
                   <BarRow key={r.label} label={r.label} value={Number(r.count)} total={pTotal}
                     color="#6610f2" right={`${r.count} · ${pct(Number(r.count), pTotal)}%`} />
@@ -369,8 +371,8 @@ export default function ReportsPage() {
 
           <div className="row g-3">
             <div className="col-lg-5">
-              <Panel title="Registration trend" icon="bi-graph-up">
-                {pMonthly.length === 0 && <div className="text-muted small text-center py-3">No registrations in this range</div>}
+              <Panel title={t('reports.panels.registrationTrend')} icon="bi-graph-up">
+                {pMonthly.length === 0 && <div className="text-muted small text-center py-3">{t('reports.panels.noRegistrations')}</div>}
                 <div className="d-flex align-items-end gap-3" style={{ height: '160px' }}>
                   {pMonthly.map((m) => (
                     <div key={m.month} className="flex-fill text-center">
@@ -384,18 +386,18 @@ export default function ReportsPage() {
               </Panel>
             </div>
             <div className="col-lg-7">
-              <Panel title="Recent registrations" icon="bi-person-lines-fill"
+              <Panel title={t('reports.panels.recentRegistrations')} icon="bi-person-lines-fill"
                 actions={<span className="badge bg-primary rounded-pill">{pRecent.length}</span>}>
                 <div className="table-responsive" style={{ maxHeight: '380px' }}>
                   <table className="table table-sm table-hover align-middle mb-0">
                     <thead className="table-light sticky-top">
-                      <tr><th>Patient</th><th>PID</th><th>DOB</th><th>Sex</th><th>Status</th><th className="text-end">Visits</th></tr>
+                      <tr><th>{t('reports.cols.patient')}</th><th>{t('reports.cols.pid')}</th><th>{t('reports.cols.dob')}</th><th>{t('reports.cols.sex')}</th><th>{t('reports.cols.status')}</th><th className="text-end">{t('reports.cols.visits')}</th></tr>
                     </thead>
                     <tbody>
                       {loadingPatients ? (
                         <tr><td colSpan={6} className="text-center py-3"><div className="spinner-border spinner-border-sm"></div></td></tr>
                       ) : pRecent.length === 0 ? (
-                        <tr><td colSpan={6} className="text-center text-muted py-4">No registrations in this range</td></tr>
+                        <tr><td colSpan={6} className="text-center text-muted py-4">{t('reports.panels.noRegistrations')}</td></tr>
                       ) : pRecent.map((p: any) => (
                         <tr key={p.patientId} style={{ cursor: 'pointer' }} onClick={() => openChart(p.patientId, p.pid)}>
                           <td className="text-nowrap fw-semibold">{p.name}</td>
@@ -419,19 +421,19 @@ export default function ReportsPage() {
       {activeTab === 'financial' && (
         <>
           <div className="row g-3 mb-3">
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-receipt" color="#0d6efd" label="Total charges" value={fin ? money(fin.totalCharges) : '—'} sub={`${fin?.chargeCount ?? 0} line items`} /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-cash-stack" color="#198754" label="Collected" value={fin ? money(fin.totalPayments) : '—'} sub={`${fin?.paymentCount ?? 0} payments`} /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-exclamation-circle" color="#dc3545" label="Outstanding" value={fin ? money(fin.balance) : '—'} sub={`${fin?.billedPatients ?? 0} billed patients`} /></div>
-            <div className="col-6 col-lg-3"><KpiTile icon="bi-percent" color="#6f42c1" label="Collection rate" value={`${fin?.collectionRate ?? 0}%`} sub={fin ? `avg charge ${money(fin.avgCharge)}` : ''} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-receipt" color="#0d6efd" label={t('reports.kpi.totalCharges')} value={fin ? money(fin.totalCharges) : '—'} sub={t('reports.kpi.lineItems', { count: fin?.chargeCount ?? 0 })} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-cash-stack" color="#198754" label={t('reports.kpi.collected')} value={fin ? money(fin.totalPayments) : '—'} sub={t('reports.kpi.paymentsCount', { count: fin?.paymentCount ?? 0 })} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-exclamation-circle" color="#dc3545" label={t('reports.kpi.outstanding')} value={fin ? money(fin.balance) : '—'} sub={t('reports.kpi.billedPatients', { count: fin?.billedPatients ?? 0 })} /></div>
+            <div className="col-6 col-lg-3"><KpiTile icon="bi-percent" color="#6f42c1" label={t('reports.kpi.collectionRate')} value={`${fin?.collectionRate ?? 0}%`} sub={fin ? t('reports.kpi.avgChargeSub', { amount: money(fin.avgCharge) }) : ''} /></div>
           </div>
 
           <div className="row g-3 mb-3">
             <div className="col-lg-5">
-              <Panel title="Charges by category" icon="bi-pie-chart">
+              <Panel title={t('reports.panels.chargesByCategory')} icon="bi-pie-chart">
                 {loadingFinancial ? (
                   <div className="text-center py-3"><div className="spinner-border spinner-border-sm"></div></div>
                 ) : categories.length === 0 ? (
-                  <div className="text-muted small text-center py-3">No charges in this range</div>
+                  <div className="text-muted small text-center py-3">{t('reports.panels.noCharges')}</div>
                 ) : categories.map((c, i) => (
                   <BarRow key={c.category} label={c.category} value={Number(c.amount)} total={Number(fin?.totalCharges) || 0}
                     color={['#0d6efd', '#198754', '#fd7e14', '#6f42c1', '#0dcaf0', '#dc3545', '#00c9a7'][i % 7]}
@@ -440,20 +442,20 @@ export default function ReportsPage() {
               </Panel>
             </div>
             <div className="col-lg-7">
-              <Panel title="Revenue summary" icon="bi-clipboard-data"
+              <Panel title={t('reports.panels.revenueSummary')} icon="bi-clipboard-data"
                 actions={
                   <button className="btn btn-sm btn-primary rounded-pill" onClick={() => navigate('/billing')}>
-                    <i className="bi bi-box-arrow-up-right me-1"></i>Open Billing
+                    <i className="bi bi-box-arrow-up-right me-1"></i>{t('reports.openBilling')}
                   </button>
                 }>
                 <div className="row g-2">
                   {[
-                    { l: 'Charges', v: money(fin?.totalCharges ?? 0), c: '#0d6efd' },
-                    { l: 'Payments', v: money(fin?.totalPayments ?? 0), c: '#198754' },
-                    { l: 'Adjustments', v: money(fin?.totalAdjustments ?? 0), c: '#fd7e14' },
-                    { l: 'Outstanding', v: money(fin?.balance ?? 0), c: '#dc3545' },
-                    { l: 'Avg charge', v: money(fin?.avgCharge ?? 0), c: '#6f42c1' },
-                    { l: 'Avg payment', v: money(fin?.avgPayment ?? 0), c: '#00c9a7' },
+                    { l: t('reports.money.charges'), v: money(fin?.totalCharges ?? 0), c: '#0d6efd' },
+                    { l: t('reports.money.payments'), v: money(fin?.totalPayments ?? 0), c: '#198754' },
+                    { l: t('reports.money.adjustments'), v: money(fin?.totalAdjustments ?? 0), c: '#fd7e14' },
+                    { l: t('reports.money.outstanding'), v: money(fin?.balance ?? 0), c: '#dc3545' },
+                    { l: t('reports.money.avgCharge'), v: money(fin?.avgCharge ?? 0), c: '#6f42c1' },
+                    { l: t('reports.money.avgPayment'), v: money(fin?.avgPayment ?? 0), c: '#00c9a7' },
                   ].map((s) => (
                     <div className="col-6 col-md-4" key={s.l}>
                       <div className="p-2 rounded-3 h-100" style={{ backgroundColor: `${s.c}10` }}>
@@ -466,7 +468,7 @@ export default function ReportsPage() {
                 <hr />
 
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="small text-muted">Collection rate</span>
+                  <span className="small text-muted">{t('reports.money.collectionRate')}</span>
                   <span className="fw-bold">{fin?.collectionRate ?? 0}%</span>
                 </div>
                 <div className="progress" style={{ height: '10px' }}>
@@ -476,33 +478,33 @@ export default function ReportsPage() {
                 {(fin?.pendingHolds ?? 0) > 0 && (
                   <div className="alert alert-warning py-2 small mt-3 mb-0">
                     <i className="bi bi-lock-fill me-1"></i>
-                    {fin.pendingHolds} billing hold{fin.pendingHolds === 1 ? '' : 's'} still to clear
-                    {fin.heldAmount ? ` · ${money(fin.heldAmount)} held` : ''}
+                    {t('reports.billingHolds', { count: fin.pendingHolds })}
+                    {fin.heldAmount ? ' ' + t('reports.heldAmount', { amount: money(fin.heldAmount) }) : ''}
                   </div>
                 )}
                 <div className="text-muted small mt-3">
-                  Encounters: {fin?.encounterCount ?? 0} · Charge lines: {fin?.chargeCount ?? 0} · Payments: {fin?.paymentCount ?? 0}
+                  {t('reports.totalsLine', { encounters: fin?.encounterCount ?? 0, lines: fin?.chargeCount ?? 0, payments: fin?.paymentCount ?? 0 })}
                 </div>
               </Panel>
             </div>
           </div>
 
-          <Panel title="Outstanding balances" icon="bi-person-exclamation"
+          <Panel title={t('reports.panels.outstandingBalances')} icon="bi-person-exclamation"
             actions={
               <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={() => navigate('/billing/medical')}>
-                <i className="bi bi-cash-coin me-1"></i>Take payment
+                <i className="bi bi-cash-coin me-1"></i>{t('reports.takePayment')}
               </button>
             }>
             <div className="table-responsive" style={{ maxHeight: '360px' }}>
               <table className="table table-sm table-hover align-middle mb-0">
                 <thead className="table-light sticky-top">
-                  <tr><th>Patient</th><th>PID</th><th className="text-end">Charges</th><th className="text-end">Paid</th><th className="text-end">Balance</th></tr>
+                  <tr><th>{t('reports.cols.patient')}</th><th>{t('reports.cols.pid')}</th><th className="text-end">{t('reports.cols.charges')}</th><th className="text-end">{t('reports.cols.paid')}</th><th className="text-end">{t('reports.cols.balance')}</th></tr>
                 </thead>
                 <tbody>
                   {loadingFinancial ? (
                     <tr><td colSpan={5} className="text-center py-3"><div className="spinner-border spinner-border-sm"></div></td></tr>
                   ) : outstanding.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center text-muted py-4">Nothing outstanding in this range</td></tr>
+                    <tr><td colSpan={5} className="text-center text-muted py-4">{t('reports.nothingOutstanding')}</td></tr>
                   ) : outstanding.map((o: any) => (
                     <tr key={o.pid} style={{ cursor: 'pointer' }} onClick={() => openChart(o.patientId, o.pid)}>
                       <td className="fw-semibold">{o.patientName}</td>

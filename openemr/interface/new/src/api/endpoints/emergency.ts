@@ -1,4 +1,5 @@
 import nestClient from '../nest-client';
+import i18n from '../../i18n';
 
 /**
  * Emergency department endpoints.
@@ -96,6 +97,15 @@ export interface EmergencyErrorState {
 }
 
 /**
+ * Translate a catalogue key when the app has booted i18n, and fall back to the
+ * English literal otherwise. The literals below are what the tests assert, so
+ * the literal stays the contract and the catalogue is only ever a translation
+ * of it — a missing key degrades to English, never to a dotted key path.
+ */
+const tr = (key: string, english: string, options?: Record<string, unknown>): string =>
+  i18n.isInitialized ? (i18n.t(key, { ...options, defaultValue: english }) as string) : english;
+
+/**
  * Turn a failed request into something a clinician can act on.
  *
  * The metrics tab used to spin forever on any failure, because "no data yet"
@@ -109,35 +119,44 @@ export function describeEmergencyError(err: any): EmergencyErrorState {
   const serverMessage = err?.response?.data?.message;
 
   if (status === 401) {
-    return { title: 'Your session has expired', detail: 'Sign in again to see the metrics.', canRetry: false, status };
+    return {
+      title: tr('emergency.error.sessionTitle', 'Your session has expired'),
+      detail: tr('emergency.error.sessionDetail', 'Sign in again to see the metrics.'),
+      canRetry: false,
+      status,
+    };
   }
   if (status === 403) {
     return {
-      title: 'Departmental metrics are not available for your role',
-      detail: 'Throughput and safety figures are limited to clinical staff (admin, physician, nurse, midwife). The board itself is unaffected.',
+      title: tr('emergency.error.roleTitle', 'Departmental metrics are not available for your role'),
+      detail: tr('emergency.error.roleDetail', 'Throughput and safety figures are limited to clinical staff (admin, physician, nurse, midwife). The board itself is unaffected.'),
       canRetry: false,
       status,
     };
   }
   if (status && status >= 500) {
     return {
-      title: 'The server could not produce the metrics',
-      detail: typeof serverMessage === 'string' && serverMessage ? serverMessage : 'This is a fault at our end, not something you did. Try again in a moment.',
+      title: tr('emergency.error.serverTitle', 'The server could not produce the metrics'),
+      detail: typeof serverMessage === 'string' && serverMessage
+        ? serverMessage
+        : tr('emergency.error.serverDetail', 'This is a fault at our end, not something you did. Try again in a moment.'),
       canRetry: true,
       status,
     };
   }
   if (!status) {
     return {
-      title: 'Could not reach the server',
-      detail: 'The network or the server is unreachable. Check the connection and try again.',
+      title: tr('emergency.error.networkTitle', 'Could not reach the server'),
+      detail: tr('emergency.error.networkDetail', 'The network or the server is unreachable. Check the connection and try again.'),
       canRetry: true,
       status: null,
     };
   }
   return {
-    title: 'Could not load the metrics',
-    detail: typeof serverMessage === 'string' && serverMessage ? serverMessage : `The request was rejected (${status}).`,
+    title: tr('emergency.error.unknownTitle', 'Could not load the metrics'),
+    detail: typeof serverMessage === 'string' && serverMessage
+      ? serverMessage
+      : tr('emergency.error.unknownDetail', 'The request was rejected ({{status}}).', { status }),
     canRetry: true,
     status,
   };

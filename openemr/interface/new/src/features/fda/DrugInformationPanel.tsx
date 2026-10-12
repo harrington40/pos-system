@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function DrugInformationPanel({ patientId: _patientId, patientName, onSelectDrug }: Props) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'search' | 'details' | 'interactions' | 'safety' | 'rxnorm' | 'recalls'>('search');
   const [selectedDrug, setSelectedDrug] = useState<string>('');
@@ -79,7 +81,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
         <div className="d-flex align-items-center justify-content-between mb-2">
           <h5 className="mb-0">
             <i className="bi bi-capsule me-2"></i>
-            Drug Information
+            {t('fda.panel.title')}
           </h5>
           <span className="badge bg-white bg-opacity-25">openFDA + RxNorm</span>
         </div>
@@ -90,7 +92,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
           <input
             type="text"
             className="form-control border-0"
-            placeholder="Search by brand or generic name (e.g., Lipitor, metformin)..."
+            placeholder={t('fda.panel.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -105,7 +107,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
         </div>
         {patientName && (
           <small className="text-white text-opacity-75 mt-1 d-block">
-            <i className="bi bi-person me-1"></i>Context: {patientName}
+            <i className="bi bi-person me-1"></i>{t('fda.panel.context', { name: patientName })}
           </small>
         )}
       </div>
@@ -115,7 +117,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
         <ul className="nav nav-tabs px-3 pt-2">
           <li className="nav-item">
             <button className={`nav-link small ${activeTab === 'search' ? 'active' : ''}`} onClick={() => setActiveTab('search')}>
-              <i className="bi bi-search me-1"></i>Results
+              <i className="bi bi-search me-1"></i>{t('fda.panel.tabs.results')}
               {searchResults?.results?.length > 0 && (
                 <span className="badge bg-primary ms-1">{searchResults.results.length}</span>
               )}
@@ -123,12 +125,12 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
           </li>
           <li className="nav-item">
             <button className={`nav-link small ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')} disabled={!selectedDrug}>
-              <i className="bi bi-info-circle me-1"></i>Details
+              <i className="bi bi-info-circle me-1"></i>{t('fda.panel.tabs.details')}
             </button>
           </li>
           <li className="nav-item">
             <button className={`nav-link small ${activeTab === 'interactions' ? 'active' : ''}`} onClick={() => setActiveTab('interactions')} disabled={!selectedDrug}>
-              <i className="bi bi-arrow-left-right me-1"></i>Interactions
+              <i className="bi bi-arrow-left-right me-1"></i>{t('fda.panel.tabs.interactions')}
               {smartData?.interactionWarnings?.length > 0 && (
                 <span className="badge bg-warning text-dark ms-1">{smartData.interactionWarnings.length}</span>
               )}
@@ -136,17 +138,17 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
           </li>
           <li className="nav-item">
             <button className={`nav-link small ${activeTab === 'safety' ? 'active' : ''}`} onClick={() => setActiveTab('safety')} disabled={!selectedDrug}>
-              <i className="bi bi-shield-exclamation me-1"></i>Safety
+              <i className="bi bi-shield-exclamation me-1"></i>{t('fda.panel.tabs.safety')}
             </button>
           </li>
           <li className="nav-item">
             <button className={`nav-link small ${activeTab === 'rxnorm' ? 'active' : ''}`} onClick={() => setActiveTab('rxnorm')} disabled={!selectedDrug}>
-              <i className="bi bi-diagram-3 me-1"></i>RxNorm
+              <i className="bi bi-diagram-3 me-1"></i>{t('fda.panel.tabs.rxnorm')}
             </button>
           </li>
           <li className="nav-item">
             <button className={`nav-link small ${activeTab === 'recalls' ? 'active' : ''}`} onClick={() => setActiveTab('recalls')} disabled={!selectedDrug}>
-              <i className="bi bi-exclamation-diamond me-1"></i>Recalls
+              <i className="bi bi-exclamation-diamond me-1"></i>{t('fda.panel.tabs.recalls')}
             </button>
           </li>
         </ul>
@@ -158,7 +160,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
               {!searchResults && !isLoading && (
                 <div className="text-center text-muted py-5">
                   <i className="bi bi-capsule" style={{ fontSize: '3rem' }}></i>
-                  <p className="mt-3">Search for a drug to see FDA label information,<br/>adverse events, and patient-specific interactions.</p>
+                  <p className="mt-3">{t('fda.panel.empty1')}<br/>{t('fda.panel.empty2')}</p>
                   <div className="d-flex gap-2 justify-content-center mt-2">
                     {['aspirin', 'Lipitor', 'metformin', 'lisinopril', 'omeprazole'].map(q => (
                       <button key={q} className="btn btn-outline-secondary btn-sm" onClick={() => { setSearch(q); setTimeout(() => refetch(), 100); }}>
@@ -171,7 +173,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
               {searchResults?.error && (
                 <div className="alert alert-warning py-2 small">
                   <i className="bi bi-exclamation-triangle me-1"></i>
-                  FDA API unavailable. Showing local data only.
+                  {t('fda.panel.apiUnavailable')}
                 </div>
               )}
               {searchResults?.results?.map((drug: any, i: number) => (
@@ -194,7 +196,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                     </div>
                     {drug.indications && (
                       <p className="small text-muted mt-1 mb-0" style={{ lineHeight: '1.3' }}>
-                        <strong>Use:</strong> {drug.indications.substring(0, 150)}...
+                        <strong>{t('fda.panel.use')}</strong> {drug.indications.substring(0, 150)}...
                       </p>
                     )}
                   </div>
@@ -221,7 +223,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   <div className="card bg-light">
                     <div className="card-body text-center py-2">
                       <div className="fw-bold text-primary">{smartData.patientCount}</div>
-                      <small className="text-muted">Patients on this drug</small>
+                      <small className="text-muted">{t('fda.panel.patientsOnDrug')}</small>
                     </div>
                   </div>
                 </div>
@@ -229,7 +231,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   <div className="card bg-light">
                     <div className="card-body text-center py-2">
                       <div className="fw-bold text-warning">{smartData.interactionWarnings?.length || 0}</div>
-                      <small className="text-muted">Interactions</small>
+                      <small className="text-muted">{t('fda.panel.interactionsLabel')}</small>
                     </div>
                   </div>
                 </div>
@@ -237,7 +239,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   <div className="card bg-light">
                     <div className="card-body text-center py-2">
                       <div className="fw-bold text-danger">{smartData.allergyWarnings?.length || 0}</div>
-                      <small className="text-muted">Allergy Alerts</small>
+                      <small className="text-muted">{t('fda.panel.allergyAlertsLabel')}</small>
                     </div>
                   </div>
                 </div>
@@ -245,21 +247,21 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
 
               {smartData.fda.indications && (
                 <div className="mb-3">
-                  <h6 className="text-primary"><i className="bi bi-bullseye me-1"></i>Indications</h6>
+                  <h6 className="text-primary"><i className="bi bi-bullseye me-1"></i>{t('fda.panel.indications')}</h6>
                   <p className="small text-muted">{smartData.fda.indications.substring(0, 500)}</p>
                 </div>
               )}
 
               {smartData.fda.dosage && (
                 <div className="mb-3">
-                  <h6 className="text-primary"><i className="bi bi-droplet me-1"></i>Dosage & Administration</h6>
+                  <h6 className="text-primary"><i className="bi bi-droplet me-1"></i>{t('fda.panel.dosage')}</h6>
                   <p className="small text-muted">{smartData.fda.dosage.substring(0, 400)}</p>
                 </div>
               )}
 
               {smartData.fda.warnings && (
                 <div className="mb-3">
-                  <h6 className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Warnings</h6>
+                  <h6 className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>{t('fda.panel.warnings')}</h6>
                   <p className="small bg-danger bg-opacity-10 p-2 rounded">{smartData.fda.warnings.substring(0, 500)}</p>
                 </div>
               )}
@@ -269,7 +271,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
           {/* Interactions Tab */}
           {activeTab === 'interactions' && (
             <div>
-              <h6 className="mb-3"><i className="bi bi-arrow-left-right me-1"></i>Drug Interactions</h6>
+              <h6 className="mb-3"><i className="bi bi-arrow-left-right me-1"></i>{t('fda.panel.drugInteractions')}</h6>
               {smartData?.interactionWarnings?.length > 0 ? (
                 smartData.interactionWarnings.map((w: string, i: number) => (
                   <div key={i} className="alert alert-warning py-2 small mb-2">
@@ -279,12 +281,12 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
               ) : (
                 <div className="text-center text-muted py-3">
                   <i className="bi bi-check-circle text-success fs-4"></i>
-                  <p className="mt-1 mb-0">No known interactions found in patient records.</p>
+                  <p className="mt-1 mb-0">{t('fda.panel.noInteractions')}</p>
                 </div>
               )}
               {smartData?.allergyWarnings?.length > 0 && (
                 <>
-                  <h6 className="mb-3 mt-3"><i className="bi bi-shield-exclamation me-1"></i>Allergy Alerts</h6>
+                  <h6 className="mb-3 mt-3"><i className="bi bi-shield-exclamation me-1"></i>{t('fda.panel.allergyAlerts')}</h6>
                   {smartData.allergyWarnings.map((w: string, i: number) => (
                     <div key={i} className="alert alert-danger py-2 small mb-2">
                       {w}
@@ -294,10 +296,10 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
               )}
               {smartData?.patientsOnDrug?.length > 0 && (
                 <>
-                  <h6 className="mb-2 mt-3">Patients on {selectedDrug}</h6>
+                  <h6 className="mb-2 mt-3">{t('fda.panel.patientsOn', { name: selectedDrug })}</h6>
                   <div className="table-responsive">
                     <table className="table table-sm small">
-                      <thead><tr><th>Name</th><th>Dosage</th><th>Since</th></tr></thead>
+                      <thead><tr><th>{t('fda.panel.cols.name')}</th><th>{t('fda.panel.cols.dosage')}</th><th>{t('fda.panel.cols.since')}</th></tr></thead>
                       <tbody>
                         {smartData.patientsOnDrug.map((p: any, i: number) => (
                           <tr key={i}>
@@ -317,7 +319,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
           {/* Safety Tab */}
           {activeTab === 'safety' && (
             <div>
-              <h6 className="mb-3"><i className="bi bi-shield-exclamation me-1"></i>Adverse Reactions</h6>
+              <h6 className="mb-3"><i className="bi bi-shield-exclamation me-1"></i>{t('fda.panel.adverseReactions')}</h6>
               {smartData?.topAdverseReactions?.length > 0 ? (
                 <div className="row g-2">
                   {smartData.topAdverseReactions.map((r: any, i: number) => (
@@ -330,11 +332,11 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   ))}
                 </div>
               ) : (
-                <div className="text-muted small">No adverse event data available.</div>
+                <div className="text-muted small">{t('fda.panel.noAdverse')}</div>
               )}
               {smartData?.fda?.adverseReactions && (
                 <div className="mt-3">
-                  <h6>Reported Reactions</h6>
+                  <h6>{t('fda.panel.reportedReactions')}</h6>
                   <p className="small text-muted">{smartData.fda.adverseReactions}</p>
                 </div>
               )}
@@ -346,17 +348,17 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
             <div>
               <div className="d-flex align-items-center gap-2 mb-3">
                 <span className="badge bg-info fs-6">NIH</span>
-                <h6 className="mb-0">RxNorm Standardized Drug Data</h6>
+                <h6 className="mb-0">{t('fda.panel.rxnormTitle')}</h6>
               </div>
               {rxnormData?.found === false ? (
                 <div>
                   <div className="alert alert-warning py-2 small">
                     <i className="bi bi-exclamation-triangle me-1"></i>
-                    No exact RxNorm match found for "{rxnormData.drugName}"
+                    {t('fda.panel.noRxnormMatch', { name: rxnormData.drugName })}
                   </div>
                   {rxnormData.suggestions?.length > 0 && (
                     <>
-                      <h6>Did you mean?</h6>
+                      <h6>{t('fda.panel.didYouMean')}</h6>
                       {rxnormData.suggestions.map((s: any, i: number) => (
                         <button
                           key={i}
@@ -378,7 +380,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                         <div>
                           <strong>{rxnormData.primary?.name}</strong>
                           <div className="small text-muted">
-                            RxCUI: <code>{rxnormData.primary?.rxcui}</code> · Type: {rxnormData.primary?.tty}
+                            {t('fda.panel.rxcuiLabel')} <code>{rxnormData.primary?.rxcui}</code>{t('fda.panel.typeSuffix', { type: rxnormData.primary?.tty })}
                           </div>
                         </div>
                       </div>
@@ -388,7 +390,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   {/* Properties */}
                   {rxnormData.properties && (
                     <div className="mb-3">
-                      <h6 className="text-info"><i className="bi bi-info-circle me-1"></i>Properties</h6>
+                      <h6 className="text-info"><i className="bi bi-info-circle me-1"></i>{t('fda.panel.properties')}</h6>
                       <div className="row g-2 small">
                         {Object.entries(rxnormData.properties).filter(([k]) => !['rxcui','name','synonym'].includes(k)).map(([key, val]: any) => (
                           <div key={key} className="col-6">
@@ -403,7 +405,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   {/* Drug Classes */}
                   {rxnormData.drugClasses?.length > 0 && (
                     <div className="mb-3">
-                      <h6 className="text-info"><i className="bi bi-tags me-1"></i>Drug Classes</h6>
+                      <h6 className="text-info"><i className="bi bi-tags me-1"></i>{t('fda.panel.drugClasses')}</h6>
                       <div className="d-flex flex-wrap gap-1">
                         {rxnormData.drugClasses.map((c: any, i: number) => (
                           <span key={i} className="badge bg-secondary small">
@@ -417,7 +419,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   {/* Active Ingredients */}
                   {rxnormData.ingredients?.length > 0 && (
                     <div className="mb-3">
-                      <h6 className="text-info"><i className="bi bi-flask me-1"></i>Active Ingredients</h6>
+                      <h6 className="text-info"><i className="bi bi-flask me-1"></i>{t('fda.panel.activeIngredients')}</h6>
                       <div className="d-flex flex-wrap gap-1">
                         {rxnormData.ingredients.map((ing: any, i: number) => (
                           <span key={i} className="badge bg-primary bg-opacity-25 text-dark small">
@@ -431,7 +433,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   {/* Branded & Clinical Forms */}
                   {rxnormData.brandedForms?.length > 0 && (
                     <div className="mb-3">
-                      <h6 className="text-info"><i className="bi bi-capsule me-1"></i>Available Forms</h6>
+                      <h6 className="text-info"><i className="bi bi-capsule me-1"></i>{t('fda.panel.availableForms')}</h6>
                       <div className="list-group list-group-flush small">
                         {rxnormData.brandedForms.map((f: any, i: number) => (
                           <div key={i} className="list-group-item py-1 px-2 d-flex justify-content-between">
@@ -446,8 +448,8 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                   {/* All Related Concepts */}
                   {rxnormData.allRelated?.length > 0 && (
                     <div className="mb-3">
-                      <h6 className="text-info"><i className="bi bi-diagram-3 me-1"></i>All RxNorm Concepts</h6>
-                      <div className="small text-muted mb-1">Showing {rxnormData.allRelated.length} related concepts</div>
+                      <h6 className="text-info"><i className="bi bi-diagram-3 me-1"></i>{t('fda.panel.allConcepts')}</h6>
+                      <div className="small text-muted mb-1">{t('fda.panel.showingRelated', { count: rxnormData.allRelated.length })}</div>
                       <div className="row g-1">
                         {rxnormData.allRelated.map((r: any, i: number) => (
                           <div key={i} className="col-6">
@@ -464,7 +466,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
               ) : (
                 <div className="text-center text-muted py-3">
                   <div className="spinner-border spinner-border-sm text-info mb-2"></div>
-                  <p className="small">Loading RxNorm data...</p>
+                  <p className="small">{t('fda.panel.loadingRxnorm')}</p>
                 </div>
               )}
             </div>
@@ -473,12 +475,12 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
           {/* Recalls Tab */}
           {activeTab === 'recalls' && (
             <div>
-              <h6 className="mb-3"><i className="bi bi-exclamation-diamond me-1 text-danger"></i>FDA Drug Recall History</h6>
+              <h6 className="mb-3"><i className="bi bi-exclamation-diamond me-1 text-danger"></i>{t('fda.panel.recallsTitle')}</h6>
               {recallsData?.results?.length > 0 ? (
                 <div className="table-responsive">
                   <table className="table table-sm small">
                     <thead className="table-light">
-                      <tr><th>Date</th><th>Product</th><th>Reason</th><th>Status</th></tr>
+                      <tr><th>{t('fda.panel.recallCols.date')}</th><th>{t('fda.panel.recallCols.product')}</th><th>{t('fda.panel.recallCols.reason')}</th><th>{t('fda.panel.recallCols.status')}</th></tr>
                     </thead>
                     <tbody>
                       {recallsData.results.map((r: any, i: number) => (
@@ -488,7 +490,7 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
                           <td><small className="text-muted">{r.reason_for_recall?.substring(0, 100) || '—'}</small></td>
                           <td>
                             <span className={`badge rounded-pill ${r.status === 'Ongoing' ? 'bg-danger' : r.status === 'Completed' ? 'bg-success' : r.status === 'Terminated' ? 'bg-secondary' : 'bg-warning text-dark'}`}>
-                              {r.status || 'Unknown'}
+                              {r.status || t('fda.panel.unknown')}
                             </span>
                           </td>
                         </tr>
@@ -499,13 +501,13 @@ export default function DrugInformationPanel({ patientId: _patientId, patientNam
               ) : (
                 <div className="text-center text-muted py-3">
                   <i className="bi bi-check-circle text-success fs-4"></i>
-                  <p className="mt-1 mb-0">No active recalls found for this drug.</p>
-                  <small className="text-muted">Data sourced from FDA Enforcement Reports</small>
+                  <p className="mt-1 mb-0">{t('fda.panel.noRecalls')}</p>
+                  <small className="text-muted">{t('fda.panel.recallSource')}</small>
                 </div>
               )}
               <div className="mt-3 small text-muted">
                 <i className="bi bi-info-circle me-1"></i>
-                Recall data from <strong>openFDA.gov</strong> — Drug Enforcement Reports. Last checked: today.
+                {t('fda.panel.recallFooterLead')} <strong>openFDA.gov</strong> {t('fda.panel.recallFooterTail')}
               </div>
             </div>
           )}

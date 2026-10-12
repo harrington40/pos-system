@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
@@ -6,6 +7,7 @@ import { formatDateOnly } from '../../utils/date';
 import { chartPatientId } from '../../utils/patientChart';
 
 export default function DrugScreeningPage() {
+  const { t } = useTranslation();
   const [count, setCount] = useState(5);
   const [selected, setSelected] = useState<any[]>([]);
   const [history, setHistory] = useState<{date:string;patients:any[];mode:string}[]>([]);
@@ -83,9 +85,9 @@ export default function DrugScreeningPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{background:'linear-gradient(135deg, #dc3545 0%, #fd7e14 50%, #ffc107 100%)'}}>
         <div className="d-flex justify-content-between align-items-start">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-shuffle me-2"></i>Smart Drug Screening</h2>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-shuffle me-2"></i>{t('appointments.screening.title')}</h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              Pool: {patients.length} patients · {selected.length} selected · {history.length > 0 ? `${history[0].date} — ${history[0].mode} mode` : 'No history'}
+              {t('appointments.screening.poolSummary', { pool: patients.length, selected: selected.length, history: history.length > 0 ? t('appointments.screening.historySummary', { date: history[0].date, mode: history[0].mode }) : t('appointments.screening.noHistory') })}
             </p>
           </div>
         </div>
@@ -94,10 +96,10 @@ export default function DrugScreeningPage() {
       {/* Smart Stats */}
       <div className="row g-3 mb-4">
         {[
-          {v:patients.length,l:'Total Pool',c:'#0d6efd',i:'bi-people'},
-          {v:history.reduce((s,h)=>s+h.patients.length,0),l:'Total Screened',c:'#198754',i:'bi-check-circle'},
-          {v:patients.filter((p:any)=>getRiskScore(p)>=5).length,l:'High Risk',c:'#dc3545',i:'bi-exclamation-triangle'},
-          {v:history.length,l:'Sessions',c:'#6f42c1',i:'bi-calendar-check'},
+          {v:patients.length,l:t('appointments.screening.statPool'),c:'#0d6efd',i:'bi-people'},
+          {v:history.reduce((s,h)=>s+h.patients.length,0),l:t('appointments.screening.statScreened'),c:'#198754',i:'bi-check-circle'},
+          {v:patients.filter((p:any)=>getRiskScore(p)>=5).length,l:t('appointments.screening.statHighRisk'),c:'#dc3545',i:'bi-exclamation-triangle'},
+          {v:history.length,l:t('appointments.screening.statSessions'),c:'#6f42c1',i:'bi-calendar-check'},
         ].map((s,i)=>(
           <div className="col-md-3 col-sm-6" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{borderRadius:'16px'}}>
@@ -117,12 +119,12 @@ export default function DrugScreeningPage() {
         <div className="card-body">
           <div className="row g-3 align-items-end">
             <div className="col-md-2">
-              <label className="form-label small fw-semibold">Algorithm</label>
+              <label className="form-label small fw-semibold">{t('appointments.screening.algorithm')}</label>
               <div className="btn-group w-100">
                 {[
-                  {v:'random' as const,l:'🎲 Random',c:'#0d6efd'},
-                  {v:'risk' as const,l:'⚠️ Risk',c:'#dc3545'},
-                  {v:'fair' as const,l:'⚖️ Fair',c:'#198754'},
+                  {v:'random' as const,l:t('appointments.screening.modeRandom'),c:'#0d6efd'},
+                  {v:'risk' as const,l:t('appointments.screening.modeRisk'),c:'#dc3545'},
+                  {v:'fair' as const,l:t('appointments.screening.modeFair'),c:'#198754'},
                 ].map(a=>(
                   <button key={a.v} className={`btn btn-sm ${mode===a.v?'text-white':'btn-outline-secondary'}`}
                     style={mode===a.v?{backgroundColor:a.c}:{}}
@@ -131,29 +133,29 @@ export default function DrugScreeningPage() {
               </div>
             </div>
             <div className="col-md-3">
-              <label className="form-label small fw-semibold">Count: <strong>{count}</strong></label>
+              <label className="form-label small fw-semibold">{t('appointments.screening.count')} <strong>{count}</strong></label>
               <input type="range" className="form-range" min={1} max={Math.min(30,patients.length)} value={count} onChange={e=>setCount(Number(e.target.value))} />
             </div>
             <div className="col-md-2">
-              <label className="form-label small fw-semibold">Pool</label>
+              <label className="form-label small fw-semibold">{t('appointments.screening.pool')}</label>
               <div className="form-control bg-light rounded-pill text-center fw-bold">{patients.length}</div>
             </div>
             <div className="col-md-3">
               <button className="btn rounded-pill w-100 text-white fw-bold" style={{background:'linear-gradient(135deg,#dc3545,#fd7e14)'}}
                 onClick={generateRandom} disabled={patients.length===0}>
-                <i className="bi bi-shuffle me-1"></i>Run Algorithm
+                <i className="bi bi-shuffle me-1"></i>{t('appointments.screening.run')}
               </button>
             </div>
             <div className="col-md-2">
               {selected.length>0&&<button className="btn btn-outline-secondary rounded-pill w-100" onClick={()=>setSelected([])}>
-                <i className="bi bi-x-circle me-1"></i>Clear</button>}
+                <i className="bi bi-x-circle me-1"></i>{t('appointments.screening.clear')}</button>}
             </div>
           </div>
           <div className="mt-2">
             <small className="text-muted">
-              {mode==='random'?'🎲 Pure random selection from all patients':
-               mode==='risk'?'⚠️ Weighted by age, sex, registration recency, and status':
-               '⚖️ Prioritizes patients never selected before, then rotates through the rest'}
+              {mode==='random'?t('appointments.screening.hintRandom'):
+               mode==='risk'?t('appointments.screening.hintRisk'):
+               t('appointments.screening.hintFair')}
             </small>
           </div>
         </div>
@@ -162,13 +164,13 @@ export default function DrugScreeningPage() {
       {/* Risk Distribution */}
       {patients.length>0&&mode==='risk'&&(
         <div className="card border-0 shadow-sm mb-4" style={{borderRadius:'16px'}}>
-          <div className="card-header bg-white py-3"><h6 className="mb-0 fw-bold"><i className="bi bi-bar-chart me-2 text-danger"></i>Risk Distribution</h6></div>
+          <div className="card-header bg-white py-3"><h6 className="mb-0 fw-bold"><i className="bi bi-bar-chart me-2 text-danger"></i>{t('appointments.screening.riskDistribution')}</h6></div>
           <div className="card-body">
             <div className="row g-2">
               {[
-                {l:'Low (1-2)',c:'#198754',f:(p:any)=>getRiskScore(p)<=2},
-                {l:'Medium (3-4)',c:'#ffc107',f:(p:any)=>getRiskScore(p)>=3&&getRiskScore(p)<=4},
-                {l:'High (5+)',c:'#dc3545',f:(p:any)=>getRiskScore(p)>=5},
+                {l:t('appointments.screening.low'),c:'#198754',f:(p:any)=>getRiskScore(p)<=2},
+                {l:t('appointments.screening.medium'),c:'#ffc107',f:(p:any)=>getRiskScore(p)>=3&&getRiskScore(p)<=4},
+                {l:t('appointments.screening.high'),c:'#dc3545',f:(p:any)=>getRiskScore(p)>=5},
               ].map(r=>{
                 const cnt = patients.filter(r.f).length;
                 const pct = patients.length>0?Math.round(cnt/patients.length*100):0;
@@ -193,8 +195,8 @@ export default function DrugScreeningPage() {
       {selected.length>0&&(
         <div className="card border-0 shadow-sm mb-4" style={{borderRadius:'16px',borderLeft:'4px solid #fd7e14'}}>
           <div className="card-header bg-white d-flex justify-content-between py-3" style={{borderRadius:'16px 16px 0 0'}}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard-check me-2" style={{color:'#fd7e14'}}></i>Selected ({selected.length})</h6>
-            <span className="badge bg-light text-dark rounded-pill">{new Date().toLocaleDateString()} · {mode} mode</span>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard-check me-2" style={{color:'#fd7e14'}}></i>{t('appointments.screening.selected', { count: selected.length })}</h6>
+            <span className="badge bg-light text-dark rounded-pill">{t('appointments.screening.modeBadge', { date: new Date().toLocaleDateString(), mode })}</span>
           </div>
           <div className="card-body p-0">
             <div className="row g-0">
@@ -213,7 +215,7 @@ export default function DrugScreeningPage() {
                         <small className="text-muted">PID #{p.pid} · {formatDateOnly(p.DOB)} · {p.sex||'—'}</small>
                         <div className="mt-1">
                           <span className={`badge rounded-pill ${risk>=5?'bg-danger':risk>=3?'bg-warning text-dark':'bg-success'}`} style={{fontSize:'0.65rem'}}>
-                            Risk: {risk}
+                            {t('appointments.screening.risk', { score: risk })}
                           </span>
                         </div>
                       </div>
@@ -230,7 +232,7 @@ export default function DrugScreeningPage() {
       {history.length>0&&(
         <div className="card border-0 shadow-sm" style={{borderRadius:'16px'}}>
           <div className="card-header bg-white py-3" style={{borderRadius:'16px 16px 0 0'}}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-info"></i>Selection History</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-info"></i>{t('appointments.screening.history')}</h6>
           </div>
           <div className="card-body p-0">
             {history.map((h,i)=>(
@@ -239,7 +241,7 @@ export default function DrugScreeningPage() {
                   <span className="fw-semibold">{h.date}</span>
                   <span className={`badge ${h.mode==='risk'?'bg-danger':h.mode==='fair'?'bg-success':'bg-secondary'}`}>{h.mode}</span>
                 </div>
-                <div className="text-muted">{h.patients.length} patients</div>
+                <div className="text-muted">{t('appointments.screening.patients', { count: h.patients.length })}</div>
                 <div className="d-flex flex-wrap gap-1 mt-1">
                   {h.patients.map(p=><span key={p.id} className="badge bg-light text-dark">{p.lname},{p.fname[0]}</span>)}
                 </div>
@@ -252,7 +254,7 @@ export default function DrugScreeningPage() {
       {selected.length===0&&!history.length&&(
         <div className="text-center py-5 text-muted">
           <i className="bi bi-shuffle opacity-50" style={{fontSize:'4rem'}}></i>
-          <p className="mt-3">Choose an algorithm, adjust the count, and run the selection</p>
+          <p className="mt-3">{t('appointments.screening.empty')}</p>
         </div>
       )}
     </div>

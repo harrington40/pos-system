@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../../api/nest-client';
 import { classifyBP, classifyPulse, classifyTemp, classifyResp, classifySpO2, vitalTrend, formatVital, formatBP, formatVitalUnit } from '../../../utils/vitalsClassify';
 import VitalsTrend from '../../../components/vitals/VitalsTrend';
@@ -18,6 +19,7 @@ const emptyForm = {
 };
 
 export default function VitalsTab({ vitals, patientId }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [view, setView] = useState<VitalsView>('chart');
@@ -65,11 +67,11 @@ export default function VitalsTab({ vitals, patientId }: Props) {
         <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
           <h6 className="mb-0">
             <i className="bi bi-heart-pulse me-2"></i>
-            {showForm ? 'Record Vital Signs' : 'Vital Signs'}
+            {showForm ? t('patients.tabs.vitals.recordTitle') : t('patients.tabs.vitals.title')}
           </h6>
           {!showForm && (
             <button className="btn btn-sm btn-light" onClick={() => setShowForm(true)}>
-              <i className="bi bi-plus-lg me-1"></i>Record Vitals
+              <i className="bi bi-plus-lg me-1"></i>{t('patients.tabs.vitals.record')}
             </button>
           )}
         </div>
@@ -78,13 +80,13 @@ export default function VitalsTab({ vitals, patientId }: Props) {
           <div className="card-body bg-light">
             {saved && (
               <div className="alert alert-success py-2 mb-3 small">
-                <i className="bi bi-check-circle me-1"></i>Vital signs recorded successfully!
+                <i className="bi bi-check-circle me-1"></i>{t('patients.tabs.vitals.savedMessage')}
               </div>
             )}
             <div className="row g-2">
               {/* Blood Pressure */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">Systolic BP</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.systolic')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" className="form-control" placeholder="120" value={form.bps}
                     onChange={e => setField('bps', e.target.value)} />
@@ -92,7 +94,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
                 </div>
               </div>
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">Diastolic BP</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.diastolic')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" className="form-control" placeholder="80" value={form.bpd}
                     onChange={e => setField('bpd', e.target.value)} />
@@ -101,7 +103,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
               {/* Pulse */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">Pulse</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.pulse')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" className="form-control" placeholder="72" value={form.pulse}
                     onChange={e => setField('pulse', e.target.value)} />
@@ -110,7 +112,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
               {/* Temperature */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">Temperature</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.temperature')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" step="0.1" className="form-control" placeholder="98.6" value={form.temperature}
                     onChange={e => setField('temperature', e.target.value)} />
@@ -119,7 +121,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
               {/* Respiration */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">Respiration</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.respiration')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" className="form-control" placeholder="16" value={form.respiration}
                     onChange={e => setField('respiration', e.target.value)} />
@@ -128,7 +130,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
               {/* O2 Saturation */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">O₂ Saturation</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.spo2')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" className="form-control" placeholder="98" value={form.oxygen_saturation}
                     onChange={e => setField('oxygen_saturation', e.target.value)} />
@@ -137,7 +139,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
               {/* Weight */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">Weight</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.weight')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" step="0.1" className="form-control" placeholder="70" value={form.weight}
                     onChange={e => setField('weight', e.target.value)} />
@@ -146,7 +148,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
               {/* Height */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">Height</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.height')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" step="0.1" className="form-control" placeholder="170" value={form.height}
                     onChange={e => setField('height', e.target.value)} />
@@ -155,18 +157,18 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               </div>
               {/* BMI (auto or manual) */}
               <div className="col-md-2 col-sm-4 col-6">
-                <label className="form-label small fw-semibold">BMI</label>
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.bmi')}</label>
                 <div className="input-group input-group-sm">
                   <input type="number" step="0.1" className="form-control" placeholder="Auto" value={form.BMI}
                     onChange={e => setField('BMI', e.target.value)} />
                   <span className="input-group-text">kg/m²</span>
                 </div>
-                <small className="text-muted">Auto if weight + height filled</small>
+                <small className="text-muted">{t('patients.tabs.vitals.autoHint')}</small>
               </div>
               {/* Note */}
               <div className="col-md-4 col-sm-6 col-12">
-                <label className="form-label small fw-semibold">Note</label>
-                <input type="text" className="form-control form-control-sm" placeholder="Optional note..." value={form.note}
+                <label className="form-label small fw-semibold">{t('patients.tabs.vitals.note')}</label>
+                <input type="text" className="form-control form-control-sm" placeholder={t('patients.tabs.vitals.notePlaceholder')} value={form.note}
                   onChange={e => setField('note', e.target.value)} />
               </div>
             </div>
@@ -175,10 +177,10 @@ export default function VitalsTab({ vitals, patientId }: Props) {
               <button className="btn btn-primary btn-sm" onClick={handleSubmit}
                 disabled={createVital.isPending}>
                 <i className={`bi ${createVital.isPending ? 'bi-hourglass-split' : 'bi-check-lg'} me-1`}></i>
-                {createVital.isPending ? 'Saving...' : 'Save Vital Signs'}
+                {createVital.isPending ? t('patients.common.saving') : t('patients.tabs.vitals.save')}
               </button>
               <button className="btn btn-outline-secondary btn-sm" onClick={() => { setShowForm(false); setForm(emptyForm); }}>
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -189,9 +191,9 @@ export default function VitalsTab({ vitals, patientId }: Props) {
         <div className="card">
           <div className="card-body text-center text-muted p-4">
             <i className="bi bi-heart-pulse" style={{ fontSize: '2rem' }}></i>
-            <p className="mt-2 mb-0">No vital signs recorded yet.</p>
+            <p className="mt-2 mb-0">{t('patients.tabs.vitals.none')}</p>
             <button className="btn btn-primary btn-sm mt-2" onClick={() => setShowForm(true)}>
-              <i className="bi bi-plus-lg me-1"></i>Record First Vitals
+              <i className="bi bi-plus-lg me-1"></i>{t('patients.tabs.vitals.recordFirst')}
             </button>
           </div>
         </div>
@@ -202,7 +204,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
           {/* View toggle — kept outside the card it controls, so both views
               stay reachable once one of them is showing. */}
           <div className="d-flex justify-content-between align-items-center mb-2">
-            <h6 className="mb-0"><i className="bi bi-graph-up me-2"></i>Vital Sign Trends</h6>
+            <h6 className="mb-0"><i className="bi bi-graph-up me-2"></i>{t('patients.tabs.vitals.trends')}</h6>
             <VitalsViewToggle view={view} onChange={setView} />
           </div>
 
@@ -213,7 +215,7 @@ export default function VitalsTab({ vitals, patientId }: Props) {
                 <VitalsTrend vitals={vitals} height={300} />
                 <div className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>
                   <i className="bi bi-info-circle me-1"></i>
-                  Shaded band marks the normal reference range. Points are plotted on the date each reading was taken.
+                  {t('patients.tabs.vitals.chartHint')}
                 </div>
               </div>
             </div>
@@ -222,12 +224,12 @@ export default function VitalsTab({ vitals, patientId }: Props) {
           {/* Table */}
           {view !== 'chart' && (
           <div className="card">
-            <div className="card-header"><h6 className="mb-0"><i className="bi bi-table me-2"></i>History</h6></div>
+            <div className="card-header"><h6 className="mb-0"><i className="bi bi-table me-2"></i>{t('patients.tabs.vitals.history')}</h6></div>
             <div className="card-body p-0">
               <div className="table-responsive">
                 <table className="table table-sm table-hover mb-0">
                   <thead className="table-light">
-                    <tr><th>Date</th><th>BP</th><th>Pulse</th><th>Temp</th><th>Resp</th><th>SpO2</th><th>Weight</th><th>BMI</th></tr>
+                    <tr><th>{t('patients.tabs.vitals.thDate')}</th><th>{t('patients.tabs.vitals.thBp')}</th><th>{t('patients.tabs.vitals.thPulse')}</th><th>{t('patients.tabs.vitals.thTemp')}</th><th>{t('patients.tabs.vitals.thResp')}</th><th>{t('patients.tabs.vitals.thSpo2')}</th><th>{t('patients.tabs.vitals.thWeight')}</th><th>{t('patients.tabs.vitals.thBmi')}</th></tr>
                   </thead>
                   <tbody>
                     {vitals.map((v, i) => {

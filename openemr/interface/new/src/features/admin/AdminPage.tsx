@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import PhoneInput from '../../components/shared/PhoneInput';
@@ -6,6 +7,7 @@ import PhoneInput from '../../components/shared/PhoneInput';
 type TabId = 'users' | 'facilities' | 'lists' | 'notifications' | 'chart-tracking' | 'settings' | 'pending' | 'menu-access';
 
 export default function AdminPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>('users');
 
   return (
@@ -58,22 +60,22 @@ export default function AdminPage() {
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '7rem', transform: 'rotate(10deg) translate(20px,-15px)' }}><i className="bi bi-gear-wide-connected"></i></div>
         <div className="position-relative d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
-            <h3 className="mb-1 fw-bold"><i className="bi bi-gear-wide-connected me-2"></i>Administration</h3>
-            <p className="mb-0 text-white text-opacity-75 small">Manage users, facilities, lookup lists, notifications, and system settings.</p>
+            <h3 className="mb-1 fw-bold"><i className="bi bi-gear-wide-connected me-2"></i>{t('admin.page.title')}</h3>
+            <p className="mb-0 text-white text-opacity-75 small">{t('admin.page.subtitle')}</p>
           </div>
         </div>
       </div>
 
       <ul className="nav nav-tabs mb-4 position-relative" style={{ zIndex: 1 }}>
         {[
-          { id: 'pending' as TabId, label: 'Pending Registrations', icon: 'bi-hourglass-split' },
-          { id: 'users' as TabId, label: 'Users', icon: 'bi-people' },
-          { id: 'facilities' as TabId, label: 'Facilities', icon: 'bi-building' },
-          { id: 'lists' as TabId, label: 'Lookup Lists', icon: 'bi-list-ul' },
-          { id: 'notifications' as TabId, label: 'Notifications', icon: 'bi-bell' },
-          { id: 'chart-tracking' as TabId, label: 'Chart Tracking', icon: 'bi-folder2' },
-          { id: 'settings' as TabId, label: 'Settings', icon: 'bi-sliders' },
-          { id: 'menu-access' as TabId, label: 'Menu Access', icon: 'bi-menu-button-wide' },
+          { id: 'pending' as TabId, label: t('admin.page.tabs.pending'), icon: 'bi-hourglass-split' },
+          { id: 'users' as TabId, label: t('admin.page.tabs.users'), icon: 'bi-people' },
+          { id: 'facilities' as TabId, label: t('admin.page.tabs.facilities'), icon: 'bi-building' },
+          { id: 'lists' as TabId, label: t('admin.page.tabs.lists'), icon: 'bi-list-ul' },
+          { id: 'notifications' as TabId, label: t('admin.page.tabs.notifications'), icon: 'bi-bell' },
+          { id: 'chart-tracking' as TabId, label: t('admin.page.tabs.chart-tracking'), icon: 'bi-folder2' },
+          { id: 'settings' as TabId, label: t('admin.page.tabs.settings'), icon: 'bi-sliders' },
+          { id: 'menu-access' as TabId, label: t('admin.page.tabs.menu-access'), icon: 'bi-menu-button-wide' },
         ].map(tab => (
           <li className="nav-item" key={tab.id}>
             <button className={`nav-link ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
@@ -96,6 +98,7 @@ export default function AdminPage() {
 }
 
 function UsersTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ username: '', fname: '', lname: '' });
 
@@ -126,14 +129,14 @@ function UsersTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 
-  const roleLabel = (role: string) => {
+  const roleLabel = (role: string, tr: (key: string) => string) => {
     switch (role) {
-      case 'admin': return { label: 'Admin', color: 'danger' };
-      case 'front_office': return { label: 'Front Desk', color: 'info' };
-      case 'standard': return { label: 'Physician', color: 'primary' };
-      case 'nurse': return { label: 'Nurse', color: 'success' };
-      case 'billing': return { label: 'Billing', color: 'warning' };
-      case 'inventory_manager': return { label: 'Inventory Manager', color: 'success' };
+      case 'admin': return { label: tr('admin.page.roles.admin'), color: 'danger' };
+      case 'front_office': return { label: tr('admin.page.roles.front_office'), color: 'info' };
+      case 'standard': return { label: tr('admin.page.roles.standard'), color: 'primary' };
+      case 'nurse': return { label: tr('admin.page.roles.nurse'), color: 'success' };
+      case 'billing': return { label: tr('admin.page.roles.billing'), color: 'warning' };
+      case 'inventory_manager': return { label: tr('admin.page.roles.inventory_manager'), color: 'success' };
       default: return { label: role || '—', color: 'secondary' };
     }
   };
@@ -141,36 +144,36 @@ function UsersTab() {
   return (
     <div>
       <div className="card mb-4">
-        <div className="card-header"><h5 className="mb-0">Add User</h5></div>
+        <div className="card-header"><h5 className="mb-0">{t('admin.page.addUser')}</h5></div>
         <div className="card-body">
           <div className="row g-2">
-            <div className="col-md-3"><input className="form-control form-control-sm" placeholder="Username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} /></div>
-            <div className="col-md-3"><input className="form-control form-control-sm" placeholder="First Name" value={form.fname} onChange={e => setForm({...form, fname: e.target.value})} /></div>
-            <div className="col-md-3"><input className="form-control form-control-sm" placeholder="Last Name" value={form.lname} onChange={e => setForm({...form, lname: e.target.value})} /></div>
-            <div className="col-md-3"><button className="btn btn-primary btn-sm w-100" onClick={() => createUser.mutate(form)} disabled={createUser.isPending || !form.username}>Create User</button></div>
+            <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('admin.page.usernamePlaceholder')} value={form.username} onChange={e => setForm({...form, username: e.target.value})} /></div>
+            <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('admin.page.firstNamePlaceholder')} value={form.fname} onChange={e => setForm({...form, fname: e.target.value})} /></div>
+            <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('admin.page.lastNamePlaceholder')} value={form.lname} onChange={e => setForm({...form, lname: e.target.value})} /></div>
+            <div className="col-md-3"><button className="btn btn-primary btn-sm w-100" onClick={() => createUser.mutate(form)} disabled={createUser.isPending || !form.username}>{t('admin.page.createUser')}</button></div>
           </div>
         </div>
       </div>
       <div className="card">
         <div className="card-header bg-white d-flex justify-content-between align-items-center">
-          <h6 className="mb-0"><i className="bi bi-people me-2"></i>All Users ({users.length})</h6>
-          <small className="text-muted">Toggle privileges below — changes apply immediately</small>
+          <h6 className="mb-0"><i className="bi bi-people me-2"></i>{t('admin.page.allUsers', { count: users.length })}</h6>
+          <small className="text-muted">{t('admin.page.toggleHint')}</small>
         </div>
         <div className="card-body p-0">
           <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
             <table className="table table-sm table-hover mb-0">
               <thead className="table-light sticky-top">
                 <tr>
-                  <th>ID</th><th>Username</th><th>Name</th><th>Role</th><th>Active</th>
-                  <th className="text-center">Chart View</th>
-                  <th className="text-center">Edit Providers</th>
-                  <th className="text-center">Edit Charges</th>
+                  <th>{t('admin.page.cols.id')}</th><th>{t('admin.page.cols.username')}</th><th>{t('admin.page.cols.name')}</th><th>{t('admin.page.cols.role')}</th><th>{t('admin.page.cols.active')}</th>
+                  <th className="text-center">{t('admin.page.cols.chartView')}</th>
+                  <th className="text-center">{t('admin.page.cols.editProviders')}</th>
+                  <th className="text-center">{t('admin.page.cols.editCharges')}</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u: any) => {
-                  const rl = roleLabel(u.main_menu_role);
+                  const rl = roleLabel(u.main_menu_role, (key: string) => t(key));
                   return (
                     <tr key={u.id}>
                       <td className="text-muted small">{u.id}</td>
@@ -179,7 +182,7 @@ function UsersTab() {
                       <td><span className={`badge bg-${rl.color}`}>{rl.label}</span></td>
                       <td>
                         <span className={`badge ${u.active ? 'bg-success' : 'bg-secondary'}`}>
-                          {u.active ? 'Active' : 'Inactive'}
+                          {u.active ? t('admin.page.active') : t('admin.page.inactive')}
                         </span>
                       </td>
                       <td className="text-center">
@@ -215,7 +218,7 @@ function UsersTab() {
                             checked={u.can_edit_charges === 1}
                             onChange={() => toggleEditCharges.mutate({ id: u.id, enabled: u.can_edit_charges !== 1 })}
                             disabled={toggleEditCharges.isPending}
-                            title="Allow this user to create/update charges"
+                            title={t('admin.page.chargePrivilegeHint')}
                           />
                         </div>
                       </td>
@@ -224,14 +227,14 @@ function UsersTab() {
                           className="btn btn-outline-secondary btn-sm"
                           onClick={() => toggleActive.mutate({ id: u.id, active: u.active })}
                         >
-                          {u.active ? 'Deactivate' : 'Activate'}
+                          {u.active ? t('admin.page.deactivate') : t('admin.page.activate')}
                         </button>
                       </td>
                     </tr>
                   );
                 })}
                 {users.length === 0 && (
-                  <tr><td colSpan={9} className="text-center text-muted py-3">No users found.</td></tr>
+                  <tr><td colSpan={9} className="text-center text-muted py-3">{t('admin.page.noUsers')}</td></tr>
                 )}
               </tbody>
             </table>
@@ -243,6 +246,7 @@ function UsersTab() {
 }
 
 function FacilitiesTab() {
+  const { t } = useTranslation();
   const { data: facilities = [] } = useQuery({ queryKey: ['facilities'], queryFn: async () => { const r = await nestClient.get('/facilities'); return r.data; } });
 
   return (
@@ -250,13 +254,13 @@ function FacilitiesTab() {
       <div className="card-header"><h5 className="mb-0">Facilities ({facilities.length})</h5></div>
       <div className="card-body p-0">
         <table className="table table-sm table-hover mb-0">
-          <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Address</th></tr></thead>
+          <thead><tr><th>{t('admin.page.cols.id')}</th><th>{t('admin.page.facilityCols.name')}</th><th>{t('admin.page.facilityCols.phone')}</th><th>{t('admin.page.facilityCols.address')}</th></tr></thead>
           <tbody>
             {facilities.map((f: any) => (
               <tr key={f.id}><td>{f.id}</td><td><strong>{f.name}</strong></td><td>{f.phone || '—'}</td>
                 <td>{[f.street, f.city].filter(Boolean).join(', ') || '—'}</td></tr>
             ))}
-            {!facilities.length && <tr><td colSpan={4} className="text-muted text-center">No facilities found</td></tr>}
+            {!facilities.length && <tr><td colSpan={4} className="text-muted text-center">{t('admin.page.noFacilities')}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -265,6 +269,7 @@ function FacilitiesTab() {
 }
 
 function ListsTab() {
+  const { t } = useTranslation();
   const { data: lists = [] } = useQuery({
     queryKey: ['admin-lists'],
     queryFn: async () => { const r = await nestClient.get('/admin/lists'); return r.data; },
@@ -272,15 +277,15 @@ function ListsTab() {
 
   return (
     <div className="card">
-      <div className="card-header"><h5 className="mb-0">Lookup Lists</h5></div>
+      <div className="card-header"><h5 className="mb-0">{t('admin.page.lookupLists')}</h5></div>
       <div className="card-body p-0">
         <table className="table table-sm table-hover mb-0">
-          <thead><tr><th>ID</th><th>Type</th><th>Title</th><th>Date</th></tr></thead>
+          <thead><tr><th>{t('admin.page.cols.id')}</th><th>{t('admin.page.listCols.type')}</th><th>{t('admin.page.listCols.title')}</th><th>{t('admin.page.listCols.date')}</th></tr></thead>
           <tbody>
             {lists.map((l: any) => (
               <tr key={l.id}><td>{l.id}</td><td><span className="badge bg-secondary">{l.type}</span></td><td>{l.title}</td><td>{l.date}</td></tr>
             ))}
-            {!lists.length && <tr><td colSpan={4} className="text-muted text-center">No lists found</td></tr>}
+            {!lists.length && <tr><td colSpan={4} className="text-muted text-center">{t('admin.page.noLists')}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -289,6 +294,7 @@ function ListsTab() {
 }
 
 function NotificationSettingsTab() {
+  const { t } = useTranslation();
   const [saved, setSaved] = useState(false);
   const [config, setConfig] = useState({
     smtp_host: 'mail.transtechologies.com', smtp_port: '587', smtp_user: 'support@transtechologies.com', smtp_pass: 'Cosinesine900**',
@@ -315,13 +321,13 @@ function NotificationSettingsTab() {
         {/* Email (SMTP) */}
         <div className="col-md-6">
           <div className="card shadow-sm">
-            <div className="card-header"><h5 className="mb-0"><i className="bi bi-envelope me-2"></i>Email (SMTP)</h5></div>
+            <div className="card-header"><h5 className="mb-0"><i className="bi bi-envelope me-2"></i>{t('admin.page.emailSmtp')}</h5></div>
             <div className="card-body">
-              <div className="mb-2"><label className="form-label small">SMTP Host</label><input className="form-control form-control-sm" placeholder="smtp.gmail.com" value={config.smtp_host} onChange={e => setConfig({...config, smtp_host: e.target.value})} /></div>
-              <div className="mb-2"><label className="form-label small">Port</label><input className="form-control form-control-sm" value={config.smtp_port} onChange={e => setConfig({...config, smtp_port: e.target.value})} /></div>
-              <div className="mb-2"><label className="form-label small">Username</label><input className="form-control form-control-sm" value={config.smtp_user} onChange={e => setConfig({...config, smtp_user: e.target.value})} /></div>
-              <div className="mb-2"><label className="form-label small">Password</label><input className="form-control form-control-sm" type="password" value={config.smtp_pass} onChange={e => setConfig({...config, smtp_pass: e.target.value})} /></div>
-              <div className="mb-2"><label className="form-label small">From Email</label><input className="form-control form-control-sm" placeholder="clinic@example.com" value={config.from_email} onChange={e => setConfig({...config, from_email: e.target.value})} /></div>
+              <div className="mb-2"><label className="form-label small">{t('admin.page.smtpHost')}</label><input className="form-control form-control-sm" placeholder="smtp.gmail.com" value={config.smtp_host} onChange={e => setConfig({...config, smtp_host: e.target.value})} /></div>
+              <div className="mb-2"><label className="form-label small">{t('admin.page.port')}</label><input className="form-control form-control-sm" value={config.smtp_port} onChange={e => setConfig({...config, smtp_port: e.target.value})} /></div>
+              <div className="mb-2"><label className="form-label small">{t('admin.page.username')}</label><input className="form-control form-control-sm" value={config.smtp_user} onChange={e => setConfig({...config, smtp_user: e.target.value})} /></div>
+              <div className="mb-2"><label className="form-label small">{t('admin.page.password')}</label><input className="form-control form-control-sm" type="password" value={config.smtp_pass} onChange={e => setConfig({...config, smtp_pass: e.target.value})} /></div>
+              <div className="mb-2"><label className="form-label small">{t('admin.page.fromEmail')}</label><input className="form-control form-control-sm" placeholder={t('admin.page.emailPlaceholder')} value={config.from_email} onChange={e => setConfig({...config, from_email: e.target.value})} /></div>
             </div>
           </div>
         </div>
@@ -329,10 +335,10 @@ function NotificationSettingsTab() {
         {/* SMS Gateway */}
         <div className="col-md-6">
           <div className="card shadow-sm">
-            <div className="card-header"><h5 className="mb-0"><i className="bi bi-chat-dots me-2"></i>SMS Gateway</h5></div>
+            <div className="card-header"><h5 className="mb-0"><i className="bi bi-chat-dots me-2"></i>{t('admin.page.smsGateway')}</h5></div>
             <div className="card-body">
               <div className="mb-3">
-                <label className="form-label small">SMS Gateway URL Template</label>
+                <label className="form-label small">{t('admin.page.smsTemplate')}</label>
                 <input className="form-control form-control-sm" placeholder="https://gateway.example.com/send?to={phone}&msg={message}" value={config.sms_gateway} onChange={e => setConfig({...config, sms_gateway: e.target.value})} />
                 <small className="text-muted">Use {'{phone}'} and {'{message}'} as placeholders</small>
               </div>
@@ -347,15 +353,16 @@ function NotificationSettingsTab() {
 
       <div className="mt-3">
         <button className="btn btn-primary" onClick={handleSave}>
-          <i className="bi bi-floppy me-1"></i>{saved ? 'Saved!' : 'Save Settings'}
+          <i className="bi bi-floppy me-1"></i>{saved ? t('admin.page.saved') : t('admin.page.saveSettings')}
         </button>
-        <small className="text-muted ms-2">Settings saved locally. Once configured, email/SMS will be sent when checked on appointments.</small>
+        <small className="text-muted ms-2">{t('admin.page.settingsNote')}</small>
       </div>
     </div>
   );
 }
 
 function ChartTrackingTab() {
+  const { t } = useTranslation();
   const [charts, setCharts] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('chart_tracking') || '[]'); } catch { return []; }
   });
@@ -381,13 +388,13 @@ function ChartTrackingTab() {
   return (
     <div>
       <div className="card shadow-sm mb-4">
-        <div className="card-header"><h5 className="mb-0">Check In / Out Paper Chart</h5></div>
+        <div className="card-header"><h5 className="mb-0">{t('admin.page.chartTitle')}</h5></div>
         <div className="card-body">
           <div className="row g-2">
-            <div className="col-md-2"><input className="form-control form-control-sm" placeholder="Patient ID" value={form.patientId} onChange={e => setForm({...form, patientId: e.target.value})} /></div>
-            <div className="col-md-3"><input className="form-control form-control-sm" placeholder="Patient Name" value={form.patientName} onChange={e => setForm({...form, patientName: e.target.value})} /></div>
-            <div className="col-md-3"><input className="form-control form-control-sm" placeholder="Location (e.g. Room 3, File Cabinet A)" value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
-            <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addChart} disabled={!form.patientId}>Check In Chart</button></div>
+            <div className="col-md-2"><input className="form-control form-control-sm" placeholder={t('admin.page.patientIdPlaceholder')} value={form.patientId} onChange={e => setForm({...form, patientId: e.target.value})} /></div>
+            <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('admin.page.patientNamePlaceholder')} value={form.patientName} onChange={e => setForm({...form, patientName: e.target.value})} /></div>
+            <div className="col-md-3"><input className="form-control form-control-sm" placeholder={t('admin.page.locationPlaceholder')} value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
+            <div className="col-md-2"><button className="btn btn-primary btn-sm w-100" onClick={addChart} disabled={!form.patientId}>{t('admin.page.checkInChart')}</button></div>
           </div>
         </div>
       </div>
@@ -396,15 +403,15 @@ function ChartTrackingTab() {
         <div className="card-header d-flex justify-content-between"><h5 className="mb-0">Active Charts ({activeCharts.length})</h5></div>
         <div className="card-body p-0">
           <table className="table table-sm table-hover mb-0">
-            <thead><tr><th>Patient ID</th><th>Name</th><th>Location</th><th>Date</th><th></th></tr></thead>
+            <thead><tr><th>{t('admin.page.chartCols.patientId')}</th><th>{t('admin.page.chartCols.name')}</th><th>{t('admin.page.chartCols.location')}</th><th>{t('admin.page.chartCols.date')}</th><th></th></tr></thead>
             <tbody>
               {charts.map(c => (
                 <tr key={c.id} className={c.checkedOut ? 'text-muted text-decoration-line-through' : ''}>
                   <td>#{c.patientId}</td><td>{c.patientName}</td><td>{c.location || '—'}</td><td>{new Date(c.date).toLocaleDateString()}</td>
-                  <td><button className="btn btn-outline-success btn-sm" onClick={() => removeChart(c.id)}>{c.checkedOut ? 'Returned' : 'Check Out'}</button></td>
+                  <td><button className="btn btn-outline-success btn-sm" onClick={() => removeChart(c.id)}>{c.checkedOut ? t('admin.page.returned') : t('admin.page.checkOut')}</button></td>
                 </tr>
               ))}
-              {charts.length === 0 && <tr><td colSpan={5} className="text-muted text-center py-3">No charts tracked.</td></tr>}
+              {charts.length === 0 && <tr><td colSpan={5} className="text-muted text-center py-3">{t('admin.page.noCharts')}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -463,6 +470,7 @@ function loadSettings(): SystemSettings {
 }
 
 function SettingsTab() {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState<SystemSettings>(loadSettings);
   const [saved, setSaved] = useState(false);
   const [activeSection, setActiveSection] = useState<'general' | 'consultations' | 'language' | 'legacy'>('general');
@@ -485,10 +493,10 @@ function SettingsTab() {
   };
 
   const legacyLinks = [
-    { title: 'OAuth2 Clients', icon: 'bi-shield-lock', url: '/interface/smart/admin-client.php', desc: 'Manage OAuth2 client registrations' },
-    { title: 'Practice Settings', icon: 'bi-gear', url: '/interface/super/edit_globals.php', desc: 'Configure global OpenRx settings' },
-    { title: 'Modules', icon: 'bi-puzzle', url: '/interface/modules/zend_modules/public/index.php', desc: 'Manage installed modules' },
-    { title: 'Database', icon: 'bi-database', url: '/sql_patch.php', desc: 'Database backup and SQL patching' },
+    { title: t('admin.page.legacy.oauth2'), icon: 'bi-shield-lock', url: '/interface/smart/admin-client.php', desc: t('admin.page.legacy.oauth2Desc') },
+    { title: t('admin.page.legacy.practice'), icon: 'bi-gear', url: '/interface/super/edit_globals.php', desc: t('admin.page.legacy.practiceDesc') },
+    { title: t('admin.page.legacy.modules'), icon: 'bi-puzzle', url: '/interface/modules/zend_modules/public/index.php', desc: t('admin.page.legacy.modulesDesc') },
+    { title: t('admin.page.legacy.database'), icon: 'bi-database', url: '/sql_patch.php', desc: t('admin.page.legacy.databaseDesc') },
   ];
 
   return (
@@ -497,10 +505,10 @@ function SettingsTab() {
       <div className="d-flex align-items-center justify-content-between mb-4">
         <ul className="nav nav-pills">
           {[
-            { id: 'general' as const, label: 'General', icon: 'bi-gear' },
-            { id: 'consultations' as const, label: 'Consultations', icon: 'bi-camera-video' },
-            { id: 'language' as const, label: 'Language & Region', icon: 'bi-translate' },
-            { id: 'legacy' as const, label: 'Legacy Tools', icon: 'bi-link-45deg' },
+            { id: 'general' as const, label: t('admin.page.sections.general'), icon: 'bi-gear' },
+            { id: 'consultations' as const, label: t('admin.page.sections.consultations'), icon: 'bi-camera-video' },
+            { id: 'language' as const, label: t('admin.page.sections.language'), icon: 'bi-translate' },
+            { id: 'legacy' as const, label: t('admin.page.sections.legacy'), icon: 'bi-link-45deg' },
           ].map((s) => (
             <li className="nav-item" key={s.id}>
               <button
@@ -517,7 +525,7 @@ function SettingsTab() {
             <i className="bi bi-arrow-counterclockwise me-1"></i>Reset Defaults
           </button>
           <button className="btn btn-primary btn-sm" onClick={handleSave}>
-            <i className="bi bi-floppy me-1"></i>{saved ? 'Saved!' : 'Save Settings'}
+            <i className="bi bi-floppy me-1"></i>{saved ? t('admin.page.saved') : t('admin.page.saveSettings')}
           </button>
         </div>
       </div>
@@ -535,25 +543,25 @@ function SettingsTab() {
         <div className="row g-4">
           <div className="col-md-6">
             <div className="card shadow-sm">
-              <div className="card-header"><h5 className="mb-0"><i className="bi bi-building me-2"></i>Clinic Information</h5></div>
+              <div className="card-header"><h5 className="mb-0"><i className="bi bi-building me-2"></i>{t('admin.page.clinicInfo')}</h5></div>
               <div className="card-body">
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Clinic Name</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.clinicName')}</label>
                   <input className="form-control form-control-sm" value={settings.clinicName}
                     onChange={e => update({ clinicName: e.target.value })} />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Phone Number</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.phone')}</label>
                   <PhoneInput value={settings.clinicPhone} onChange={v => update({ clinicPhone: v })} />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Email Address</label>
-                  <input className="form-control form-control-sm" placeholder="clinic@example.com" value={settings.clinicEmail}
+                  <label className="form-label small fw-semibold">{t('admin.page.email')}</label>
+                  <input className="form-control form-control-sm" placeholder={t('admin.page.emailPlaceholder')} value={settings.clinicEmail}
                     onChange={e => update({ clinicEmail: e.target.value })} />
                 </div>
                 <div className="mb-0">
-                  <label className="form-label small fw-semibold">Default Provider</label>
-                  <input className="form-control form-control-sm" placeholder="Dr. Smith" value={settings.defaultProvider}
+                  <label className="form-label small fw-semibold">{t('admin.page.defaultProvider')}</label>
+                  <input className="form-control form-control-sm" placeholder={t('admin.page.providerPlaceholder')} value={settings.defaultProvider}
                     onChange={e => update({ defaultProvider: e.target.value })} />
                 </div>
               </div>
@@ -562,15 +570,15 @@ function SettingsTab() {
 
           <div className="col-md-6">
             <div className="card shadow-sm">
-              <div className="card-header"><h5 className="mb-0"><i className="bi bi-palette me-2"></i>Appearance</h5></div>
+              <div className="card-header"><h5 className="mb-0"><i className="bi bi-palette me-2"></i>{t('admin.page.appearance')}</h5></div>
               <div className="card-body">
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Theme</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.theme')}</label>
                   <div className="d-flex gap-2">
                     {([
-                      { value: 'light' as const, icon: 'bi-sun', label: 'Light' },
-                      { value: 'dark' as const, icon: 'bi-moon', label: 'Dark' },
-                      { value: 'system' as const, icon: 'bi-display', label: 'System' },
+                      { value: 'light' as const, icon: 'bi-sun', label: t('admin.page.light') },
+                      { value: 'dark' as const, icon: 'bi-moon', label: t('admin.page.dark') },
+                      { value: 'system' as const, icon: 'bi-display', label: t('admin.page.system') },
                     ]).map((t) => (
                       <button key={t.value}
                         className={`btn btn-sm flex-fill ${settings.theme === t.value ? 'btn-primary' : 'btn-outline-secondary'}`}
@@ -581,7 +589,7 @@ function SettingsTab() {
                   </div>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Time Format</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.timeFormat')}</label>
                   <div className="d-flex gap-2">
                     <button className={`btn btn-sm flex-fill ${settings.timeFormat === '12h' ? 'btn-primary' : 'btn-outline-secondary'}`}
                       onClick={() => update({ timeFormat: '12h' })}>
@@ -594,16 +602,16 @@ function SettingsTab() {
                   </div>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Date Format</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.dateFormat')}</label>
                   <select className="form-select form-select-sm" value={settings.dateFormat}
                     onChange={e => update({ dateFormat: e.target.value as SystemSettings['dateFormat'] })}>
-                    <option value="mm/dd/yyyy">MM/DD/YYYY (US)</option>
-                    <option value="dd/mm/yyyy">DD/MM/YYYY (International)</option>
-                    <option value="yyyy-mm-dd">YYYY-MM-DD (ISO)</option>
+                    <option value="mm/dd/yyyy">{t('admin.page.dateUs')}</option>
+                    <option value="dd/mm/yyyy">{t('admin.page.dateIntl')}</option>
+                    <option value="yyyy-mm-dd">{t('admin.page.dateIso')}</option>
                   </select>
                 </div>
                 <div className="mb-0">
-                  <label className="form-label small fw-semibold">Timezone</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.timezone')}</label>
                   <select className="form-select form-select-sm" value={settings.timezone}
                     onChange={e => update({ timezone: e.target.value })}>
                     {timezones.map(tz => (
@@ -640,10 +648,10 @@ function SettingsTab() {
                       onClick={() => update({ language: 'en' })}
                     >
                       <span style={{ fontSize: '3rem' }}>🇺🇸</span>
-                      <h5 className="mt-2 mb-1">English</h5>
-                      <span className="opacity-75 small">English (Default)</span>
+                      <h5 className="mt-2 mb-1">{t('admin.page.english')}</h5>
+                      <span className="opacity-75 small">{t('admin.page.englishDefault')}</span>
                       {settings.language === 'en' && (
-                        <div className="mt-2"><span className="badge bg-white text-primary small">Active</span></div>
+                        <div className="mt-2"><span className="badge bg-white text-primary small">{t('admin.page.active')}</span></div>
                       )}
                     </button>
                   </div>
@@ -654,7 +662,7 @@ function SettingsTab() {
                     >
                       <span style={{ fontSize: '3rem' }}>🇫🇷</span>
                       <h5 className="mt-2 mb-1">Français</h5>
-                      <span className="opacity-75 small">French / Français</span>
+                      <span className="opacity-75 small">{t('admin.page.frenchFull')}</span>
                       {settings.language === 'fr' && (
                         <div className="mt-2"><span className="badge bg-white text-primary small">Actif</span></div>
                       )}
@@ -671,16 +679,16 @@ function SettingsTab() {
 
             <div className="card shadow-sm mt-4">
               <div className="card-header">
-                <h5 className="mb-0"><i className="bi bi-geo-alt me-2"></i>Regional Settings</h5>
+                <h5 className="mb-0"><i className="bi bi-geo-alt me-2"></i>{t('admin.page.regional')}</h5>
               </div>
               <div className="card-body">
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Date Format</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.dateFormat')}</label>
                   <select className="form-select form-select-sm" value={settings.dateFormat}
                     onChange={e => update({ dateFormat: e.target.value as SystemSettings['dateFormat'] })}>
-                    <option value="mm/dd/yyyy">MM/DD/YYYY (US)</option>
-                    <option value="dd/mm/yyyy">DD/MM/YYYY (International)</option>
-                    <option value="yyyy-mm-dd">YYYY-MM-DD (ISO)</option>
+                    <option value="mm/dd/yyyy">{t('admin.page.dateUs')}</option>
+                    <option value="dd/mm/yyyy">{t('admin.page.dateIntl')}</option>
+                    <option value="yyyy-mm-dd">{t('admin.page.dateIso')}</option>
                   </select>
                   <div className="form-text">Preview: {new Date().toLocaleDateString(
                     settings.language === 'fr' ? 'fr-FR' : 'en-US',
@@ -688,7 +696,7 @@ function SettingsTab() {
                   )}</div>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold">Time Format</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.timeFormat')}</label>
                   <div className="d-flex gap-2">
                     <button className={`btn btn-sm flex-fill ${settings.timeFormat === '12h' ? 'btn-primary' : 'btn-outline-secondary'}`}
                       onClick={() => update({ timeFormat: '12h' })}>12-Hour</button>
@@ -697,7 +705,7 @@ function SettingsTab() {
                   </div>
                 </div>
                 <div className="mb-0">
-                  <label className="form-label small fw-semibold">Timezone</label>
+                  <label className="form-label small fw-semibold">{t('admin.page.timezone')}</label>
                   <select className="form-select form-select-sm" value={settings.timezone}
                     onChange={e => update({ timezone: e.target.value })}>
                     {timezones.map(tz => (
@@ -838,6 +846,7 @@ interface ServerSettingItem {
  * backend and enforced by the API, so they apply to every patient and device.
  */
 function ConsultationsSettings() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
 
@@ -864,8 +873,8 @@ function ConsultationsSettings() {
       <div className="col-lg-8">
         <div className="card shadow-sm">
           <div className="card-header d-flex align-items-center justify-content-between">
-            <h5 className="mb-0"><i className="bi bi-camera-video me-2"></i>Video Consultations</h5>
-            <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary">Patient-facing</span>
+            <h5 className="mb-0"><i className="bi bi-camera-video me-2"></i>{t('admin.page.video.title')}</h5>
+            <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary">{t('admin.page.video.patientFacing')}</span>
           </div>
           <div className="card-body">
             <p className="text-muted small mb-3">
@@ -887,7 +896,7 @@ function ConsultationsSettings() {
             {isLoading ? (
               <div className="text-center py-4"><div className="spinner-border text-primary"></div></div>
             ) : consultations.length === 0 ? (
-              <div className="text-muted small py-3">No consultation settings available.</div>
+              <div className="text-muted small py-3">{t('admin.page.video.none')}</div>
             ) : (
               consultations.map((s) => (
                 <div
@@ -908,7 +917,7 @@ function ConsultationsSettings() {
                       <div className="fw-semibold d-flex align-items-center gap-2 flex-wrap">
                         {s.label}
                         <span className={`badge rounded-pill ${s.value === true ? 'bg-success' : 'bg-secondary'}`}>
-                          {s.value === true ? 'On' : 'Off'}
+                          {s.value === true ? t('admin.page.video.on') : t('admin.page.video.off')}
                         </span>
                       </div>
                       <div className="small text-muted mt-1">{s.description}</div>
@@ -935,12 +944,12 @@ function ConsultationsSettings() {
 
       <div className="col-lg-4">
         <div className="card shadow-sm">
-          <div className="card-header"><h5 className="mb-0"><i className="bi bi-info-circle me-2"></i>How it works</h5></div>
+          <div className="card-header"><h5 className="mb-0"><i className="bi bi-info-circle me-2"></i>{t('admin.page.video.howItWorks')}</h5></div>
           <div className="card-body small text-muted">
             <p>
-              While <strong>Video consultations</strong> is on, patients can pick a video visit on
-              <code className="ms-1">/book-appointment</code> and receive a private room link to meet
-              their physician.
+              {t('admin.page.video.howLead')} <strong>{t('admin.page.video.title')}</strong>{' '}
+              {t('admin.page.video.howMid')}
+              <code className="ms-1">/book-appointment</code> {t('admin.page.video.howTail')}
             </p>
             <p className="mb-0">
               Turned off, the video option and its booking callout disappear, and any video booking
@@ -956,6 +965,7 @@ function ConsultationsSettings() {
 
 // ── Pending Registrations Tab (admin review) ──────────────────
 function PendingRegistrationsTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data: pending = [], isLoading } = useQuery({
@@ -989,17 +999,17 @@ function PendingRegistrationsTab() {
       {pending.length === 0 ? (
         <div className="text-center py-5 text-muted">
           <i className="bi bi-check-circle" style={{ fontSize: '3rem' }}></i>
-          <h5 className="mt-2">No pending registrations</h5>
-          <p className="small">All staff applications have been reviewed.</p>
+          <h5 className="mt-2">{t('admin.page.pending.emptyTitle')}</h5>
+          <p className="small">{t('admin.page.pending.emptyHint')}</p>
         </div>
       ) : (
         <div className="table-responsive">
           <table className="table table-sm table-hover align-middle">
             <thead className="table-light">
               <tr>
-                <th>ID</th><th>Name</th><th>Username</th><th>Title</th>
-                <th>Specialty</th><th>Email</th><th>Registered</th>
-                <th>Days Left</th><th>Actions</th>
+                <th>{t('admin.page.pending.cols.id')}</th><th>{t('admin.page.pending.cols.name')}</th><th>{t('admin.page.pending.cols.username')}</th><th>{t('admin.page.pending.cols.title')}</th>
+                <th>{t('admin.page.pending.cols.specialty')}</th><th>{t('admin.page.pending.cols.email')}</th><th>{t('admin.page.pending.cols.registered')}</th>
+                <th>{t('admin.page.pending.cols.daysLeft')}</th><th>{t('admin.page.pending.cols.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1017,7 +1027,7 @@ function PendingRegistrationsTab() {
                     <td><small>{new Date(u.date_created).toLocaleDateString()}</small></td>
                     <td>
                       <span className={`badge ${urgent ? 'bg-danger' : daysLeft <= 14 ? 'bg-warning text-dark' : 'bg-success'}`}>
-                        {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                        {t('admin.page.pending.days', { count: daysLeft })}
                       </span>
                     </td>
                     <td>
@@ -1048,6 +1058,7 @@ function PendingRegistrationsTab() {
 // ── Menu access control ──────────────────────────────────────────────────
 
 function MenuAccessTab() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'menu-permissions'],
@@ -1067,14 +1078,14 @@ function MenuAccessTab() {
   return (
     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', position: 'relative', zIndex: 1 }}>
       <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-        <h6 className="mb-1 fw-bold"><i className="bi bi-menu-button-wide me-2 text-primary"></i>Menu Access by Role</h6>
-        <small className="text-muted">Toggle which sidebar menu items each role can see. Changes apply immediately.</small>
+        <h6 className="mb-1 fw-bold"><i className="bi bi-menu-button-wide me-2 text-primary"></i>{t('admin.page.menuAccess.title')}</h6>
+        <small className="text-muted">{t('admin.page.menuAccess.hint')}</small>
       </div>
       <div className="card-body p-0" style={{ overflowX: 'auto' }}>
         <table className="table table-sm align-middle mb-0" style={{ minWidth: '960px' }}>
           <thead className="table-light">
             <tr>
-              <th style={{ position: 'sticky', left: 0, background: '#f8f9fa', minWidth: '230px', zIndex: 1 }}>Menu Item</th>
+              <th style={{ position: 'sticky', left: 0, background: '#f8f9fa', minWidth: '230px', zIndex: 1 }}>{t('admin.page.menuAccess.menuItem')}</th>
               {roles.map((r: string) => (
                 <th key={r} className="text-center text-capitalize" style={{ fontSize: '0.7rem' }}>{r.replace(/_/g, ' ')}</th>
               ))}

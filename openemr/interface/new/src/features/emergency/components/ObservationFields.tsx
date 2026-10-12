@@ -7,6 +7,8 @@
  * 72 that nobody took is worse than no value at all.
  */
 
+import { useTranslation } from 'react-i18next';
+
 export interface ObservationValues {
   respiration: string;
   oxygen_saturation: string;
@@ -74,6 +76,7 @@ export function ObservationFields({
   onChange: (next: ObservationValues) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const set = (key: keyof ObservationValues, value: string | boolean) => onChange({ ...values, [key]: value });
   const { complete, filled, total } = observationCompleteness(values);
 
@@ -97,32 +100,32 @@ export function ObservationFields({
 
   return (
     <div className="row g-2 align-items-end">
-      {input('respiration', 'Resp', '/min', '1')}
-      {input('oxygen_saturation', 'SpO₂', '%', '1')}
-      {input('temperature', 'Temp', '°C')}
-      {input('bps', 'Systolic', 'mmHg', '1')}
-      {input('bpd', 'Diastolic', 'mmHg', '1')}
-      {input('pulse', 'Pulse', '/min', '1')}
-      {input('painScore', 'Pain', '/10', '1')}
+      {input('respiration', t('emergency.obs.resp'), '/min', '1')}
+      {input('oxygen_saturation', t('nurse.aide.thSpo2'), '%', '1')}
+      {input('temperature', t('nurse.aide.thTemp'), '°C')}
+      {input('bps', t('emergency.obs.systolic'), 'mmHg', '1')}
+      {input('bpd', t('emergency.obs.diastolic'), 'mmHg', '1')}
+      {input('pulse', t('nurse.aide.thPulse'), '/min', '1')}
+      {input('painScore', t('emergency.obs.pain'), '/10', '1')}
 
       <div className="col-12 col-md-4">
         <div className="d-flex flex-wrap gap-3">
           <div className="form-check form-switch">
             <input className="form-check-input" type="checkbox" id="ed-on-o2" checked={values.onSupplementalO2}
               disabled={disabled} onChange={(e) => set('onSupplementalO2', e.target.checked)} />
-            <label className="form-check-label small" htmlFor="ed-on-o2">On oxygen</label>
+            <label className="form-check-label small" htmlFor="ed-on-o2">{t('emergency.obs.onOxygen')}</label>
           </div>
           <div className="form-check form-switch">
             <input className="form-check-input" type="checkbox" id="ed-alert" checked={values.avpuAlert}
               disabled={disabled} onChange={(e) => set('avpuAlert', e.target.checked)} />
-            <label className="form-check-label small" htmlFor="ed-alert">Alert (AVPU)</label>
+            <label className="form-check-label small" htmlFor="ed-alert">{t('emergency.obs.avpuAlert')}</label>
           </div>
         </div>
         <div className="small mt-1" style={{ color: complete ? '#198754' : '#fd7e14' }}>
           <i className={`bi ${complete ? 'bi-check-circle' : 'bi-exclamation-triangle'} me-1`}></i>
           {complete
-            ? 'Full set — the level can be graded down to Blue if nothing is wrong.'
-            : `${filled}/${total} recorded — without the rest the patient cannot be graded non-urgent.`}
+            ? t('emergency.obs.complete')
+            : t('emergency.obs.partial', { filled, total })}
         </div>
       </div>
     </div>

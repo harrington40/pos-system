@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
@@ -21,13 +22,13 @@ interface VitalForm {
  * the only point where they are captured, so a blank set here means the chart
  * has no baseline at all. Weight/height and pain are optional.
  */
-const REQUIRED_VITALS: { key: keyof VitalForm; label: string }[] = [
-  { key: 'bp_systolic', label: 'Systolic BP' },
-  { key: 'bp_diastolic', label: 'Diastolic BP' },
-  { key: 'pulse', label: 'Pulse' },
-  { key: 'temp', label: 'Temperature' },
-  { key: 'resp', label: 'Respirations' },
-  { key: 'o2_sat', label: 'SpO\u2082' },
+const REQUIRED_VITALS: { key: keyof VitalForm; labelKey: string }[] = [
+  { key: 'bp_systolic', labelKey: 'vitalsBpSys' },
+  { key: 'bp_diastolic', labelKey: 'vitalsBpDia' },
+  { key: 'pulse', labelKey: 'vitalsPulse' },
+  { key: 'temp', labelKey: 'vitalsTemp' },
+  { key: 'resp', labelKey: 'vitalsResp' },
+  { key: 'o2_sat', labelKey: 'thSpo2' },
 ];
 
 interface Prescription {
@@ -281,14 +282,15 @@ function computeAcuity(note: string): { level: AcuityLevel; score: number } {
 }
 
 function SmartAcuityBadge({ note }: { note: string }) {
+  const { t } = useTranslation();
   const { level, score } = useMemo(() => computeAcuity(note), [note]);
   const color = level === 'stat' ? '#dc3545' : level === 'urgent' ? '#fd7e14' : '#198754';
   const icon = level === 'stat' ? 'bi-exclamation-octagon' : level === 'urgent' ? 'bi-exclamation-triangle' : 'bi-check-circle';
   return (
     <span className="badge rounded-pill d-inline-flex align-items-center gap-1"
       style={{ backgroundColor: `${color}20`, color, fontSize: '0.6rem' }}
-      title={`Smart acuity score: ${score} — shared with the nursing team`}>
-      <i className={`bi ${icon}`}></i>Smart {level.toUpperCase()} ({score})
+      title={t('screening.acuityTitle', { score })}>
+      <i className={`bi ${icon}`}></i>{t('screening.acuityBadge', { level: level.toUpperCase(), score })}
     </span>
   );
 }
@@ -308,6 +310,9 @@ function computeAge(dob: string | undefined): string {
 // ── Main Component ───────────────────────────────────────────────
 
 export default function StartScreeningPage() {
+  const { t } = useTranslation();
+  const labGroup = (s: string) => t(`screening.labgroups.${s}`, s);
+  const medCat = (s: string) => t(`screening.medcats.${s}`, s);
   const { pid } = useParams<{ pid: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -625,7 +630,7 @@ export default function StartScreeningPage() {
         // treated as not recorded rather than sent and rejected.
         const n = Number(vitals[v.key]);
         return !(Number.isFinite(n) && n > 0);
-      }).map((v) => v.label),
+      }).map((v) => t(`screening.${v.labelKey}`)),
     [vitals],
   );
 
@@ -923,7 +928,7 @@ export default function StartScreeningPage() {
     });
   }, [latestVital]);
 
-  if (!pid) return <div className="alert alert-danger">No patient ID provided</div>;
+  if (!pid) return <div className="alert alert-danger">{t('screening.noPatientId')}</div>;
 
   // ── RENDER ──────────────────────────────────────────────────
 
@@ -997,12 +1002,12 @@ export default function StartScreeningPage() {
         <div className="alert alert-danger py-2 mb-2 small d-flex align-items-start gap-2" style={{ borderRadius: '8px' }}>
           <i className="bi bi-exclamation-octagon-fill fs-6"></i>
           <div className="flex-grow-1">
-            <strong>Vitals were not saved</strong>
+            <strong>{t('screening.vitalsNotSaved')}</strong>
             <br />
             <span>{vitalsSaveError}</span>
           </div>
           <button type="button" className="btn btn-sm btn-outline-danger rounded-pill align-self-center"
-            onClick={() => setVitalsSaveError('')}>Dismiss</button>
+            onClick={() => setVitalsSaveError('')}>{t('screening.dismiss')}</button>
         </div>
       )}
 
@@ -1010,11 +1015,11 @@ export default function StartScreeningPage() {
         <div className="alert alert-warning py-2 mb-2 small d-flex align-items-start gap-2" style={{ borderRadius: '8px' }}>
           <i className="bi bi-heart-pulse-fill fs-6"></i>
           <div className="flex-grow-1">
-            <strong>Cannot complete — vitals are missing</strong>
+            <strong>{t('screening.cannotComplete')}</strong>
             <br />
             <span>Record: {missingVitalsNotice.join(', ')}</span>
             <br />
-            <span className="text-muted">Vitals are taken at triage, so a screening cannot be completed without them.</span>
+            <span className="text-muted">{t('screening.cannotCompleteHint')}</span>
           </div>
           <button type="button" className="btn btn-sm btn-warning rounded-pill align-self-center"
             onClick={() => setShowVitals(true)}>
@@ -1039,15 +1044,15 @@ export default function StartScreeningPage() {
             </span>
             <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
               <span className="form-check form-switch mb-0 d-inline-flex align-items-center gap-1"
-                title="Document this note in the patient chart and share it with the nursing team">
+                title={t('screening.titleNoteHint')}>
                 <input className="form-check-input" type="checkbox" id="share-nursing" checked={shareWithNursing}
                   onChange={e => setShareWithNursing(e.target.checked)} />
-                <label className="form-check-label" htmlFor="share-nursing" style={{ fontSize: '0.6rem' }}>Share with Nursing</label>
+                <label className="form-check-label" htmlFor="share-nursing" style={{ fontSize: '0.6rem' }}>{t('screening.shareWithNursing')}</label>
               </span>
               {clinicalNote && <SmartAcuityBadge note={clinicalNote} />}
               <button className="btn btn-outline-secondary btn-sm rounded-pill"
                 style={{ fontSize: '0.6rem', padding: '1px 8px' }}
-                onClick={() => setShowQuickNotes(!showQuickNotes)}>Quick Note ▼</button>
+                onClick={() => setShowQuickNotes(!showQuickNotes)}>{t('screening.quickNote')}</button>
             </div>
           </div>
           {showQuickNotes && (
@@ -1071,7 +1076,7 @@ export default function StartScreeningPage() {
 
       {/* ═══ VITAL HISTORY (previously recorded) ═══ */}
       <div className="card border-0 order-card mb-2" style={{ cursor: 'pointer', borderLeft: '4px solid #0dcaf0' }}
-        onClick={() => setVitalHistoryOpen(true)} title="View vital history">
+        onClick={() => setVitalHistoryOpen(true)} title={t('screening.titleVitalHistory')}>
         <div className="card-body py-2 px-3">
           <div className="d-flex justify-content-between align-items-center">
             <span className="fw-bold small" style={{ fontSize: '0.75rem' }}>
@@ -1079,16 +1084,16 @@ export default function StartScreeningPage() {
             </span>
             <span className="badge bg-info rounded-pill" style={{ fontSize: '0.6rem' }}>{vitalHistory.length} record{vitalHistory.length !== 1 ? 's' : ''}</span>
           </div>
-          <div className="text-muted small mt-1" style={{ fontSize: '0.7rem' }}>Click to view table & trend chart</div>
+          <div className="text-muted small mt-1" style={{ fontSize: '0.7rem' }}>{t('screening.viewTableTrend')}</div>
         </div>
       </div>
 
       {/* ═══ SMART TEMPLATE ═══ */}
       <div className="d-flex align-items-center gap-2 px-2 py-1 mb-2 rounded-3 bg-light border" style={{ fontSize: '0.8rem' }}>
         <i className="bi bi-lightning-charge text-warning"></i>
-        <span className="fw-semibold text-nowrap">Smart Template:</span>
+        <span className="fw-semibold text-nowrap">{t('screening.smartTemplate')}</span>
         <input className="form-control form-control-sm border-0 bg-transparent" style={{ maxWidth: 200 }}
-          placeholder="e.g. UTI, HTN..." value={templateSearch}
+          placeholder={t('screening.phTemplateSearch')} value={templateSearch}
           onChange={e => setTemplateSearch(e.target.value)} />
         {matchingTemplate && (
           <button className="btn btn-warning btn-sm rounded-pill text-nowrap" style={{ fontSize: '0.7rem' }}
@@ -1100,13 +1105,13 @@ export default function StartScreeningPage() {
 
       {/* ═══ PHYSICAL EXAMINATION ═══ */}
       <div className="card border-0 order-card mb-2" style={{ cursor: 'pointer', borderLeft: '4px solid #6f42c1' }}
-        onClick={() => setExamOrderOpen(true)} title="Open physical examination">
+        onClick={() => setExamOrderOpen(true)} title={t('screening.titleExam')}>
         <div className="card-body py-2 px-3">
           <div className="d-flex justify-content-between align-items-center">
             <span className="fw-bold small" style={{ fontSize: '0.75rem' }}>
-              <i className="bi bi-clipboard-pulse me-1 text-primary"></i>Physical Examination
+              <i className="bi bi-clipboard-pulse me-1 text-primary"></i>{t('screening.physicalExam')}
             </span>
-            {physicalExam && <span className="badge bg-primary rounded-pill" style={{ fontSize: '0.6rem' }}>documented</span>}
+            {physicalExam && <span className="badge bg-primary rounded-pill" style={{ fontSize: '0.6rem' }}>{t('screening.documented')}</span>}
           </div>
           <div className="text-muted small mt-1" style={{ fontSize: '0.7rem' }}>
             {physicalExam ? physicalExam.slice(0, 120) + (physicalExam.length > 120 ? '…' : '') : 'Click to document exam findings (systems-based)'}
@@ -1148,7 +1153,7 @@ export default function StartScreeningPage() {
         {/* LABS column */}
         <div className="col-md-4">
           <div className="card border-0 order-card h-100" style={{ cursor: 'pointer' }}
-            onClick={() => setLabOrderOpen(true)} title="Open lab order form">
+            onClick={() => setLabOrderOpen(true)} title={t('screening.titleLabOrder')}>
             <div className="card-body py-2 px-3">
               <div className="d-flex justify-content-between align-items-center mb-1">
                 <span className="fw-bold small" style={{ fontSize: '0.75rem' }}>
@@ -1179,7 +1184,7 @@ export default function StartScreeningPage() {
         {/* MEDS column */}
         <div className="col-md-4">
           <div className="card border-0 order-card h-100" style={{ cursor: 'pointer' }}
-            onClick={() => { setMedOrderStage('categories'); setMedOrderOpen(true); }} title="New medication order">
+            onClick={() => { setMedOrderStage('categories'); setMedOrderOpen(true); }} title={t('screening.titleMedOrder')}>
             <div className="card-body py-2 px-3">
               <div className="d-flex justify-content-between align-items-center mb-1">
                 <span className="fw-bold small" style={{ fontSize: '0.75rem' }}>
@@ -1209,7 +1214,7 @@ export default function StartScreeningPage() {
         {/* IMAGING column */}
         <div className="col-md-4">
           <div className="card border-0 order-card h-100" style={{ cursor: 'pointer' }}
-            onClick={() => setImagingOrderOpen(true)} title="Order imaging">
+            onClick={() => setImagingOrderOpen(true)} title={t('screening.titleImaging')}>
             <div className="card-body py-2 px-3">
               <div className="d-flex justify-content-between align-items-center mb-1">
                 <span className="fw-bold small" style={{ fontSize: '0.75rem' }}>
@@ -1241,12 +1246,12 @@ export default function StartScreeningPage() {
       <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '10px' }}>
         <div className="card-body py-2 px-3">
           <div className="d-flex align-items-center gap-2 mb-1">
-            <span className="fw-bold small text-uppercase text-muted" style={{ fontSize: '0.7rem' }}>Diagnosis</span>
+            <span className="fw-bold small text-uppercase text-muted" style={{ fontSize: '0.7rem' }}>{t('screening.diagnosis')}</span>
             <button className={`btn btn-sm rounded-pill ${!showVitals ? 'btn-outline-secondary' : 'btn-secondary'}`}
               style={{ fontSize: '0.65rem', padding: '2px 10px' }}
               onClick={() => setShowVitals(!showVitals)}
-              title="Alt+V">
-              <i className="bi bi-heart-pulse me-1"></i>Vitals
+              title={t('screening.titleAltV')}>
+              <i className="bi bi-heart-pulse me-1"></i>{t('screening.vitalsTab')}
             </button>
           </div>
 
@@ -1254,7 +1259,7 @@ export default function StartScreeningPage() {
           <div className="rounded-3 p-2 mb-2" style={{ background: 'linear-gradient(135deg, #eef6ff 0%, #f4fbf7 100%)', border: '1px solid #dbe7f3' }}>
             <div className="d-flex justify-content-between align-items-center mb-1">
               <span className="small fw-semibold" style={{ color: '#0d6efd', fontSize: '0.72rem' }}>
-                <i className="bi bi-stars me-1"></i>Diagnosis / impression
+                <i className="bi bi-stars me-1"></i>{t('screening.diagnosisImpression')}
               </span>
               <span className="badge bg-white text-muted border rounded-pill" style={{ fontSize: '0.6rem', fontWeight: 500 }}>
                 {dxWords} word{dxWords === 1 ? '' : 's'} · {dxText.length} char{dxText.length === 1 ? '' : 's'}
@@ -1265,7 +1270,7 @@ export default function StartScreeningPage() {
                 className="form-control"
                 rows={3}
                 style={{ borderRadius: '12px', borderColor: '#cfe0f2', fontSize: '0.85rem', resize: 'vertical' }}
-                placeholder="Type a diagnosis…  suggestions appear as you type (↑ ↓ then Enter to insert)"
+                placeholder={t('screening.phDxSearch')}
                 value={dxText}
                 onChange={e => { setSoap({ ...soap, assessment: e.target.value }); setDxOpen(true); setDxActive(-1); }}
                 onKeyDown={onDxKeyDown}
@@ -1299,7 +1304,7 @@ export default function StartScreeningPage() {
             {/* Charted conditions — one-tap insert */}
             {chartDx.length > 0 && (
               <div className="d-flex flex-wrap gap-1 mt-1 align-items-center">
-                <span className="text-muted" style={{ fontSize: '0.6rem' }}>From chart:</span>
+                <span className="text-muted" style={{ fontSize: '0.6rem' }}>{t('screening.fromChart')}</span>
                 {chartDx.slice(0, 6).map(d => (
                   <button type="button" key={d}
                     className="btn btn-sm btn-outline-primary rounded-pill"
@@ -1313,7 +1318,7 @@ export default function StartScreeningPage() {
           {/* Duration + Severity row */}
           <div className="d-flex gap-3 flex-wrap align-items-center">
             <div className="d-flex align-items-center gap-1">
-              <span className="small text-muted" style={{ fontSize: '0.7rem' }}>Duration:</span>
+              <span className="small text-muted" style={{ fontSize: '0.7rem' }}>{t('screening.duration')}</span>
               {DURATIONS.map(d => (
                 <button key={d}
                   className={`btn btn-sm rounded-pill ${duration === d ? 'btn-secondary' : 'btn-outline-secondary'}`}
@@ -1322,7 +1327,7 @@ export default function StartScreeningPage() {
               ))}
             </div>
             <div className="d-flex align-items-center gap-1">
-              <span className="small text-muted" style={{ fontSize: '0.7rem' }}>Severity:</span>
+              <span className="small text-muted" style={{ fontSize: '0.7rem' }}>{t('screening.severity')}</span>
               {SEVERITIES.map(s => (
                 <button key={s}
                   className={`btn btn-sm rounded-pill ${severity === s ? (s === 'Severe' ? 'btn-danger' : s === 'Moderate' ? 'btn-warning' : 'btn-success') : 'btn-outline-secondary'}`}
@@ -1350,11 +1355,11 @@ export default function StartScreeningPage() {
             className="btn btn-sm btn-danger rounded-pill text-nowrap mb-2"
             style={{ fontSize: '0.7rem' }}
             onClick={() => setShowNoteModal(true)}>
-            <i className="bi bi-plus-lg me-1"></i>Add Note
+            <i className="bi bi-plus-lg me-1"></i>{t('screening.addNote')}
           </button>
-          {chartNoteSaved && <small className="text-success d-block mb-1"><i className="bi bi-check-circle me-1"></i>Note added to the patient chart.</small>}
+          {chartNoteSaved && <small className="text-success d-block mb-1"><i className="bi bi-check-circle me-1"></i>{t('screening.noteAdded')}</small>}
           {showChartNotes && (existingNotes.length === 0 ? (
-            <small className="text-muted">No prior notes on this patient's chart. Notes documented during screening will appear here and in the full chart.</small>
+            <small className="text-muted">{t('screening.noPriorNotes')}</small>
           ) : (
             <div style={{ maxHeight: '220px', overflow: 'auto' }}>
               {existingNotes.map((n: any, i: number) => (
@@ -1384,10 +1389,10 @@ export default function StartScreeningPage() {
 
       {/* ═══ PHARMACY (progressive disclosure) ═══ */}
       <div className="d-flex align-items-center gap-2 px-2 py-1 mb-2 rounded-3 bg-light border" style={{ fontSize: '0.8rem' }}>
-        <span className="fw-semibold small text-nowrap">Pharmacy:</span>
+        <span className="fw-semibold small text-nowrap">{t('screening.pharmacy')}</span>
         <select className="form-select form-select-sm" style={{ fontSize: '0.7rem', maxWidth: '250px' }}
           value={pharmacy} onChange={e => setPharmacy(e.target.value)}>
-          <option value="">Patient Pharmacy</option>
+          <option value="">{t('screening.patientPharmacy')}</option>
           <option value="Rite Aid">Rite Aid</option>
           <option value="CVS Pharmacy">CVS Pharmacy</option>
           <option value="Walgreens">Walgreens</option>
@@ -1396,12 +1401,12 @@ export default function StartScreeningPage() {
         </select>
         {draftSaved && (
           <span className="badge bg-success ms-2" style={{ fontSize: '0.6rem' }}>
-            <i className="bi bi-check me-1"></i>Draft saved
+            <i className="bi bi-check me-1"></i>{t('screening.draftSaved')}
           </span>
         )}
         <button className="btn btn-outline-secondary btn-sm rounded-pill ms-auto" style={{ fontSize: '0.65rem' }}
           onClick={saveDraft}>
-          <i className="bi bi-save me-1"></i>Save Draft
+          <i className="bi bi-save me-1"></i>{t('screening.meds.saveDraft')}
         </button>
         {localStorage.getItem(`screening-draft-${pid}`) && !draftSaved && (
           <button className="btn btn-outline-info btn-sm rounded-pill" style={{ fontSize: '0.65rem' }}
@@ -1414,8 +1419,8 @@ export default function StartScreeningPage() {
       {/* ═══ ACTION TOOLBAR ═══ */}
       <div className="d-flex gap-2 mb-2 flex-wrap align-items-center">
         <button className="btn btn-outline-secondary btn-sm rounded-pill" style={{ fontSize: '0.7rem' }}
-          onClick={() => setShowVitals(!showVitals)} title="Alt+V">
-          <i className="bi bi-heart-pulse me-1"></i>Vitals
+          onClick={() => setShowVitals(!showVitals)} title={t('screening.titleAltV')}>
+          <i className="bi bi-heart-pulse me-1"></i>{t('screening.vitalsTab')}
         </button>
         <button className="btn btn-outline-secondary btn-sm rounded-pill" style={{ fontSize: '0.7rem' }}
           onClick={() => navigate(`/dicom`)}>
@@ -1455,7 +1460,7 @@ export default function StartScreeningPage() {
               <i className="bi bi-send me-1 text-success"></i>Refer to Specialist
             </span>
             <textarea className="form-control form-control-sm mt-1" style={{ fontSize: '0.75rem' }}
-              rows={2} placeholder="Referral reason and specialist type..."
+              rows={2} placeholder={t('screening.phReferral')}
               value={referralNote} onChange={e => setReferralNote(e.target.value)} />
           </div>
         </div>
@@ -1467,18 +1472,18 @@ export default function StartScreeningPage() {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content" style={{ borderRadius: '16px' }}>
               <div className="modal-header py-2">
-                <h6 className="modal-title"><i className="bi bi-exclamation-triangle me-2 text-warning"></i>Duplicate note</h6>
+                <h6 className="modal-title"><i className="bi bi-exclamation-triangle me-2 text-warning"></i>{t('screening.duplicateNote')}</h6>
                 <button className="btn-close" onClick={() => setDupPrompt(null)}></button>
               </div>
               <div className="modal-body">
-                <p className="small mb-2">A note with the same text already exists on this chart — it will not be added again:</p>
+                <p className="small mb-2">{t('screening.dupExplain')}</p>
                 <div className="border rounded-3 p-2 small text-muted" style={{ maxHeight: '160px', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
                   {dupPrompt.existing}
                 </div>
-                <p className="small mt-3 mb-0">Do you want to add this entry anyway?</p>
+                <p className="small mt-3 mb-0">{t('screening.dupConfirm')}</p>
               </div>
               <div className="modal-footer py-2">
-                <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setDupPrompt(null)}>Cancel</button>
+                <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setDupPrompt(null)}>{t('common.cancel')}</button>
                 <button className="btn btn-warning btn-sm rounded-pill"
                   onClick={() => { const run = dupPrompt.run; setDupPrompt(null); run(); }}>
                   Add anyway
@@ -1538,7 +1543,7 @@ export default function StartScreeningPage() {
                         </div>
                         {latestRisk.flags.length > 0 ? (
                           <div>
-                            <h6 className="fw-bold small mb-2"><i className="bi bi-exclamation-triangle me-1 text-danger"></i>Clinical Flags</h6>
+                            <h6 className="fw-bold small mb-2"><i className="bi bi-exclamation-triangle me-1 text-danger"></i>{t('screening.clinicalFlags')}</h6>
                             {latestRisk.flags.map((f: any, i: number) => (
                               <div key={i} className="d-flex gap-2 border-bottom py-1 small">
                                 <span className={`badge rounded-pill ${f.severity === 'critical' ? 'bg-danger' : 'bg-warning text-dark'}`}>{f.label}</span>
@@ -1547,11 +1552,11 @@ export default function StartScreeningPage() {
                             ))}
                           </div>
                         ) : (
-                          <div className="alert alert-success py-2 small mb-0"><i className="bi bi-check-circle me-1"></i>No critical flags — vitals within expected range.</div>
+                          <div className="alert alert-success py-2 small mb-0"><i className="bi bi-check-circle me-1"></i>{t('screening.noCriticalFlags')}</div>
                         )}
                       </div>
                     ) : (
-                      <div className="text-muted small py-3 text-center"><i className="bi bi-shield-check fs-3 d-block mb-1"></i>No vitals on file to assess.</div>
+                      <div className="text-muted small py-3 text-center"><i className="bi bi-shield-check fs-3 d-block mb-1"></i>{t('screening.noVitalsToAssess')}</div>
                     )}
                   </div>
                 )}
@@ -1559,7 +1564,7 @@ export default function StartScreeningPage() {
                 {noteTab === 'history' && (
                   <div>
                     {existingNotes.length === 0 ? (
-                      <small className="text-muted">No prior chart notes on file.</small>
+                      <small className="text-muted">{t('screening.noPriorChartNotes')}</small>
                     ) : (
                       <div className="rounded-3 border p-2 mb-3" style={{ maxHeight: '260px', overflowY: 'auto', backgroundColor: '#f8f9fa' }}>
                         {existingNotes.map((n: any, i: number) => (
@@ -1580,11 +1585,11 @@ export default function StartScreeningPage() {
                 {noteTab === 'vitals' && (
                   <div>
                     {vitalHistory.length === 0 ? (
-                      <small className="text-muted">No prior vitals recorded.</small>
+                      <small className="text-muted">{t('screening.noPriorVitals')}</small>
                     ) : (
                       <div className="table-responsive rounded-3 border mb-3">
                         <table className="table table-sm table-hover mb-0 small" style={{ fontSize: '0.75rem' }}>
-                          <thead className="table-light"><tr><th>Date & Time</th><th>BP</th><th>Pulse</th><th>Temp</th><th>Resp</th><th>SpO₂</th><th>BMI</th></tr></thead>
+                          <thead className="table-light"><tr><th>{t('screening.thDateTime')}</th><th>{t('nurse.aide.thBp')}</th><th>{t('screening.thPulse')}</th><th>{t('screening.thTemp')}</th><th>{t('screening.thResp')}</th><th>{t('screening.thSpo2')}</th><th>{t('screening.thBmi')}</th></tr></thead>
                           <tbody>
                             {vitalHistory.map((v: any) => (
                               <tr key={v.id}>
@@ -1606,13 +1611,13 @@ export default function StartScreeningPage() {
               </div>
 
               <div className="border-top p-3 bg-light" style={{ borderRadius: '0 0 12px 12px' }}>
-                <label className="form-label small fw-semibold">New Note</label>
-                <textarea className="form-control" rows={4} autoFocus placeholder="Write a note for the patient chart…" value={chartNote} onChange={e => setChartNote(e.target.value)} />
-                <small className="text-muted d-block mt-1">Saved to the patient's chart and shared with the care team.</small>
+                <label className="form-label small fw-semibold">{t('screening.newNote')}</label>
+                <textarea className="form-control" rows={4} autoFocus placeholder={t('screening.phNote')} value={chartNote} onChange={e => setChartNote(e.target.value)} />
+                <small className="text-muted d-block mt-1">{t('screening.noteSavedHint')}</small>
               </div>
             </div>
             <div className="modal-footer border-0">
-              <button className="btn btn-outline-secondary" onClick={() => setShowNoteModal(false)}>Cancel</button>
+              <button className="btn btn-outline-secondary" onClick={() => setShowNoteModal(false)}>{t('common.cancel')}</button>
               <button className="btn btn-danger px-4" onClick={() => guardedNoteAdd(chartNote, () => { addChartNote.mutate(); setShowNoteModal(false); })} disabled={!chartNote.trim() || addChartNote.isPending}>
                 {addChartNote.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-check-lg me-1"></i>}
                 Add to Chart
@@ -1645,8 +1650,8 @@ export default function StartScreeningPage() {
                 </button>
               )}
 
-              <label className="form-label small fw-semibold"><span className="badge bg-primary me-1">S</span>Subjective — patient-reported</label>
-              <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Chief complaint, symptoms, history…" value={soap.subjective} onChange={e => setSoap({ ...soap, subjective: e.target.value })} />
+              <label className="form-label small fw-semibold"><span className="badge bg-primary me-1">S</span>{t('screening.soapSubjective')}</label>
+              <textarea className="form-control form-control-sm mb-2" rows={2} placeholder={t('screening.phSubjective')} value={soap.subjective} onChange={e => setSoap({ ...soap, subjective: e.target.value })} />
               <div className="d-flex flex-wrap gap-1 mb-2">
                 {Object.keys(QUICK_NOTES).map(k => (
                   <button key={k} className="btn btn-outline-secondary btn-sm rounded-pill" style={{ fontSize: '0.65rem', padding: '1px 8px' }}
@@ -1654,11 +1659,11 @@ export default function StartScreeningPage() {
                 ))}
               </div>
 
-              <label className="form-label small fw-semibold"><span className="badge bg-success me-1">O</span>Objective — findings & vitals</label>
-              <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Exam findings, vitals… (auto-filled from recorded vitals)" value={soap.objective} onChange={e => setSoap({ ...soap, objective: e.target.value })} />
+              <label className="form-label small fw-semibold"><span className="badge bg-success me-1">O</span>{t('screening.soapObjective')}</label>
+              <textarea className="form-control form-control-sm mb-2" rows={2} placeholder={t('screening.phObjective')} value={soap.objective} onChange={e => setSoap({ ...soap, objective: e.target.value })} />
 
-              <label className="form-label small fw-semibold"><span className="badge bg-warning text-dark me-1">A</span>Assessment — diagnosis</label>
-              <textarea className="form-control form-control-sm mb-1" rows={2} placeholder="Diagnosis / differential…" value={soap.assessment} onChange={e => setSoap({ ...soap, assessment: e.target.value })} />
+              <label className="form-label small fw-semibold"><span className="badge bg-warning text-dark me-1">A</span>{t('screening.soapAssessment')}</label>
+              <textarea className="form-control form-control-sm mb-1" rows={2} placeholder={t('screening.phAssessment')} value={soap.assessment} onChange={e => setSoap({ ...soap, assessment: e.target.value })} />
               <div className="d-flex flex-wrap gap-1 mb-2">
                 {DX_PHRASES.map(p => (
                   <button key={p} type="button" className="btn btn-outline-secondary btn-sm rounded-pill"
@@ -1667,8 +1672,8 @@ export default function StartScreeningPage() {
                 ))}
               </div>
 
-              <label className="form-label small fw-semibold"><span className="badge bg-danger me-1">P</span>Plan — orders & next steps</label>
-              <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Labs, medications, imaging, follow-up… (auto-filled from selected orders)" value={soap.plan} onChange={e => setSoap({ ...soap, plan: e.target.value })} />
+              <label className="form-label small fw-semibold"><span className="badge bg-danger me-1">P</span>{t('screening.soapPlan')}</label>
+              <textarea className="form-control form-control-sm mb-2" rows={2} placeholder={t('screening.phPlan')} value={soap.plan} onChange={e => setSoap({ ...soap, plan: e.target.value })} />
 
               <div className="alert alert-info py-2 small mb-0">
                 <i className="bi bi-info-circle me-1"></i>
@@ -1676,7 +1681,7 @@ export default function StartScreeningPage() {
               </div>
             </div>
             <div className="modal-footer border-0">
-              <button className="btn btn-outline-secondary" onClick={() => setShowClinicalModal(false)}>Cancel</button>
+              <button className="btn btn-outline-secondary" onClick={() => setShowClinicalModal(false)}>{t('common.cancel')}</button>
               <button className="btn btn-success px-4" onClick={handleSaveClinicalNote} disabled={saveClinicalNote.isPending}>
                 {saveClinicalNote.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="bi bi-check-lg me-1"></i>}
                 Save to Chart & Share
@@ -1692,11 +1697,11 @@ export default function StartScreeningPage() {
               <div className="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
                 <div className="modal-content" style={{ borderRadius: '16px' }}>
                   <div className="modal-header py-2">
-                    <h6 className="modal-title"><i className="bi bi-flask me-2 text-success"></i>Lab Order</h6>
+                    <h6 className="modal-title"><i className="bi bi-flask me-2 text-success"></i>{t('screening.labOrder')}</h6>
                     <button className="btn-close" onClick={() => setLabOrderOpen(false)}></button>
                   </div>
                   <div className="modal-body">
-                    <input className="form-control form-control-sm mb-2" placeholder="🔍 Search lab test…" value={labOrderSearch} onChange={e => setLabOrderSearch(e.target.value)} />
+                    <input className="form-control form-control-sm mb-2" placeholder={t('screening.phSearchLab')} value={labOrderSearch} onChange={e => setLabOrderSearch(e.target.value)} />
                     {LAB_ORDER_CATEGORIES.map(cat => {
                       const q = labOrderSearch.trim().toLowerCase();
                       const visibleGroups = cat.groups
@@ -1708,7 +1713,7 @@ export default function StartScreeningPage() {
                         <div key={cat.title} className="border rounded-3 mb-2">
                           <button type="button" className="w-100 d-flex justify-content-between align-items-center btn btn-light btn-sm rounded-3 border-0"
                             onClick={() => setLabOrderCats(prev => ({ ...prev, [cat.title]: !(prev[cat.title] ?? cat.title.includes('BLOOD BIOCHEMISTRY')) }))}>
-                            <span className="fw-semibold small text-start">{open ? '▼' : '▶'} {cat.title}</span>
+                            <span className="fw-semibold small text-start">{open ? '▼' : '▶'} {labGroup(cat.title)}</span>
                           </button>
                           {open && (
                             <div className="p-2 pt-0">
@@ -1726,7 +1731,7 @@ export default function StartScreeningPage() {
                               )}
                               {visibleGroups.map((g, gi) => (
                                 <div key={gi}>
-                                  {g.subtitle && <div className="small fw-semibold text-muted text-uppercase mt-2 mb-1" style={{ fontSize: '0.65rem' }}>{g.subtitle}</div>}
+                                  {g.subtitle && <div className="small fw-semibold text-muted text-uppercase mt-2 mb-1" style={{ fontSize: '0.65rem' }}>{labGroup(g.subtitle)}</div>}
                                   <div className="d-flex flex-wrap gap-1">
                                     {g.tests.map(t => (
                                       <label key={t} className="d-inline-flex align-items-center gap-1 border rounded-pill px-2 py-1 me-1 mb-1"
@@ -1747,9 +1752,9 @@ export default function StartScreeningPage() {
                   <div className="modal-footer py-2 d-flex justify-content-between">
                     <span className="small text-muted">Selected: {selectedLabs.length} test{selectedLabs.length !== 1 ? 's' : ''}</span>
                     <div className="d-flex gap-2">
-                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setSelectedLabs([])}>Clear</button>
-                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setLabOrderOpen(false)}>Cancel</button>
-                      <button className="btn btn-success btn-sm rounded-pill px-3" onClick={() => setLabOrderOpen(false)}>Add to Order</button>
+                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setSelectedLabs([])}>{t('screening.clear')}</button>
+                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setLabOrderOpen(false)}>{t('common.cancel')}</button>
+                      <button className="btn btn-success btn-sm rounded-pill px-3" onClick={() => setLabOrderOpen(false)}>{t('screening.addToOrder')}</button>
                     </div>
                   </div>
                 </div>
@@ -1770,20 +1775,20 @@ export default function StartScreeningPage() {
                     <div className="p-2 rounded-3 bg-light small mb-2" style={{ fontSize: '0.75rem' }}>
                       <div className="d-flex justify-content-between flex-wrap">
                         <span><strong>{formatPatientName(patient)}</strong> · {patient?.DOB?.split('T')[0]} · {patient?.sex || '—'}</span>
-                        <span><i className="bi bi-exclamation-triangle text-warning me-1"></i>Allergies: Penicillin · Weight: — kg</span>
+                        <span><i className="bi bi-exclamation-triangle text-warning me-1"></i>{t('screening.meds.allergyWeightLine')}</span>
                       </div>
-                      <div className="text-muted">Prescriber: {user?.displayName || 'Provider'} · {new Date().toLocaleString()}</div>
+                      <div className="text-muted">{t('screening.meds.prescriber', { name: user?.displayName || t('patients.tabs.notes.provider') })} · {new Date().toLocaleString()}</div>
                     </div>
 
                     {medOrderStage === 'categories' && (
                       <>
-                        <input className="form-control form-control-sm mb-2" placeholder="🔍 Search medication..." value={medOrderSearch} onChange={e => setMedOrderSearch(e.target.value)} />
+                        <input className="form-control form-control-sm mb-2" placeholder={t('screening.phSearchMed')} value={medOrderSearch} onChange={e => setMedOrderSearch(e.target.value)} />
                         <div className="row g-2">
                           {MED_CATEGORIES.map(c => (
                             <div className="col-6 col-md-4" key={c.name}>
                               <button type="button" className="btn btn-outline-primary w-100 h-100 text-start rounded-3" style={{ fontSize: '0.72rem' }}
                                 onClick={() => { setMedOrderCategory(c.name); setMedOrderStage('list'); setMedOrderSearch(''); }}>
-                                <div className="fw-semibold">{c.name}</div>
+                                <div className="fw-semibold">{medCat(c.name)}</div>
                                 <small className="text-muted">{c.items.length} items</small>
                               </button>
                             </div>
@@ -1801,9 +1806,9 @@ export default function StartScreeningPage() {
                         <>
                           <div className="d-flex align-items-center gap-2 mb-2">
                             <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => setMedOrderStage('categories')}><i className="bi bi-arrow-left"></i></button>
-                            <span className="fw-semibold small">{cat.name}</span>
+                            <span className="fw-semibold small">{medCat(cat.name)}</span>
                           </div>
-                          <input className="form-control form-control-sm mb-2" placeholder={`Search ${cat.name.toLowerCase()}...`} value={medOrderSearch} onChange={e => setMedOrderSearch(e.target.value)} />
+                          <input className="form-control form-control-sm mb-2" placeholder={t('screening.meds.searchCategory', { category: medCat(cat.name).toLowerCase() })} value={medOrderSearch} onChange={e => setMedOrderSearch(e.target.value)} />
                           <div className="d-flex flex-wrap gap-1">
                             {items.map(i => (
                               <button key={i} type="button" className="btn btn-outline-secondary btn-sm rounded-pill"
@@ -1820,82 +1825,82 @@ export default function StartScreeningPage() {
                       const type = cat?.type || 'medication';
                       return (
                         <>
-                          <div className="mb-2 small text-muted">Medication: <strong className="text-dark">{medDraft.drug}</strong></div>
+                          <div className="mb-2 small text-muted">{t('screening.meds.medication')} <strong className="text-dark">{medDraft.drug}</strong></div>
                           <div className="row g-2">
                             {type === 'medication' && (
                               <>
-                                <div className="col-6"><label className="form-label small mb-0">Dose *</label><input className="form-control form-control-sm" value={medDraft.dose} onChange={e => setMedDraft({...medDraft, dose: e.target.value})} /></div>
-                                <div className="col-6"><label className="form-label small mb-0">Route *</label>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.dose')}</label><input className="form-control form-control-sm" value={medDraft.dose} onChange={e => setMedDraft({...medDraft, dose: e.target.value})} /></div>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.route')}</label>
                                   <select className="form-select form-select-sm" value={medDraft.route} onChange={e => setMedDraft({...medDraft, route: e.target.value})}>
                                     <option>Oral</option><option>IV</option><option>IM</option><option>SC</option><option>Topical</option><option>Ophthalmic</option><option>Otic</option>
                                   </select></div>
-                                <div className="col-6"><label className="form-label small mb-0">Frequency *</label>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.frequency')}</label>
                                   <select className="form-select form-select-sm" value={medDraft.frequency} onChange={e => setMedDraft({...medDraft, frequency: e.target.value})}>
-                                    <option value="">Select…</option><option>Once daily</option><option>Twice daily</option><option>Three times daily</option><option>Every 8 hours</option><option>Every 6 hours</option><option>At bedtime</option><option>As needed</option>
+                                    <option value="">{t('screening.selectOption')}</option><option>Once daily</option><option>Twice daily</option><option>Three times daily</option><option>Every 8 hours</option><option>Every 6 hours</option><option>At bedtime</option><option>As needed</option>
                                   </select></div>
-                                <div className="col-6"><label className="form-label small mb-0">Duration *</label><input className="form-control form-control-sm" placeholder="e.g. 7 days" value={medDraft.duration} onChange={e => setMedDraft({...medDraft, duration: e.target.value})} /></div>
-                                <div className="col-6"><label className="form-label small mb-0">Start Date *</label><input type="date" className="form-control form-control-sm" value={medDraft.startDate} onChange={e => setMedDraft({...medDraft, startDate: e.target.value})} /></div>
-                                <div className="col-6"><label className="form-label small mb-0">Quantity</label><input className="form-control form-control-sm" placeholder="e.g. 21 capsules" value={medDraft.quantity} onChange={e => setMedDraft({...medDraft, quantity: e.target.value})} /></div>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.duration')}</label><input className="form-control form-control-sm" placeholder="e.g. 7 days" value={medDraft.duration} onChange={e => setMedDraft({...medDraft, duration: e.target.value})} /></div>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.startDate')}</label><input type="date" className="form-control form-control-sm" value={medDraft.startDate} onChange={e => setMedDraft({...medDraft, startDate: e.target.value})} /></div>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.quantity')}</label><input className="form-control form-control-sm" placeholder={t('screening.phQuantity')} value={medDraft.quantity} onChange={e => setMedDraft({...medDraft, quantity: e.target.value})} /></div>
                               </>
                             )}
                             {type === 'supply' && (
-                              <div className="col-6"><label className="form-label small mb-0">Quantity *</label><input className="form-control form-control-sm" placeholder="e.g. 2" value={medDraft.quantity} onChange={e => setMedDraft({...medDraft, quantity: e.target.value})} /></div>
+                              <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.quantityRequired')}</label><input className="form-control form-control-sm" placeholder={t('screening.phQuantityShort')} value={medDraft.quantity} onChange={e => setMedDraft({...medDraft, quantity: e.target.value})} /></div>
                             )}
                             {type === 'oxygen' && (
                               <>
-                                <div className="col-6"><label className="form-label small mb-0">Flow Rate *</label><input className="form-control form-control-sm" value={medDraft.flowRate} onChange={e => setMedDraft({...medDraft, flowRate: e.target.value})} /></div>
-                                <div className="col-6"><label className="form-label small mb-0">Delivery Method *</label>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.flowRate')}</label><input className="form-control form-control-sm" value={medDraft.flowRate} onChange={e => setMedDraft({...medDraft, flowRate: e.target.value})} /></div>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.deliveryMethod')}</label>
                                   <select className="form-select form-select-sm" value={medDraft.deliveryMethod} onChange={e => setMedDraft({...medDraft, deliveryMethod: e.target.value})}>
-                                    <option value="">Select…</option><option>Nasal Cannula</option><option>Face Mask</option><option>Non-Rebreather</option>
+                                    <option value="">{t('screening.selectOption')}</option><option>Nasal Cannula</option><option>Face Mask</option><option>Non-Rebreather</option>
                                   </select></div>
-                                <div className="col-6"><label className="form-label small mb-0">Duration *</label><input className="form-control form-control-sm" placeholder="e.g. 4 hours" value={medDraft.duration} onChange={e => setMedDraft({...medDraft, duration: e.target.value})} /></div>
+                                <div className="col-6"><label className="form-label small mb-0">{t('screening.meds.duration')}</label><input className="form-control form-control-sm" placeholder={t('screening.phDurationHours')} value={medDraft.duration} onChange={e => setMedDraft({...medDraft, duration: e.target.value})} /></div>
                               </>
                             )}
-                            <div className="col-12"><label className="form-label small mb-0">Administration / Timing</label><input className="form-control form-control-sm" value={medDraft.administration} onChange={e => setMedDraft({...medDraft, administration: e.target.value})} /></div>
-                            <div className="col-12"><label className="form-label small mb-0">Indication / Reason</label><input className="form-control form-control-sm" value={medDraft.indication} onChange={e => setMedDraft({...medDraft, indication: e.target.value})} /></div>
-                            <div className="col-12"><label className="form-label small mb-0">Special Instructions</label><input className="form-control form-control-sm" value={medDraft.instructions} onChange={e => setMedDraft({...medDraft, instructions: e.target.value})} /></div>
+                            <div className="col-12"><label className="form-label small mb-0">{t('screening.meds.administration')}</label><input className="form-control form-control-sm" value={medDraft.administration} onChange={e => setMedDraft({...medDraft, administration: e.target.value})} /></div>
+                            <div className="col-12"><label className="form-label small mb-0">{t('screening.meds.indication')}</label><input className="form-control form-control-sm" value={medDraft.indication} onChange={e => setMedDraft({...medDraft, indication: e.target.value})} /></div>
+                            <div className="col-12"><label className="form-label small mb-0">{t('screening.meds.specialInstructions')}</label><input className="form-control form-control-sm" value={medDraft.instructions} onChange={e => setMedDraft({...medDraft, instructions: e.target.value})} /></div>
                           </div>
                           <div className="border rounded-3 p-2 mt-2 small bg-light" style={{ fontSize: '0.7rem' }}>
-                            <div><i className="bi bi-check-circle text-success me-1"></i>Patient identity verified</div>
-                            <div><i className="bi bi-exclamation-triangle text-warning me-1"></i>Allergy check</div>
-                            <div><i className="bi bi-check-circle text-success me-1"></i>Duplicate medication check</div>
-                            <div><i className="bi bi-check-circle text-success me-1"></i>Drug interaction check</div>
-                            <div><i className="bi bi-exclamation-triangle text-warning me-1"></i>Dose / route validation</div>
+                            <div><i className="bi bi-check-circle text-success me-1"></i>{t('screening.meds.checkIdentity')}</div>
+                            <div><i className="bi bi-exclamation-triangle text-warning me-1"></i>{t('screening.meds.checkAllergy')}</div>
+                            <div><i className="bi bi-check-circle text-success me-1"></i>{t('screening.meds.checkDuplicate')}</div>
+                            <div><i className="bi bi-check-circle text-success me-1"></i>{t('screening.meds.checkInteraction')}</div>
+                            <div><i className="bi bi-exclamation-triangle text-warning me-1"></i>{t('screening.meds.checkDoseRoute')}</div>
                           </div>
-                          <div className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>Prescribed by: {user?.displayName || 'Provider'} · {new Date().toLocaleString()}</div>
+                          <div className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>{t('screening.meds.prescribedBy', { name: user?.displayName || t('patients.tabs.notes.provider') })} · {new Date().toLocaleString()}</div>
                         </>
                       );
                     })()}
 
                     {medOrderStage === 'sign' && (
                       <div className="small">
-                        <h6 className="fw-bold">Review & Sign Order</h6>
+                        <h6 className="fw-bold">{t('screening.meds.reviewSign')}</h6>
                         <div className="border rounded-3 p-2 mb-2">
-                          <div><strong>Patient:</strong> {formatPatientName(patient)}</div>
-                          <div><strong>Medication:</strong> {medDraft.drug}</div>
-                          <div><strong>Dose:</strong> {medDraft.dose || medDraft.flowRate || medDraft.quantity} {medDraft.route || medDraft.deliveryMethod}</div>
-                          <div><strong>Frequency:</strong> {medDraft.frequency || '—'}</div>
-                          <div><strong>Duration:</strong> {medDraft.duration || '—'}</div>
-                          <div><strong>Quantity:</strong> {medDraft.quantity || '—'}</div>
-                          <div><strong>Prescriber:</strong> {user?.displayName || 'Provider'}</div>
-                          <div><strong>Status:</strong> NEW — Requires Pharmacy Review</div>
+                          <div><strong>{t('screening.meds.patient')}</strong> {formatPatientName(patient)}</div>
+                          <div><strong>{t('screening.meds.medicationLabel')}</strong> {medDraft.drug}</div>
+                          <div><strong>{t('screening.meds.doseLabel')}</strong> {medDraft.dose || medDraft.flowRate || medDraft.quantity} {medDraft.route || medDraft.deliveryMethod}</div>
+                          <div><strong>{t('screening.meds.frequencyLabel')}</strong> {medDraft.frequency || '—'}</div>
+                          <div><strong>{t('screening.meds.durationLabel')}</strong> {medDraft.duration || '—'}</div>
+                          <div><strong>{t('screening.meds.quantityLabel')}</strong> {medDraft.quantity || '—'}</div>
+                          <div><strong>{t('screening.meds.prescriberLabel')}</strong> {user?.displayName || t('patients.tabs.notes.provider')}</div>
+                          <div><strong>{t('screening.meds.statusLabel')}</strong> {t('screening.meds.statusNew')}</div>
                         </div>
-                        <div className="alert alert-info py-2 small mb-0">Signing sends this order to the pharmacy. Original signed orders are preserved with an audit trail.</div>
+                        <div className="alert alert-info py-2 small mb-0">{t('screening.meds.signHint')}</div>
                       </div>
                     )}
                   </div>
                   <div className="modal-footer py-2">
                     {medOrderStage === 'categories' || medOrderStage === 'list' ? (
-                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setMedOrderOpen(false)}>Cancel</button>
+                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setMedOrderOpen(false)}>{t('common.cancel')}</button>
                     ) : medOrderStage === 'editor' ? (
                       <>
-                        <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setMedOrderStage('list')}>Back</button>
-                        <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => setMedOrderOpen(false)}>Save Draft</button>
-                        <button className="btn btn-primary btn-sm rounded-pill px-3" onClick={() => setMedOrderStage('sign')}>Review & Sign Order</button>
+                        <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setMedOrderStage('list')}>{t('screening.back')}</button>
+                        <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => setMedOrderOpen(false)}>{t('screening.meds.saveDraft')}</button>
+                        <button className="btn btn-primary btn-sm rounded-pill px-3" onClick={() => setMedOrderStage('sign')}>{t('screening.meds.reviewSign')}</button>
                       </>
                     ) : (
                       <>
-                        <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setMedOrderStage('editor')}>Back</button>
+                        <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setMedOrderStage('editor')}>{t('screening.back')}</button>
                         <button className="btn btn-success btn-sm rounded-pill px-3" onClick={() => {
                           const med = {
                             drug: medDraft.drug,
@@ -1908,7 +1913,7 @@ export default function StartScreeningPage() {
                           setSelectedMeds(prev => [...prev, med]);
                           sendSingleMed.mutate(med);
                           setMedOrderOpen(false);
-                        }}>Sign & Send to Pharmacy</button>
+                        }}>{t('screening.meds.signSend')}</button>
                       </>
                     )}
                   </div>
@@ -1923,11 +1928,11 @@ export default function StartScreeningPage() {
               <div className="modal-dialog modal-md modal-dialog-centered">
                 <div className="modal-content" style={{ borderRadius: '16px' }}>
                   <div className="modal-header py-2">
-                    <h6 className="modal-title"><i className="bi bi-image me-2 text-info"></i>Imaging Order</h6>
+                    <h6 className="modal-title"><i className="bi bi-image me-2 text-info"></i>{t('screening.imagingOrder')}</h6>
                     <button className="btn-close" onClick={() => setImagingOrderOpen(false)}></button>
                   </div>
                   <div className="modal-body">
-                    <input className="form-control form-control-sm mb-2" placeholder="Search imaging..." value={imagingOrderSearch} onChange={e => setImagingOrderSearch(e.target.value)} />
+                    <input className="form-control form-control-sm mb-2" placeholder={t('screening.phSearchImaging')} value={imagingOrderSearch} onChange={e => setImagingOrderSearch(e.target.value)} />
                     <div className="d-flex flex-wrap gap-1">
                       {COMMON_IMAGING.filter(im => im.toLowerCase().includes(imagingOrderSearch.trim().toLowerCase())).map(im => (
                         <label key={im} className="d-inline-flex align-items-center gap-1 border rounded-pill px-2 py-1 me-1 mb-1"
@@ -1941,8 +1946,8 @@ export default function StartScreeningPage() {
                   <div className="modal-footer py-2 d-flex justify-content-between">
                     <span className="small text-muted">Selected: {selectedImaging.filter(i => i !== 'None').length}</span>
                     <div className="d-flex gap-2">
-                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setSelectedImaging([])}>Clear</button>
-                      <button className="btn btn-info btn-sm rounded-pill px-3 text-white" onClick={() => setImagingOrderOpen(false)}>Add to Order</button>
+                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setSelectedImaging([])}>{t('screening.clear')}</button>
+                      <button className="btn btn-info btn-sm rounded-pill px-3 text-white" onClick={() => setImagingOrderOpen(false)}>{t('screening.addToOrder')}</button>
                     </div>
                   </div>
                 </div>
@@ -1961,7 +1966,7 @@ export default function StartScreeningPage() {
                   </div>
                   <div className="modal-body">
                     {vitalHistory.length === 0 ? (
-                      <div className="text-center text-muted py-4">No prior vitals recorded for this patient.</div>
+                      <div className="text-center text-muted py-4">{t('screening.noPriorVitalsPatient')}</div>
                     ) : (
                       <>
                         {/* Same three-way toggle as the patient chart, so both
@@ -1973,7 +1978,7 @@ export default function StartScreeningPage() {
                         {vitalsView !== 'chart' && (
                         <div style={{ maxHeight: '340px', overflow: 'auto' }}>
                           <table className="table table-sm table-hover mb-0 small" style={{ fontSize: '0.75rem' }}>
-                            <thead className="table-light"><tr><th>When</th><th>BP</th><th>Pulse</th><th>Temp</th><th>Resp</th><th>SpO₂</th><th>BMI</th></tr></thead>
+                            <thead className="table-light"><tr><th>{t('screening.thWhen')}</th><th>{t('nurse.aide.thBp')}</th><th>{t('screening.thPulse')}</th><th>{t('screening.thTemp')}</th><th>{t('screening.thResp')}</th><th>{t('screening.thSpo2')}</th><th>{t('screening.thBmi')}</th></tr></thead>
                             <tbody>
                               {vitalHistory.map((v: any) => (
                                 <tr key={v.id}>
@@ -1994,7 +1999,7 @@ export default function StartScreeningPage() {
                     )}
                   </div>
                   <div className="modal-footer py-2">
-                    <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setVitalHistoryOpen(false)}>Close</button>
+                    <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setVitalHistoryOpen(false)}>{t('screening.close')}</button>
                   </div>
                 </div>
               </div>
@@ -2007,11 +2012,11 @@ export default function StartScreeningPage() {
               <div className="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
                 <div className="modal-content" style={{ borderRadius: '16px' }}>
                   <div className="modal-header py-2">
-                    <h6 className="modal-title"><i className="bi bi-clipboard-pulse me-2 text-primary"></i>Physical Examination</h6>
+                    <h6 className="modal-title"><i className="bi bi-clipboard-pulse me-2 text-primary"></i>{t('screening.physicalExam')}</h6>
                     <button className="btn-close" onClick={() => setExamOrderOpen(false)}></button>
                   </div>
                   <div className="modal-body">
-                    <div className="small text-muted mb-2" style={{ fontSize: '0.7rem' }}>Click a system to insert standard exam text, then edit as needed.</div>
+                    <div className="small text-muted mb-2" style={{ fontSize: '0.7rem' }}>{t('screening.examHint')}</div>
                     <div className="d-flex flex-wrap gap-1 mb-2">
                       {Object.keys(PHYSICAL_EXAM_NOTES).map(k => (
                         <button key={k} className="btn btn-outline-primary btn-sm rounded-pill"
@@ -2019,13 +2024,13 @@ export default function StartScreeningPage() {
                           onClick={() => applyExamNote(k)}>{k}</button>
                       ))}
                     </div>
-                    <textarea className="form-control" rows={7} value={physicalExam} onChange={e => setPhysicalExam(e.target.value)} placeholder="Exam findings… (click a system above to insert standard exam text)" />
+                    <textarea className="form-control" rows={7} value={physicalExam} onChange={e => setPhysicalExam(e.target.value)} placeholder={t('screening.phExam')} />
                   </div>
                   <div className="modal-footer py-2 d-flex justify-content-between">
-                    <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setPhysicalExam('')}>Clear</button>
+                    <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setPhysicalExam('')}>{t('screening.clear')}</button>
                     <div className="d-flex gap-2">
-                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setExamOrderOpen(false)}>Cancel</button>
-                      <button className="btn btn-primary btn-sm rounded-pill px-3" onClick={() => setExamOrderOpen(false)}>Add to Note</button>
+                      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setExamOrderOpen(false)}>{t('common.cancel')}</button>
+                      <button className="btn btn-primary btn-sm rounded-pill px-3" onClick={() => setExamOrderOpen(false)}>{t('screening.addToNote')}</button>
                     </div>
                   </div>
                 </div>

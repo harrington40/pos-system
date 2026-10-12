@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 
@@ -32,6 +33,7 @@ type SignalData =
   | { type: 'candidate'; candidate: RTCIceCandidateInit };
 
 export default function VideoConsultPage() {
+  const { t } = useTranslation();
   const { room = '' } = useParams<{ room: string }>();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -250,11 +252,11 @@ export default function VideoConsultPage() {
           <div className="d-flex align-items-center gap-2">
             <i className="bi bi-camera-video-fill text-info fs-4"></i>
             <div>
-              <div className="fw-bold">OpenRx Video Consultation</div>
-              <div className="small text-white-50">Room {room} · joined as {role}</div>
+              <div className="fw-bold">{t('telehealth.title')}</div>
+              <div className="small text-white-50">{t('telehealth.roomInfo', { room, role })}</div>
             </div>
           </div>
-          <span className="badge rounded-pill bg-secondary text-white-50">{peers} participant(s)</span>
+          <span className="badge rounded-pill bg-secondary text-white-50">{t('telehealth.participants', { count: peers })}</span>
         </div>
 
         <div className={`alert ${banner.cls} py-2 d-flex align-items-center gap-2`}>
@@ -269,7 +271,7 @@ export default function VideoConsultPage() {
               {status !== 'connected' && (
                 <div className="position-absolute top-50 start-50 translate-middle text-center text-white-50">
                   <i className="bi bi-person-video3 display-1 d-block mb-2"></i>
-                  {status === 'waiting' ? 'Waiting for the other participant…' : 'Connecting…'}
+                  {status === 'waiting' ? t('telehealth.waiting') : t('telehealth.connecting')}
                 </div>
               )}
             </div>
@@ -277,7 +279,7 @@ export default function VideoConsultPage() {
           <div className="col-12 col-lg-3">
             <div className="position-relative rounded-4 overflow-hidden bg-black mb-3" style={{ aspectRatio: '4 / 3' }}>
               <video ref={localVideoRef} autoPlay playsInline muted className="w-100 h-100" style={{ objectFit: 'cover', transform: 'scaleX(-1)' }} />
-              <span className="position-absolute bottom-0 start-0 m-2 badge bg-dark bg-opacity-75">You</span>
+              <span className="position-absolute bottom-0 start-0 m-2 badge bg-dark bg-opacity-75">{t('telehealth.you')}</span>
               {!camOn && (
                 <div className="position-absolute top-50 start-50 translate-middle text-white-50">
                   <i className="bi bi-camera-video-off fs-1"></i>
@@ -290,7 +292,7 @@ export default function VideoConsultPage() {
                   <i className="bi bi-link-45deg me-1"></i>{joinUrl}
                 </div>
                 <button className="btn btn-outline-light btn-sm w-100 mb-1" onClick={copyLink}>
-                  <i className="bi bi-clipboard me-1"></i>Copy invite link
+                  <i className="bi bi-clipboard me-1"></i>{t('telehealth.copyLink')}
                 </button>
               </div>
             </div>
@@ -298,17 +300,17 @@ export default function VideoConsultPage() {
         </div>
 
         <div className="d-flex justify-content-center gap-2 py-3">
-          <button className={`btn btn-lg rounded-circle ${micOn ? 'btn-light' : 'btn-danger'}`} style={{ width: 56, height: 56 }} onClick={toggleMic} title={micOn ? 'Mute' : 'Unmute'}>
+          <button className={`btn btn-lg rounded-circle ${micOn ? 'btn-light' : 'btn-danger'}`} style={{ width: 56, height: 56 }} onClick={toggleMic} title={micOn ? t('telehealth.mute') : t('telehealth.unmute')}>
             <i className={`bi ${micOn ? 'bi-mic-fill' : 'bi-mic-mute-fill'}`}></i>
           </button>
-          <button className={`btn btn-lg rounded-circle ${camOn ? 'btn-light' : 'btn-danger'}`} style={{ width: 56, height: 56 }} onClick={toggleCam} title={camOn ? 'Stop video' : 'Start video'}>
+          <button className={`btn btn-lg rounded-circle ${camOn ? 'btn-light' : 'btn-danger'}`} style={{ width: 56, height: 56 }} onClick={toggleCam} title={camOn ? t('telehealth.stopVideo') : t('telehealth.startVideo')}>
             <i className={`bi ${camOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`}></i>
           </button>
-          <button className="btn btn-lg btn-danger rounded-circle" style={{ width: 56, height: 56 }} onClick={hangUp} title="Hang up">
+          <button className="btn btn-lg btn-danger rounded-circle" style={{ width: 56, height: 56 }} onClick={hangUp} title={t('telehealth.hangUp')}>
             <i className="bi bi-telephone-x-fill"></i>
           </button>
           <button className="btn btn-lg btn-outline-light rounded-pill px-4" onClick={() => navigate(-1)}>
-            Leave
+            {t('telehealth.leave')}
           </button>
         </div>
       </div>

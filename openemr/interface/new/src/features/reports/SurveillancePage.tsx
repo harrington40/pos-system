@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
 export default function SurveillancePage() {
+  const { t } = useTranslation();
   const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
@@ -33,41 +35,41 @@ export default function SurveillancePage() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h3 className="mb-1"><i className="bi bi-broadcast me-2"></i>Syndrome Surveillance</h3>
-          <p className="text-muted small mb-0">Monitor disease patterns and public health alerts</p>
+          <h3 className="mb-1"><i className="bi bi-broadcast me-2"></i>{t('reports.surveillance.title')}</h3>
+          <p className="text-muted small mb-0">{t('reports.surveillance.subtitle')}</p>
         </div>
         <div className="d-flex gap-2 align-items-center">
           <input type="date" className="form-control form-control-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
-          <span>to</span>
+          <span>{t('reports.surveillance.to')}</span>
           <input type="date" className="form-control form-control-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
       </div>
 
       <div className="row g-3 mb-4">
         <div className="col-md-3">
-          <div className="card shadow-sm border-0 text-bg-primary"><div className="card-body text-center"><h2>{appointments?.total || 0}</h2><small>Appointments</small></div></div>
+          <div className="card shadow-sm border-0 text-bg-primary"><div className="card-body text-center"><h2>{appointments?.total || 0}</h2><small>{t('reports.surveillance.appointments')}</small></div></div>
         </div>
         <div className="col-md-3">
-          <div className="card shadow-sm border-0 text-bg-success"><div className="card-body text-center"><h2>{encounters?.total || 0}</h2><small>Encounters</small></div></div>
+          <div className="card shadow-sm border-0 text-bg-success"><div className="card-body text-center"><h2>{encounters?.total || 0}</h2><small>{t('reports.surveillance.encounters')}</small></div></div>
         </div>
         <div className="col-md-3">
-          <div className="card shadow-sm border-0 text-bg-warning"><div className="card-body text-center"><h2>{alerts.filter(a => a.status === 'alert').length}</h2><small>Active Alerts</small></div></div>
+          <div className="card shadow-sm border-0 text-bg-warning"><div className="card-body text-center"><h2>{alerts.filter(a => a.status === 'alert').length}</h2><small>{t('reports.surveillance.activeAlerts')}</small></div></div>
         </div>
         <div className="col-md-3">
-          <button className="btn btn-outline-danger w-100 h-100" onClick={() => alert('Report submitted to public health agency.')}><i className="bi bi-send me-2"></i>Submit Report</button>
+          <button className="btn btn-outline-danger w-100 h-100" onClick={() => alert(t('reports.surveillance.submitted'))}><i className="bi bi-send me-2"></i>{t('reports.surveillance.submitReport')}</button>
         </div>
       </div>
 
       <div className="card shadow-sm">
-        <div className="card-header"><h5 className="mb-0">Syndrome Alerts</h5></div>
+        <div className="card-header"><h5 className="mb-0">{t('reports.surveillance.syndromeAlerts')}</h5></div>
         <div className="card-body p-0">
           <table className="table table-sm table-hover mb-0">
-            <thead><tr><th>Condition</th><th>Count</th><th>Threshold</th><th>Status</th></tr></thead>
+            <thead><tr><th>{t('reports.surveillance.cols.condition')}</th><th>{t('reports.surveillance.cols.count')}</th><th>{t('reports.surveillance.cols.threshold')}</th><th>{t('reports.surveillance.cols.status')}</th></tr></thead>
             <tbody>
               {alerts.map(a => (
                 <tr key={a.condition} className={a.status === 'alert' ? 'table-danger' : ''}>
                   <td><strong>{a.condition}</strong></td><td>{a.count}</td><td>{a.threshold}</td>
-                  <td><span className={`badge ${a.status === 'alert' ? 'bg-danger' : 'bg-success'}`}>{a.status === 'alert' ? '⚠ Alert' : '✓ Normal'}</span></td>
+                  <td><span className={`badge ${a.status === 'alert' ? 'bg-danger' : 'bg-success'}`}>{a.status === 'alert' ? t('reports.surveillance.alert') : t('reports.surveillance.normal')}</span></td>
                 </tr>
               ))}
             </tbody>

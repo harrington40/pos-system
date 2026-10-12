@@ -1,5 +1,6 @@
  import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
@@ -11,7 +12,8 @@ type BadgeKey = 'messages' | 'referrals' | 'drugInfo' | 'pharmacy' | 'patientFlo
 
 interface SubItem {
   to: string;
-  label: string;
+  /** i18n key under `shell.items.*` (stable; also used as a React key). */
+  labelKey: string;
   icon: string;
   roles: string[];
   mainMenuRoles?: string[];
@@ -20,7 +22,8 @@ interface SubItem {
 }
 
 interface MenuSection {
-  label: string;
+  /** Stable id (used for state/collapse keys) — translated via `shell.sections.*`. */
+  key: string;
   icon: string;
   roles: string[];
   children: SubItem[];
@@ -28,159 +31,160 @@ interface MenuSection {
 
 const menuSections: MenuSection[] = [
   {
-    label: 'Dashboard', icon: 'bi-speedometer2',
+    key: 'dashboard', icon: 'bi-speedometer2',
     roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'],
     children: [
-      { to: '/provider-dashboard', label: 'My Dashboard', icon: 'bi-person-badge', roles: ['admin', 'physician'] },
-      { to: '/registrar-dashboard', label: 'My Dashboard', icon: 'bi-person-badge', roles: ['front_desk'] },
-      { to: '/nurse-dashboard', label: 'Nurse Aide Dashboard', icon: 'bi-person-badge', roles: ['nurse'], mainMenuRoles: ['nurse'] },
-      { to: '/rn-dashboard', label: 'RN Dashboard', icon: 'bi-person-badge', roles: ['nurse'], mainMenuRoles: ['registered_nurse'] },
-      { to: '/midwife-dashboard', label: 'My Dashboard', icon: 'bi-person-badge', roles: ['midwife'] },
-      { to: '/lab-tech-dashboard', label: 'My Dashboard', icon: 'bi-person-badge', roles: ['lab_tech'] },
-      { to: '/dashboard', label: 'Clinic Overview', icon: 'bi-grid', roles: ['admin'] },
+      { to: '/provider-dashboard', labelKey: 'myDashboard', icon: 'bi-person-badge', roles: ['admin', 'physician'] },
+      { to: '/registrar-dashboard', labelKey: 'myDashboard', icon: 'bi-person-badge', roles: ['front_desk'] },
+      { to: '/nurse-dashboard', labelKey: 'nurseAideDashboard', icon: 'bi-person-badge', roles: ['nurse'], mainMenuRoles: ['nurse'] },
+      { to: '/rn-dashboard', labelKey: 'rnDashboard', icon: 'bi-person-badge', roles: ['nurse'], mainMenuRoles: ['registered_nurse'] },
+      { to: '/midwife-dashboard', labelKey: 'myDashboard', icon: 'bi-person-badge', roles: ['midwife'] },
+      { to: '/lab-tech-dashboard', labelKey: 'myDashboard', icon: 'bi-person-badge', roles: ['lab_tech'] },
+      { to: '/dashboard', labelKey: 'clinicOverview', icon: 'bi-grid', roles: ['admin'] },
     ],
   },
   {
-    label: 'Patients', icon: 'bi-people',
+    key: 'patients', icon: 'bi-people',
     roles: ['admin', 'physician', 'midwife', 'nurse', 'billing', 'front_desk'],
     children: [
-      { to: '/patients', label: 'Search & Register', icon: 'bi-search', roles: ['admin', 'front_desk', 'midwife'] },
-      { to: '/providers', label: 'Providers', icon: 'bi-person-badge', roles: ['admin', 'front_desk'] },
+      { to: '/patients', labelKey: 'searchRegister', icon: 'bi-search', roles: ['admin', 'front_desk', 'midwife'] },
+      { to: '/providers', labelKey: 'providers', icon: 'bi-person-badge', roles: ['admin', 'front_desk'] },
     ],
   },
   {
-    label: 'Maternity', icon: 'bi-heart-fill',
+    key: 'maternity', icon: 'bi-heart-fill',
     roles: ['midwife', 'admin', 'physician'],
     children: [
-      { to: '/midwife-dashboard', label: 'Maternal Dashboard', icon: 'bi-speedometer2', roles: ['midwife'] },
-      { to: '/patients', label: 'Maternal Patients', icon: 'bi-people-fill', roles: ['midwife', 'physician'] },
-      { to: '/appointments', label: 'Delivery Schedule', icon: 'bi-calendar-heart', roles: ['midwife', 'admin'] },
+      { to: '/midwife-dashboard', labelKey: 'maternalDashboard', icon: 'bi-speedometer2', roles: ['midwife'] },
+      { to: '/patients', labelKey: 'maternalPatients', icon: 'bi-people-fill', roles: ['midwife', 'physician'] },
+      { to: '/appointments', labelKey: 'deliverySchedule', icon: 'bi-calendar-heart', roles: ['midwife', 'admin'] },
     ],
   },
   {
-    label: 'Laboratory', icon: 'bi-flask',
+    key: 'laboratory', icon: 'bi-flask',
     roles: ['lab_tech', 'admin', 'physician', 'nurse'],
     children: [
-      { to: '/lab-tech-dashboard', label: 'Lab Dashboard', icon: 'bi-speedometer2', roles: ['lab_tech'] },
-      { to: '/lab-dashboard', label: 'Lab Management', icon: 'bi-clipboard-pulse', roles: ['lab_tech', 'admin', 'physician'] },
-      { to: '/labs', label: 'Lab Orders', icon: 'bi-clipboard-check', roles: ['lab_tech', 'physician', 'nurse'] },
-      { to: '/lab-results', label: 'Lab Result Forms', icon: 'bi-clipboard2-pulse', roles: ['lab_tech', 'admin', 'physician'] },
+      { to: '/lab-tech-dashboard', labelKey: 'labDashboard', icon: 'bi-speedometer2', roles: ['lab_tech'] },
+      { to: '/lab-dashboard', labelKey: 'labManagement', icon: 'bi-clipboard-pulse', roles: ['lab_tech', 'admin', 'physician'] },
+      { to: '/labs', labelKey: 'labOrders', icon: 'bi-clipboard-check', roles: ['lab_tech', 'physician', 'nurse'] },
+      { to: '/lab-results', labelKey: 'labResultForms', icon: 'bi-clipboard2-pulse', roles: ['lab_tech', 'admin', 'physician'] },
     ],
   },
   {
-    label: 'Inventory', icon: 'bi-boxes',
+    key: 'inventory', icon: 'bi-boxes',
     roles: ['admin', 'inventory_manager', 'physician', 'nurse', 'lab_tech', 'front_desk'],
     children: [
-      { to: '/inventory', label: 'Inventory', icon: 'bi-box-seam', roles: ['admin', 'inventory_manager', 'physician', 'nurse', 'lab_tech', 'front_desk'] },
+      { to: '/inventory', labelKey: 'inventory', icon: 'bi-box-seam', roles: ['admin', 'inventory_manager', 'physician', 'nurse', 'lab_tech', 'front_desk'] },
     ],
   },
   {
-    label: 'Pharmacy', icon: 'bi-capsule',
+    key: 'pharmacy', icon: 'bi-capsule',
     roles: ['pharmacist', 'admin'],
     children: [
-      { to: '/pharmacy', label: 'Pharmacy & Prescriptions', icon: 'bi-capsule-pill', roles: ['pharmacist', 'admin'], badgeKey: 'pharmacy' },
+      { to: '/pharmacy', labelKey: 'pharmacyPrescriptions', icon: 'bi-capsule-pill', roles: ['pharmacist', 'admin'], badgeKey: 'pharmacy' },
     ],
   },
   {
-    label: 'Appointments', icon: 'bi-calendar-event',
+    key: 'appointments', icon: 'bi-calendar-event',
     roles: ['admin', 'physician', 'front_desk'],
     children: [
-      { to: '/appointments', label: 'Calendar', icon: 'bi-calendar3', roles: ['admin', 'physician', 'front_desk'] },
-      { to: '/bookings', label: 'Bookings & QR', icon: 'bi-qr-code', roles: ['admin', 'front_desk'] },
-      { to: '/appointments/flow', label: 'Patient Flow', icon: 'bi-kanban', roles: ['admin', 'physician', 'front_desk'], badgeKey: 'patientFlow' },
-      { to: '/appointments/recall', label: 'Recall Board', icon: 'bi-bell', roles: ['admin', 'physician'] },
-      { to: '/appointments/screening', label: 'Drug Screening', icon: 'bi-shuffle', roles: ['admin', 'physician'] },
-      { to: '/inpatient', label: 'Inpatient / ADT', icon: 'bi-hospital', roles: ['admin', 'physician', 'nurse', 'front_desk'] },
+      { to: '/appointments', labelKey: 'calendar', icon: 'bi-calendar3', roles: ['admin', 'physician', 'front_desk'] },
+      { to: '/bookings', labelKey: 'bookingsQr', icon: 'bi-qr-code', roles: ['admin', 'front_desk'] },
+      { to: '/appointments/flow', labelKey: 'patientFlow', icon: 'bi-kanban', roles: ['admin', 'physician', 'front_desk'], badgeKey: 'patientFlow' },
+      { to: '/appointments/recall', labelKey: 'recallBoard', icon: 'bi-bell', roles: ['admin', 'physician'] },
+      { to: '/appointments/screening', labelKey: 'drugScreening', icon: 'bi-shuffle', roles: ['admin', 'physician'] },
+      { to: '/inpatient', labelKey: 'inpatientAdt', icon: 'bi-hospital', roles: ['admin', 'physician', 'nurse', 'front_desk'] },
     ],
   },
   {
-    label: 'Emergency', icon: 'bi-heart-pulse-fill',
+    key: 'emergency', icon: 'bi-heart-pulse-fill',
     roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk'],
     children: [
-      { to: '/emergency', label: 'Triage Board', icon: 'bi-clipboard2-pulse', roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk'] },
+      { to: '/emergency', labelKey: 'triageBoard', icon: 'bi-clipboard2-pulse', roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk'] },
     ],
   },
   {
-    label: 'Clinical', icon: 'bi-heart-pulse',
+    key: 'clinical', icon: 'bi-heart-pulse',
     roles: ['admin', 'physician'],
     children: [
-      { to: '/referrals', label: 'Referrals', icon: 'bi-send', roles: ['admin', 'physician', 'front_desk'], badgeKey: 'referrals' },
-      { to: '/cds', label: 'Decision Support', icon: 'bi-cpu', roles: ['admin', 'physician'] },
-      { to: '/group-therapy', label: 'Group Therapy', icon: 'bi-people-fill', roles: ['admin', 'physician'] },
-      { to: '/fda', label: 'FDA Lookup', icon: 'bi-shield-check', roles: ['admin', 'physician', 'nurse'] },
-      { to: '/drug-info', label: 'Drug Info', icon: 'bi-capsule', roles: ['admin', 'physician', 'nurse'], badgeKey: 'drugInfo' },
-      { to: '/templates', label: 'Templates', icon: 'bi-file-earmark-text', roles: ['admin', 'physician'] },
-      { to: '/pharmacy', label: 'Pharmacy', icon: 'bi-capsule-pill', roles: ['admin', 'physician', 'nurse'], badgeKey: 'pharmacy' },
+      { to: '/referrals', labelKey: 'referrals', icon: 'bi-send', roles: ['admin', 'physician', 'front_desk'], badgeKey: 'referrals' },
+      { to: '/cds', labelKey: 'decisionSupport', icon: 'bi-cpu', roles: ['admin', 'physician'] },
+      { to: '/group-therapy', labelKey: 'groupTherapy', icon: 'bi-people-fill', roles: ['admin', 'physician'] },
+      { to: '/fda', labelKey: 'fdaLookup', icon: 'bi-shield-check', roles: ['admin', 'physician', 'nurse'] },
+      { to: '/drug-info', labelKey: 'drugInfo', icon: 'bi-capsule', roles: ['admin', 'physician', 'nurse'], badgeKey: 'drugInfo' },
+      { to: '/templates', labelKey: 'templates', icon: 'bi-file-earmark-text', roles: ['admin', 'physician'] },
+      { to: '/pharmacy', labelKey: 'pharmacy', icon: 'bi-capsule-pill', roles: ['admin', 'physician', 'nurse'], badgeKey: 'pharmacy' },
     ],
   },
   {
-    label: 'Messaging', icon: 'bi-chat-dots',
+    key: 'messaging', icon: 'bi-chat-dots',
     roles: ['admin', 'physician', 'front_desk', 'billing', 'midwife', 'lab_tech', 'nurse'],
     children: [
-      { to: '/messages', label: 'Inbox', icon: 'bi-inbox', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'], badgeKey: 'messages' },
-      { to: '/messages/patient-chat', label: 'Patient Chat', icon: 'bi-chat-heart', roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk', 'lab_tech', 'pharmacist', 'billing'] },
-      { to: '/direct-messaging', label: 'Direct Msg', icon: 'bi-envelope-arrow-up', roles: ['admin', 'physician'] },
+      { to: '/messages', labelKey: 'inbox', icon: 'bi-inbox', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'], badgeKey: 'messages' },
+      { to: '/messages/patient-chat', labelKey: 'patientChat', icon: 'bi-chat-heart', roles: ['admin', 'physician', 'nurse', 'midwife', 'front_desk', 'lab_tech', 'pharmacist', 'billing'] },
+      { to: '/direct-messaging', labelKey: 'directMsg', icon: 'bi-envelope-arrow-up', roles: ['admin', 'physician'] },
     ],
   },
   {
-    label: 'Billing', icon: 'bi-currency-dollar',
+    key: 'billing', icon: 'bi-currency-dollar',
     roles: ['admin', 'billing'],
     children: [
-      { to: '/billing', label: 'Billing Dashboard', icon: 'bi-cash-stack', roles: ['admin', 'billing'] },
-      { to: '/billing/medical', label: 'Medical Billing', icon: 'bi-file-earmark-medical', roles: ['admin', 'billing'] },
+      { to: '/billing', labelKey: 'billingDashboard', icon: 'bi-cash-stack', roles: ['admin', 'billing'] },
+      { to: '/billing/medical', labelKey: 'medicalBilling', icon: 'bi-file-earmark-medical', roles: ['admin', 'billing'] },
     ],
   },
   {
-    label: 'Documents', icon: 'bi-folder',
+    key: 'documents', icon: 'bi-folder',
     roles: ['admin', 'physician', 'front_desk'],
     children: [
-      { to: '/documents', label: 'Secure Documents', icon: 'bi-shield-lock', roles: ['admin', 'physician', 'nurse', 'front_desk'] },
-      { to: '/dicom', label: 'DICOM / X-Ray', icon: 'bi-image', roles: ['admin', 'physician'] },
+      { to: '/documents', labelKey: 'secureDocuments', icon: 'bi-shield-lock', roles: ['admin', 'physician', 'nurse', 'front_desk'] },
+      { to: '/dicom', labelKey: 'dicom', icon: 'bi-image', roles: ['admin', 'physician'] },
     ],
   },
   {
-    label: 'Reports', icon: 'bi-graph-up',
+    key: 'reports', icon: 'bi-graph-up',
     roles: ['admin', 'physician'],
     children: [
-      { to: '/reports', label: 'Reports', icon: 'bi-bar-chart', roles: ['admin', 'physician'] },
-      { to: '/reports/surveillance', label: 'Surveillance', icon: 'bi-broadcast', roles: ['admin'] },
+      { to: '/reports', labelKey: 'reports', icon: 'bi-bar-chart', roles: ['admin', 'physician'] },
+      { to: '/reports/surveillance', labelKey: 'surveillance', icon: 'bi-broadcast', roles: ['admin'] },
     ],
   },
   {
-    label: 'Admin', icon: 'bi-gear-wide-connected',
+    key: 'admin', icon: 'bi-gear-wide-connected',
     roles: ['admin'],
     children: [
-      { to: '/admin', label: 'System Admin', icon: 'bi-sliders', roles: ['admin'] },
-      { to: '/db-admin', label: 'Database Admin', icon: 'bi-database', roles: ['admin'] },
-      { to: '/disclosures', label: 'Disclosures', icon: 'bi-shield-lock', roles: ['admin'] },
-      { to: '/license', label: 'License', icon: 'bi-key', roles: ['admin'] },
+      { to: '/admin', labelKey: 'systemAdmin', icon: 'bi-sliders', roles: ['admin'] },
+      { to: '/db-admin', labelKey: 'databaseAdmin', icon: 'bi-database', roles: ['admin'] },
+      { to: '/disclosures', labelKey: 'disclosures', icon: 'bi-shield-lock', roles: ['admin'] },
+      { to: '/license', labelKey: 'license', icon: 'bi-key', roles: ['admin'] },
     ],
   },
   {
-    label: 'Patient Portal', icon: 'bi-person-heart',
+    key: 'patientPortal', icon: 'bi-person-heart',
     roles: ['admin', 'front_desk', 'billing'],
     children: [
-      { to: '/portal/login', label: 'Portal Login', icon: 'bi-box-arrow-in-right', roles: ['admin', 'front_desk', 'billing'] },
-      { to: '/portal/dashboard', label: 'Portal Dashboard', icon: 'bi-speedometer2', roles: ['admin', 'front_desk', 'billing'] },
-      { to: '/portal/register', label: 'Register Patient', icon: 'bi-person-plus', roles: ['admin', 'front_desk'] },
+      { to: '/portal/login', labelKey: 'portalLogin', icon: 'bi-box-arrow-in-right', roles: ['admin', 'front_desk', 'billing'] },
+      { to: '/portal/dashboard', labelKey: 'portalDashboard', icon: 'bi-speedometer2', roles: ['admin', 'front_desk', 'billing'] },
+      { to: '/portal/register', labelKey: 'registerPatient', icon: 'bi-person-plus', roles: ['admin', 'front_desk'] },
     ],
   },
   {
-    label: 'Help', icon: 'bi-question-circle',
+    key: 'help', icon: 'bi-question-circle',
     roles: ['admin', 'physician', 'front_desk', 'billing', 'midwife', 'lab_tech', 'nurse'],
     children: [
-      { to: '/how-to', label: 'How-To Guide', icon: 'bi-journal-text', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
-      { to: '/wiki', label: 'Wiki / Docs', icon: 'bi-book', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
-      { to: '/community', label: 'Community Forum', icon: 'bi-people-fill', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
-      { to: '/help', label: 'FAQ & Help', icon: 'bi-question-circle', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
+      { to: '/how-to', labelKey: 'howToGuide', icon: 'bi-journal-text', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
+      { to: '/wiki', labelKey: 'wiki', icon: 'bi-book', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
+      { to: '/community', labelKey: 'communityForum', icon: 'bi-people-fill', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
+      { to: '/help', labelKey: 'faqHelp', icon: 'bi-question-circle', roles: ['admin', 'physician', 'nurse', 'midwife', 'lab_tech', 'front_desk', 'billing'] },
     ],
   },
 ];
 
 export default function Sidebar() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    Dashboard: true,
+    dashboard: true,
   });
   // Easter egg: "Database Admin" is hidden until the admin avatar is clicked 5 times.
   const [adminAvatarClicks, setAdminAvatarClicks] = useState(0);
@@ -214,8 +218,8 @@ export default function Sidebar() {
   const badgeTone = (key?: BadgeKey) =>
     key === 'referrals' || key === 'drugInfo' ? 'bg-danger' : 'bg-primary';
 
-  const toggleSection = (label: string) => {
-    setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Filter sections by role — only show when user is loaded
@@ -269,7 +273,7 @@ export default function Sidebar() {
       <div className="p-3 border-bottom" style={{ borderBottom: '1px solid rgba(13,110,253,0.12)' }}>
         <h6 className="mb-0 fw-bold" style={{ color: '#0d6efd' }}>
           <i className="bi bi-heart-pulse-fill me-2" style={{ color: '#00c9a7' }}></i>
-          OpenRx Health
+          {t('login.brand')}
         </h6>
       </div>
 
@@ -287,22 +291,22 @@ export default function Sidebar() {
           if (visibleChildren.length === 0) return null;
           const sectionBadge = visibleChildren.reduce((n, c) => n + badgeFor(c), 0);
 
-          const sectionId = section.label.replace(/\s+/g, '-');
-          const isOpen = openSections[section.label] ?? false;
+          const sectionId = section.key;
+          const isOpen = openSections[section.key] ?? false;
 
           return (
-            <div key={section.label} className="side-section">
+            <div key={section.key} className="side-section">
               {/* Section header — clickable toggle */}
               <button
                 className="btn btn-link side-header text-decoration-none d-flex align-items-center w-100 py-2 px-2"
                 style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}
-                onClick={() => toggleSection(section.label)}
+                onClick={() => toggleSection(section.key)}
                 data-bs-toggle="collapse"
                 data-bs-target={`#menu-${sectionId}`}
                 aria-expanded={isOpen}
               >
                 <i className={`bi ${section.icon} me-2`} style={{ fontSize: '0.85rem', color: '#0d6efd' }}></i>
-                <span className="flex-grow-1 text-start">{section.label}</span>
+                <span className="flex-grow-1 text-start">{t(`shell.sections.${section.key}`)}</span>
                 {sectionBadge > 0 && (
                   <span className="badge rounded-pill bg-danger me-2" style={{ fontSize: '0.6rem' }}>
                     {sectionBadge > 99 ? '99+' : sectionBadge}
@@ -324,7 +328,7 @@ export default function Sidebar() {
                         style={{ fontSize: '0.78rem' }}
                       >
                         <i className={`bi ${item.icon} me-2`} style={{ fontSize: '0.75rem', width: '16px', textAlign: 'center' }}></i>
-                        <span className="text-truncate">{item.label}</span>
+                        <span className="text-truncate">{t(`shell.items.${item.labelKey}`)}</span>
                         {badgeFor(item) > 0 && (
                           <span
                             className={`badge rounded-pill ms-auto ${badgeTone(item.badgeKey)}`}
@@ -352,7 +356,7 @@ export default function Sidebar() {
           <div
             className="d-flex align-items-center gap-2"
             onClick={handleAdminAvatarClick}
-            title="Click the avatar"
+            title={t('shell.clickAvatar')}
             style={{ cursor: 'pointer', userSelect: 'none' }}
           >
             {myAvatarUrl ? (
@@ -382,19 +386,19 @@ export default function Sidebar() {
               style={{ fontSize: '0.7rem', color: '#0d6efd' }}
             >
               <i className="bi bi-person-badge"></i>
-              {myAvatarUrl ? 'My profile & photo' : 'Add your photo'}
+              {myAvatarUrl ? t('shell.myProfilePhoto') : t('shell.addYourPhoto')}
             </NavLink>
           ) : null}
           {adminAvatarClicks >= 3 && !dbAdminUnlocked && (
             <div className="text-center mt-2" style={{ fontSize: '0.7rem', color: '#0d6efd' }}>
               <i className="bi bi-unlock me-1"></i>
-              Database Admin: {dbAdminClicksRemaining} more click{dbAdminClicksRemaining === 1 ? '' : 's'}
+              {t('shell.dbAdminMore', { count: dbAdminClicksRemaining })}
             </div>
           )}
           {dbAdminUnlocked && (
             <div className="text-center mt-2" style={{ fontSize: '0.7rem', color: '#00a98f' }}>
               <i className="bi bi-unlock-fill me-1"></i>
-              Database Admin unlocked
+              {t('shell.dbAdminUnlocked')}
             </div>
           )}
         </div>

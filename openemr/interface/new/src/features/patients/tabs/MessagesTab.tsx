@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../../api/nest-client';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -33,6 +34,7 @@ const initials = (name: string) => {
  * Uses the same patient-chat backend endpoints as the standalone chat page.
  */
 export default function MessagesTab({ patientId, patientName }: Props) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const canWrite = user?.role === 'physician' || user?.role === 'admin';
   const qc = useQueryClient();
@@ -70,7 +72,7 @@ export default function MessagesTab({ patientId, patientName }: Props) {
     },
     onError: (err: any) => {
       setError(
-        err?.response?.data?.message || 'Could not send message. Please try again.',
+        err?.response?.data?.message || t('patients.tabs.messages.sendFailed'),
       );
     },
   });
@@ -105,7 +107,7 @@ export default function MessagesTab({ patientId, patientName }: Props) {
     <div
       className={`rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 text-white ${isProvider ? 'bg-primary ms-2' : 'bg-info me-2'}`}
       style={{ width: '26px', height: '26px', fontSize: '0.65rem', fontWeight: 700 }}
-      title={isProvider ? (user?.displayName || user?.username || 'You') : patientName}
+      title={isProvider ? (user?.displayName || user?.username || t('patients.tabs.messages.you')) : patientName}
     >
       {isProvider ? providerInitials : patientInitials}
     </div>
@@ -118,8 +120,8 @@ export default function MessagesTab({ patientId, patientName }: Props) {
           <i className="bi bi-chat-dots text-info"></i>
         </div>
         <div>
-          <h6 className="mb-0 fw-bold">Messages with {patientName}</h6>
-          <small className="text-muted">Conversation with the patient</small>
+          <h6 className="mb-0 fw-bold">{t('patients.tabs.messages.title', { name: patientName })}</h6>
+          <small className="text-muted">{t('patients.tabs.messages.subtitle')}</small>
         </div>
       </div>
 
@@ -128,12 +130,12 @@ export default function MessagesTab({ patientId, patientName }: Props) {
           {isLoading ? (
             <div className="text-center text-muted py-5">
               <div className="spinner-border text-primary mb-2"></div>
-              <p>Loading conversation...</p>
+              <p>{t('patients.tabs.messages.loading')}</p>
             </div>
           ) : !messages.length ? (
             <div className="text-center text-muted py-5">
               <i className="bi bi-chat-left-text fs-1 d-block mb-2 opacity-25"></i>
-              <p>No messages yet. Start the conversation below.</p>
+              <p>{t('patients.tabs.messages.none')}</p>
             </div>
           ) : null}
           {messages.map((m: ChatMsg) => {
@@ -153,7 +155,7 @@ export default function MessagesTab({ patientId, patientName }: Props) {
                     <div style={{ whiteSpace: 'pre-wrap' }}>{m.body}</div>
                   </div>
                   <small className={`text-muted ${isProvider ? 'text-end' : ''}`} style={{ fontSize: '0.7rem' }}>
-                    {isProvider ? 'You' : patientName} · {fmtTime(m.date)}
+                    {isProvider ? t('patients.tabs.messages.you') : patientName} · {fmtTime(m.date)}
                   </small>
                 </div>
                 {isProvider && avatar(true)}
@@ -178,7 +180,7 @@ export default function MessagesTab({ patientId, patientName }: Props) {
                     handleSend();
                   }
                 }}
-                placeholder={`Message ${patientName}...`}
+                placeholder={t('patients.tabs.messages.inputPlaceholder', { name: patientName })}
               />
               <button
                 className="btn btn-primary align-self-end d-flex align-items-center"
@@ -194,7 +196,7 @@ export default function MessagesTab({ patientId, patientName }: Props) {
             </div>
           ) : (
             <div className="text-center text-muted small py-2">
-              <i className="bi bi-lock me-1"></i>Read-only — only providers (physicians) can send messages.
+              <i className="bi bi-lock me-1"></i>{t('patients.tabs.messages.readOnly')}
             </div>
           )}
         </div>

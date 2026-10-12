@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../../api/nest-client';
 
 interface Assessment {
@@ -27,6 +28,7 @@ const LEVEL_STYLE = (level?: string | null) => {
 };
 
 export default function MaternityTab({ pid }: Props) {
+  const { t } = useTranslation();
   const { data: assessments = [], isLoading } = useQuery({
     queryKey: ['midwife-assessments', String(pid)],
     queryFn: async () => {
@@ -37,9 +39,9 @@ export default function MaternityTab({ pid }: Props) {
   });
 
   const kindLabel: Record<string, string> = {
-    risk: 'Pregnancy risk',
-    edd: 'EDD / dating',
-    apgar: 'APGAR',
+    risk: t('patients.tabs.maternity.kindRisk'),
+    edd: t('patients.tabs.maternity.kindEdd'),
+    apgar: t('patients.tabs.maternity.kindApgar'),
   };
 
   return (
@@ -47,7 +49,7 @@ export default function MaternityTab({ pid }: Props) {
       <div className="card-header d-flex justify-content-between align-items-center">
         <h5 className="mb-0">
           <i className="bi bi-clipboard-heart me-2" style={{ color: '#d63384' }}></i>
-          Maternity Record
+          {t('patients.tabs.maternity.title')}
         </h5>
         <span className="badge bg-secondary rounded-pill">{assessments.length}</span>
       </div>
@@ -58,15 +60,14 @@ export default function MaternityTab({ pid }: Props) {
           <div className="text-center text-muted p-4">
             <i className="bi bi-clipboard-heart" style={{ fontSize: '2rem' }}></i>
             <p className="mt-2 mb-0 small">
-              No maternity assessments recorded. Risk scores, EDDs and APGARs are filed
-              here from the Midwife Dashboard.
+              {t('patients.tabs.maternity.none')}
             </p>
           </div>
         ) : (
           <div className="table-responsive">
             <table className="table table-sm table-hover mb-0" style={{ fontSize: '0.8rem' }}>
               <thead className="table-light">
-                <tr><th>When</th><th>Type</th><th>Result</th><th>Detail</th><th>By</th></tr>
+                <tr><th>{t('patients.tabs.maternity.thWhen')}</th><th>{t('patients.tabs.maternity.thType')}</th><th>{t('patients.tabs.maternity.thResult')}</th><th>{t('patients.tabs.maternity.thDetail')}</th><th>{t('patients.tabs.maternity.thBy')}</th></tr>
               </thead>
               <tbody>
                 {assessments.map((a) => {

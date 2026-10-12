@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../api/nest-client';
 import { useAuth } from '../../hooks/useAuth';
+import LanguageSwitcher from '../../components/shared/LanguageSwitcher';
 
 /** Map an authenticated role to its default landing page. */
 const homeForRole = (role?: string, mainMenuRole?: string): string => {
@@ -19,54 +21,24 @@ const homeForRole = (role?: string, mainMenuRole?: string): string => {
 };
 
 const FEATURES = [
-  {
-    icon: 'bi-capsule',
-    title: 'E-Prescribing & Pharmacy',
-    text: 'Prescribe, verify, and dispense with live drug info, interactions, and billing status.',
-    tint: 'rgba(0,201,167,0.22)',
-  },
-  {
-    icon: 'bi-eyedropper',
-    title: 'Labs & Diagnostics',
-    text: 'Order tests, capture results, and route them back to the care team instantly.',
-    tint: 'rgba(13,110,253,0.22)',
-  },
-  {
-    icon: 'bi-cash-stack',
-    title: 'Billing & Clearance',
-    text: 'Auto-bill encounters and generate smart receipts for a smooth discharge.',
-    tint: 'rgba(255,193,7,0.22)',
-  },
-  {
-    icon: 'bi-box-seam',
-    title: 'Inventory & Barcodes',
-    text: 'Track stock, traceability, and approvals with real Code-128 barcode labels.',
-    tint: 'rgba(0,201,167,0.22)',
-  },
-  {
-    icon: 'bi-people',
-    title: 'Patient Portal',
-    text: 'Secure patient access to records, messages, appointments, and payments.',
-    tint: 'rgba(13,110,253,0.22)',
-  },
-  {
-    icon: 'bi-clipboard2-pulse',
-    title: 'Clinical Notes & Vitals',
-    text: 'Document encounters with smart acuity scoring, NEWS2, and trending vitals.',
-    tint: 'rgba(255,193,7,0.22)',
-  },
+  { icon: 'bi-capsule', titleKey: 'login.features.prescribingTitle', textKey: 'login.features.prescribingText', tint: 'rgba(0,201,167,0.22)' },
+  { icon: 'bi-eyedropper', titleKey: 'login.features.labsTitle', textKey: 'login.features.labsText', tint: 'rgba(13,110,253,0.22)' },
+  { icon: 'bi-cash-stack', titleKey: 'login.features.billingTitle', textKey: 'login.features.billingText', tint: 'rgba(255,193,7,0.22)' },
+  { icon: 'bi-box-seam', titleKey: 'login.features.inventoryTitle', textKey: 'login.features.inventoryText', tint: 'rgba(0,201,167,0.22)' },
+  { icon: 'bi-people', titleKey: 'login.features.portalTitle', textKey: 'login.features.portalText', tint: 'rgba(13,110,253,0.22)' },
+  { icon: 'bi-clipboard2-pulse', titleKey: 'login.features.notesTitle', textKey: 'login.features.notesText', tint: 'rgba(255,193,7,0.22)' },
 ];
 
 const TRUST = [
-  { icon: 'bi-shield-lock', label: 'Role-Based Access' },
-  { icon: 'bi-graph-up-arrow', label: 'Real-Time Analytics' },
-  { icon: 'bi-lightning-charge', label: 'Smart Automation' },
+  { icon: 'bi-shield-lock', labelKey: 'login.trust.roleBased' },
+  { icon: 'bi-graph-up-arrow', labelKey: 'login.trust.analytics' },
+  { icon: 'bi-lightning-charge', labelKey: 'login.trust.automation' },
 ];
 
 const PRICING = [
-  { tier: 'Basic', price: '$49', period: '/mo', users: 'Up to 5 users', highlight: false },
-  { tier: 'Professional', price: '$149', period: '/mo', users: 'Up to 25 users', highlight: true },
-  { tier: 'Enterprise', price: '$499', period: '/mo', users: 'Up to 100 users', highlight: false },
+  { tierKey: 'login.pricing.basic', price: '$49', period: '/mo', usersKey: 'login.pricing.upTo5Users', highlight: false },
+  { tierKey: 'login.pricing.professional', price: '$149', period: '/mo', usersKey: 'login.pricing.upTo25Users', highlight: true },
+  { tierKey: 'login.pricing.enterprise', price: '$499', period: '/mo', usersKey: 'login.pricing.upTo100Users', highlight: false },
 ];
 
 const CONTACT_EMAIL = 'dev@transtechologies.com';
@@ -74,6 +46,7 @@ const CONTACT_EMAIL = 'dev@transtechologies.com';
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -94,10 +67,10 @@ export default function LoginPage() {
         login({ ...user, token });
         navigate(homeForRole(user.role, user.main_menu_role), { replace: true });
       } else {
-        setError('Invalid response from server');
+        setError(t('login.invalidResponse'));
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Login failed';
+      const msg = err.response?.data?.message || t('login.loginFailed');
       setError(msg);
     } finally {
       setLoading(false);
@@ -162,24 +135,23 @@ export default function LoginPage() {
                   <i className="bi bi-heart-pulse-fill" style={{ fontSize: '1.9rem', color: '#ffffff' }}></i>
                 </div>
                 <div>
-                  <h1 className="fw-bold mb-0" style={{ letterSpacing: '-0.5px', fontSize: '2rem' }}>OpenRx Health</h1>
+                  <h1 className="fw-bold mb-0" style={{ letterSpacing: '-0.5px', fontSize: '2rem' }}>{t('login.brand')}</h1>
                   <p className="mb-0" style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.95rem' }}>
-                    Electronic Prescription & Health Records
+                    {t('login.tagline')}
                   </p>
                 </div>
               </div>
 
               <h2 className="fw-semibold mb-2" style={{ fontSize: '1.45rem', letterSpacing: '-0.3px' }}>
-                One connected platform for the entire care journey.
+                {t('login.headline')}
               </h2>
               <p className="mb-4" style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.95rem', maxWidth: '620px' }}>
-                From the front desk to the pharmacy, OpenRx unifies registration, clinical notes, prescriptions,
-                labs, billing, inventory, and patient engagement — so every department works as one.
+                {t('login.subheadline')}
               </p>
 
               <div className="row g-3 mb-4">
                 {FEATURES.map((f) => (
-                  <div className="col-6" key={f.title}>
+                  <div className="col-6" key={f.titleKey}>
                     <div
                       className="d-flex align-items-start gap-2 h-100"
                       style={{
@@ -197,8 +169,8 @@ export default function LoginPage() {
                         <i className={`bi ${f.icon}`} style={{ fontSize: '1.15rem', color: '#fff' }}></i>
                       </div>
                       <div>
-                        <div className="fw-semibold" style={{ fontSize: '0.88rem', lineHeight: 1.2 }}>{f.title}</div>
-                        <div className="mt-1" style={{ color: 'rgba(255,255,255,0.78)', fontSize: '0.78rem', lineHeight: 1.35 }}>{f.text}</div>
+                        <div className="fw-semibold" style={{ fontSize: '0.88rem', lineHeight: 1.2 }}>{t(f.titleKey)}</div>
+                        <div className="mt-1" style={{ color: 'rgba(255,255,255,0.78)', fontSize: '0.78rem', lineHeight: 1.35 }}>{t(f.textKey)}</div>
                       </div>
                     </div>
                   </div>
@@ -206,9 +178,9 @@ export default function LoginPage() {
               </div>
 
               <div className="d-flex flex-wrap gap-2">
-                {TRUST.map((t) => (
+                {TRUST.map((item) => (
                   <span
-                    key={t.label}
+                    key={item.labelKey}
                     className="badge d-inline-flex align-items-center gap-1 rounded-pill"
                     style={{
                       background: 'rgba(255,255,255,0.12)',
@@ -219,7 +191,7 @@ export default function LoginPage() {
                       padding: '8px 14px',
                     }}
                   >
-                    <i className={`bi ${t.icon}`}></i>{t.label}
+                    <i className={`bi ${item.icon}`}></i>{t(item.labelKey)}
                   </span>
                 ))}
               </div>
@@ -227,11 +199,11 @@ export default function LoginPage() {
               <div className="mt-4">
                 <div className="d-flex align-items-center gap-2 mb-2">
                   <i className="bi bi-credit-card"></i>
-                  <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>Plans & Pricing</span>
+                  <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{t('login.pricing.title')}</span>
                 </div>
                 <div className="row g-2">
                   {PRICING.map((p) => (
-                    <div className="col-4" key={p.tier}>
+                    <div className="col-4" key={p.tierKey}>
                       <div
                         role="button"
                         tabIndex={0}
@@ -248,13 +220,13 @@ export default function LoginPage() {
                           textAlign: 'center',
                         }}
                       >
-                        <div className="fw-semibold text-uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px', opacity: 0.9 }}>{p.tier}</div>
+                        <div className="fw-semibold text-uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px', opacity: 0.9 }}>{t(p.tierKey)}</div>
                         <div className="mt-1" style={{ fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.5px' }}>
                           {p.price}<span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.8 }}>{p.period}</span>
                         </div>
-                        <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>{p.users}</div>
+                        <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>{t(p.usersKey)}</div>
                         <div className="mt-2" style={{ fontSize: '0.7rem', opacity: 0.85 }}>
-                          <i className="bi bi-arrow-right-circle me-1"></i>Get Started
+                          <i className="bi bi-arrow-right-circle me-1"></i>{t('login.pricing.getStarted')}
                         </div>
                       </div>
                     </div>
@@ -264,7 +236,7 @@ export default function LoginPage() {
 
               <div className="mt-3 d-flex flex-wrap align-items-center gap-2" style={{ fontSize: '0.82rem' }}>
                 <i className="bi bi-envelope"></i>
-                <span style={{ opacity: 0.85 }}>Business & subscription inquiries:</span>
+                <span style={{ opacity: 0.85 }}>{t('login.businessInquiries')}</span>
                 <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: '#fff', fontWeight: 600, textDecoration: 'none' }}>
                   {CONTACT_EMAIL}
                 </a>
@@ -289,6 +261,11 @@ export default function LoginPage() {
                 color: '#fff',
               }}
             >
+              {/* Language selector: switches the interface immediately (EN / ES) */}
+              <div className="d-flex justify-content-end mb-3">
+                <LanguageSwitcher variant="light" />
+              </div>
+
               <div className="text-center mb-4">
                 <div
                   className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3 d-lg-none"
@@ -296,12 +273,12 @@ export default function LoginPage() {
                 >
                   <i className="bi bi-heart-pulse-fill" style={{ fontSize: '2.2rem', color: '#ffffff' }}></i>
                 </div>
-                <h2 className="fw-bold mb-1 d-lg-none" style={{ letterSpacing: '-0.5px' }}>OpenRx Health</h2>
+                <h2 className="fw-bold mb-1 d-lg-none" style={{ letterSpacing: '-0.5px' }}>{t('login.brand')}</h2>
                 <p className="mb-0 d-lg-none" style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem' }}>
-                  Electronic Prescription & Health Records
+                  {t('login.tagline')}
                 </p>
                 <p className="mb-0 d-none d-lg-block" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem' }}>
-                  <i className="bi bi-box-arrow-in-right me-1"></i>Sign in to your workspace
+                  <i className="bi bi-box-arrow-in-right me-1"></i>{t('login.signInToWorkspace')}
                 </p>
               </div>
 
@@ -323,12 +300,12 @@ export default function LoginPage() {
               <form onSubmit={handleLogin}>
                 <div className="mb-3">
                   <label className="form-label small mb-1" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                    <i className="bi bi-person me-1"></i>Username
+                    <i className="bi bi-person me-1"></i>{t('auth.username')}
                   </label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Enter your username"
+                    placeholder={t('login.usernamePlaceholder')}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -337,12 +314,12 @@ export default function LoginPage() {
                 </div>
                 <div className="mb-4">
                   <label className="form-label small mb-1" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                    <i className="bi bi-lock me-1"></i>Password
+                    <i className="bi bi-lock me-1"></i>{t('auth.password')}
                   </label>
                   <input
                     type="password"
                     className="form-control"
-                    placeholder="Enter your password"
+                    placeholder={t('login.passwordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -368,7 +345,7 @@ export default function LoginPage() {
                   ) : (
                     <i className="bi bi-box-arrow-in-right me-1"></i>
                   )}
-                  Sign In
+                  {t('auth.login')}
                 </button>
               </form>
 
@@ -386,7 +363,7 @@ export default function LoginPage() {
                     WebkitBackdropFilter: 'blur(8px)',
                   }}
                 >
-                  <i className="bi bi-person-plus me-1"></i>Staff Registration
+                  <i className="bi bi-person-plus me-1"></i>{t('auth.staffRegistration')}
                 </NavLink>
               </div>
             </div>

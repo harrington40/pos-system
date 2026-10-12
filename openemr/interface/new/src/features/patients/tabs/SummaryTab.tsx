@@ -1,5 +1,6 @@
 import type { Patient } from '../../../types/patient';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../../api/nest-client';
 import { formatVital, formatVitalUnit, formatBP, classifyBP, classifyPulse, classifyTemp, classifyResp, classifySpO2 } from '../../../utils/vitalsClassify';
 import { formatPatientName } from '../../../utils/patientName';
@@ -20,17 +21,17 @@ interface Props {
   onViewTrend: () => void;
 }
 
-const ROS_SYSTEMS: { key: string; label: string; words: string[] }[] = [
-  { key: 'constitutional', label: 'Constitutional', words: ['fever', 'fatigue', 'chills', 'weight'] },
-  { key: 'respiratory', label: 'Respiratory', words: ['cough', 'shortness of breath', 'dyspnea', 'wheeze'] },
-  { key: 'cardiovascular', label: 'Cardiovascular', words: ['chest pain', 'palpitations', 'edema'] },
-  { key: 'gi', label: 'GI', words: ['nausea', 'vomiting', 'abdominal', 'diarrhea'] },
-  { key: 'gu', label: 'GU', words: ['dysuria', 'urinary', 'hematuria'] },
-  { key: 'neuro', label: 'Neuro', words: ['headache', 'dizziness', 'numbness', 'weakness'] },
-  { key: 'msk', label: 'MSK', words: ['joint', 'back pain', 'muscle'] },
-  { key: 'skin', label: 'Skin', words: ['rash', 'lesion', 'itching'] },
-  { key: 'psych', label: 'Psych', words: ['anxiety', 'depression', 'mood'] },
-  { key: 'heent', label: 'HEENT', words: ['sore throat', 'ear pain', 'vision'] },
+const ROS_SYSTEMS: { key: string; labelKey: string; words: string[] }[] = [
+  { key: 'constitutional', labelKey: 'rosConstitutional', words: ['fever', 'fatigue', 'chills', 'weight'] },
+  { key: 'respiratory', labelKey: 'rosRespiratory', words: ['cough', 'shortness of breath', 'dyspnea', 'wheeze'] },
+  { key: 'cardiovascular', labelKey: 'rosCardiovascular', words: ['chest pain', 'palpitations', 'edema'] },
+  { key: 'gi', labelKey: 'rosGi', words: ['nausea', 'vomiting', 'abdominal', 'diarrhea'] },
+  { key: 'gu', labelKey: 'rosGu', words: ['dysuria', 'urinary', 'hematuria'] },
+  { key: 'neuro', labelKey: 'rosNeuro', words: ['headache', 'dizziness', 'numbness', 'weakness'] },
+  { key: 'msk', labelKey: 'rosMsk', words: ['joint', 'back pain', 'muscle'] },
+  { key: 'skin', labelKey: 'rosSkin', words: ['rash', 'lesion', 'itching'] },
+  { key: 'psych', labelKey: 'rosPsych', words: ['anxiety', 'depression', 'mood'] },
+  { key: 'heent', labelKey: 'rosHeent', words: ['sore throat', 'ear pain', 'vision'] },
 ];
 
 export default function SummaryTab({
@@ -47,6 +48,7 @@ export default function SummaryTab({
   labResults = [],
   onViewTrend,
 }: Props) {
+  const { t } = useTranslation();
   const p = patient as any;
   const dobRaw = p.DOB || p.dob;
   const age = dobRaw
@@ -86,9 +88,9 @@ export default function SummaryTab({
   // ── Needs Attention flags ─────────────────────────────────────────
   const flags: { icon: string; color: string; text: string }[] = [];
   const bpHigh = latest && (Number(latest.bps) >= 140 || Number(latest.bpd) >= 90);
-  if (bpHigh) flags.push({ icon: 'bi-heart-pulse', color: 'danger', text: `Elevated BP (${formatBP(latest.bps, latest.bpd)}) — latest reading` });
+  if (bpHigh) flags.push({ icon: 'bi-heart-pulse', color: 'danger', text: t('patients.tabs.summary.flagElevatedBp', { bp: formatBP(latest.bps, latest.bpd) }) });
   if (latest && Number(latest.oxygen_saturation) > 0 && Number(latest.oxygen_saturation) < 94) {
-    flags.push({ icon: 'bi-lungs', color: 'danger', text: `Low SpO₂ (${formatVital(latest.oxygen_saturation)}%) — latest reading` });
+    flags.push({ icon: 'bi-lungs', color: 'danger', text: t('patients.tabs.summary.flagLowSpo2', { spo2: formatVital(latest.oxygen_saturation) }) });
   }
   const allergySource = (allergiesEnriched && allergiesEnriched.length) ? allergiesEnriched : allergies;
   const allergyNames = allergySource.map((a: any) => String(a.allergen || a.title || '').toLowerCase()).filter(Boolean);
@@ -96,14 +98,14 @@ export default function SummaryTab({
     const d = String(m.drug || '').toLowerCase();
     return allergyNames.some((a) => d.includes(a));
   });
-  drugAllergy.forEach((m: any) => flags.push({ icon: 'bi-capsule', color: 'danger', text: `Drug-allergy interaction: ${m.drug}` }));
-  if (medications.length >= 5) flags.push({ icon: 'bi-capsule-pill', color: 'warning', text: `Polypharmacy: ${medications.length} active medications` });
+  drugAllergy.forEach((m: any) => flags.push({ icon: 'bi-capsule', color: 'danger', text: t('patients.tabs.summary.flagDrugAllergy', { drug: m.drug }) }));
+  if (medications.length >= 5) flags.push({ icon: 'bi-capsule-pill', color: 'warning', text: t('patients.tabs.summary.flagPolypharmacy', { count: medications.length }) });
 
   // ── Smart clinical summary ────────────────────────────────────────
   const insights: string[] = [];
-  if (latest && prev && Number(latest.bps) > Number(prev.bps)) insights.push("Patient's BP trend has been increasing over the last readings.");
-  if (allergyNames.length && drugAllergy.length === 0) insights.push('No medication allergy conflicts with current orders.');
-  insights.push(`Active medications: ${medications.length} · Allergies: ${allergies.length} · Diagnoses: ${conditions.length}`);
+  if (latest && prev && Number(latest.bps) > Number(prev.bps)) insights.push(t('patients.tabs.summary.insightBpUp'));
+  if (allergyNames.length && drugAllergy.length === 0) insights.push(t('patients.tabs.summary.insightNoConflicts'));
+  insights.push(t('patients.tabs.summary.insightCounts', { meds: medications.length, allergies: allergies.length, diagnoses: conditions.length }));
 
   // ── ROS detection from notes ──────────────────────────────────────
   const noteText = notes.map((n: any) => `${n.title || ''} ${n.body || ''}`).join(' ').toLowerCase();
@@ -114,9 +116,9 @@ export default function SummaryTab({
     <div className="medical-record">
       {/* Facility header */}
       <div className="text-center mb-3">
-        <h5 className="fw-bold mb-0">Ma Juan Memorial Hospital Clinic</h5>
-        <div className="text-uppercase fw-bold" style={{ letterSpacing: '1px', fontSize: '0.8rem' }}>Patient Medical Record</div>
-        <small className="text-muted">Confidential — For Authorized Use Only · Care Today, Healthier Tomorrow</small>
+        <h5 className="fw-bold mb-0">{t('patients.tabs.summary.facility')}</h5>
+        <div className="text-uppercase fw-bold" style={{ letterSpacing: '1px', fontSize: '0.8rem' }}>{t('patients.tabs.summary.recordTitle')}</div>
+        <small className="text-muted">{t('patients.tabs.summary.confidential')}</small>
       </div>
 
       {/* Demographics banner */}
@@ -125,43 +127,43 @@ export default function SummaryTab({
           <div className="row g-2 small">
             <div className="col-md-6">
               <div className="fw-bold fs-6">{patientName || formatPatientName(patient)}</div>
-              <div className="text-muted">DOB: {formatDateOnly(dobRaw)} {age != null ? `(${age} y/o)` : ''} · {patient.sex || '—'}</div>
-              <div className="text-muted">PID: {patient.pid ?? '—'} · Chart #: {patient.public_id || '—'}</div>
+              <div className="text-muted">{t('patients.tabs.summary.dobLabel')} {formatDateOnly(dobRaw)} {age != null ? t('patients.tabs.summary.age', { count: age }) : ''} · {patient.sex || '—'}</div>
+              <div className="text-muted">{t('patients.tabs.summary.pidChart', { pid: patient.pid ?? '—', chart: patient.public_id || '—' })}</div>
             </div>
             <div className="col-md-6">
-              <div><span className="text-muted">Attending:</span> {attending}</div>
-              <div><span className="text-muted">Phone:</span> {phone}</div>
-              <div><span className="text-muted">Code Status:</span> {codeStatus}</div>
+              <div><span className="text-muted">{t('patients.tabs.summary.attending')}</span> {attending}</div>
+              <div><span className="text-muted">{t('patients.tabs.summary.phone')}</span> {phone}</div>
+              <div><span className="text-muted">{t('patients.tabs.summary.codeStatus')}</span> {codeStatus}</div>
             </div>
           </div>
           <div className="row g-2 small mt-2 border-top pt-2">
-            <div className="col-6 col-md-3"><span className="text-muted d-block">Blood Pressure</span><b style={{ color: latest ? classifyBP(latest.bps, latest.bpd).color : undefined }}>{bpText}</b></div>
-            <div className="col-6 col-md-2"><span className="text-muted d-block">Pulse</span><b style={{ color: latest ? classifyPulse(latest.pulse).color : undefined }}>{pulseText}</b></div>
-            <div className="col-6 col-md-2"><span className="text-muted d-block">Temp</span><b style={{ color: latest ? classifyTemp(latest.temperature).color : undefined }}>{tempText}</b></div>
-            <div className="col-6 col-md-2"><span className="text-muted d-block">Resp</span><b style={{ color: latest ? classifyResp(latest.respiration).color : undefined }}>{respText}</b></div>
-            <div className="col-6 col-md-3"><span className="text-muted d-block">SpO₂</span><b style={{ color: latest ? classifySpO2(latest.oxygen_saturation).color : undefined }}>{spo2Text}</b></div>
+            <div className="col-6 col-md-3"><span className="text-muted d-block">{t('patients.tabs.summary.bloodPressure')}</span><b style={{ color: latest ? classifyBP(latest.bps, latest.bpd).color : undefined }}>{bpText}</b></div>
+            <div className="col-6 col-md-2"><span className="text-muted d-block">{t('patients.tabs.summary.pulse')}</span><b style={{ color: latest ? classifyPulse(latest.pulse).color : undefined }}>{pulseText}</b></div>
+            <div className="col-6 col-md-2"><span className="text-muted d-block">{t('patients.tabs.summary.temp')}</span><b style={{ color: latest ? classifyTemp(latest.temperature).color : undefined }}>{tempText}</b></div>
+            <div className="col-6 col-md-2"><span className="text-muted d-block">{t('patients.tabs.summary.resp')}</span><b style={{ color: latest ? classifyResp(latest.respiration).color : undefined }}>{respText}</b></div>
+            <div className="col-6 col-md-3"><span className="text-muted d-block">{t('patients.tabs.summary.spo2')}</span><b style={{ color: latest ? classifySpO2(latest.oxygen_saturation).color : undefined }}>{spo2Text}</b></div>
           </div>
           <div className="row g-2 small mt-2 border-top pt-2">
-            <div className="col-4 col-md-3"><span className="text-muted d-block">Weight</span><b style={{ color: '#198754' }}>{weight} kg</b></div>
-            <div className="col-4 col-md-3"><span className="text-muted d-block">Height</span><b style={{ color: '#0d6efd' }}>{height} cm</b></div>
-            <div className="col-4 col-md-3"><span className="text-muted d-block">BMI</span><b style={{ color: bmiColor }}>{bmi}</b></div>
+            <div className="col-4 col-md-3"><span className="text-muted d-block">{t('patients.tabs.summary.weight')}</span><b style={{ color: '#198754' }}>{weight} kg</b></div>
+            <div className="col-4 col-md-3"><span className="text-muted d-block">{t('patients.tabs.summary.height')}</span><b style={{ color: '#0d6efd' }}>{height} cm</b></div>
+            <div className="col-4 col-md-3"><span className="text-muted d-block">{t('patients.tabs.summary.bmi')}</span><b style={{ color: bmiColor }}>{bmi}</b></div>
             <div className="col-12 col-md-3">
-              <span className="text-muted d-block">Allergies</span>
+              <span className="text-muted d-block">{t('patients.tabs.summary.allergies')}</span>
               {allergySource.length ? (
                 allergySource.map((a: any, i: number) => (
-                  <span key={i} className="badge bg-danger bg-opacity-10 text-danger me-1" title={a.source && a.source !== 'recorded' ? `Population source: ${a.source}` : undefined}>
+                  <span key={i} className="badge bg-danger bg-opacity-10 text-danger me-1" title={a.source && a.source !== 'recorded' ? t('patients.tabs.summary.populationSource', { source: a.source }) : undefined}>
                     {a.allergen || a.title}
                     {a.source && a.source !== 'recorded' && <i className={`bi ms-1 ${a.source === 'note' ? 'bi-journal-text' : 'bi-capsule'}`}></i>}
                   </span>
                 ))
               ) : (
-                <b className="text-muted">No known allergies</b>
+                <b className="text-muted">{t('patients.tabs.summary.noKnownAllergies')}</b>
               )}
             </div>
           </div>
           {attendingHistory.length > 0 && (
             <div className="mt-2 border-top pt-2">
-              <div className="text-muted small mb-1"><i className="bi bi-clock-history me-1"></i>Attending History</div>
+              <div className="text-muted small mb-1"><i className="bi bi-clock-history me-1"></i>{t('patients.tabs.summary.attendingHistory')}</div>
               <div className="d-flex flex-wrap gap-2">
                 {(attendingHistory as any[]).map((a: any, i: number) => (
                   <span key={i} className="badge bg-light text-dark border" style={{ fontWeight: 500 }}>
@@ -178,7 +180,7 @@ export default function SummaryTab({
       {flags.length > 0 && (
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px', borderLeft: '4px solid #dc3545' }}>
           <div className="card-body py-2 px-3">
-            <div className="fw-bold small mb-1"><i className="bi bi-exclamation-triangle text-danger me-1"></i>Needs Attention</div>
+            <div className="fw-bold small mb-1"><i className="bi bi-exclamation-triangle text-danger me-1"></i>{t('patients.tabs.summary.needsAttention')}</div>
             {flags.map((f, i) => (
               <div key={i} className="small mb-1"><i className={`bi ${f.icon} text-${f.color} me-1`}></i>{f.text}</div>
             ))}
@@ -188,16 +190,16 @@ export default function SummaryTab({
 
       {/* Chief complaint + HPI */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
-        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-chat-left-text me-2 text-primary"></i>Chief Complaint & History of Present Illness</h6></div>
+        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-chat-left-text me-2 text-primary"></i>{t('patients.tabs.summary.chiefComplaint')}</h6></div>
         <div className="card-body py-2 small">
           <div className="fw-semibold mb-1">{latestNote?.title || '—'}</div>
-          <div className="text-muted" style={{ whiteSpace: 'pre-wrap' }}>{(latestNote?.body || 'No narrative recorded').slice(0, 500)}</div>
+          <div className="text-muted" style={{ whiteSpace: 'pre-wrap' }}>{(latestNote?.body || t('patients.tabs.summary.noNarrative')).slice(0, 500)}</div>
         </div>
       </div>
 
       {/* Smart clinical summary */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px', borderLeft: '4px solid #6f42c1' }}>
-        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-stars me-2 text-primary"></i>Smart Clinical Summary</h6></div>
+        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-stars me-2 text-primary"></i>{t('patients.tabs.summary.smartSummary')}</h6></div>
         <div className="card-body py-2">
           <ul className="mb-0 small ps-3">
             {insights.map((s, i) => <li key={i} className="mb-1">{s}</li>)}
@@ -209,21 +211,21 @@ export default function SummaryTab({
       <div className="row g-3">
         <div className="col-md-6">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
-            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-clipboard2-pulse me-2 text-info"></i>Past Medical History</h6></div>
+            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-clipboard2-pulse me-2 text-info"></i>{t('patients.tabs.summary.pastMedical')}</h6></div>
             <div className="card-body py-2">
               {conditions.length ? conditions.map((c: any, i: number) => (
                 <div key={i} className="small mb-1">• {c.title || c.name || c.diagnosis || c.code || '—'}</div>
-              )) : <div className="small text-muted">No diagnoses recorded</div>}
+              )) : <div className="small text-muted">{t('patients.tabs.summary.noDiagnoses')}</div>}
             </div>
           </div>
         </div>
         <div className="col-md-6">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
-            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-scissors me-2 text-secondary"></i>Past Surgical / Social / Family History</h6></div>
+            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-scissors me-2 text-secondary"></i>{t('patients.tabs.summary.pastSurgical')}</h6></div>
             <div className="card-body py-2 small">
-              <div className="mb-2"><span className="text-muted">Surgical:</span> {latestNote ? '—' : '—'}</div>
-              <div className="mb-2"><span className="text-muted">Social:</span> —</div>
-              <div><span className="text-muted">Family:</span> —</div>
+              <div className="mb-2"><span className="text-muted">{t('patients.tabs.summary.surgical')}</span> {latestNote ? '—' : '—'}</div>
+              <div className="mb-2"><span className="text-muted">{t('patients.tabs.summary.social')}</span> —</div>
+              <div><span className="text-muted">{t('patients.tabs.summary.family')}</span> —</div>
             </div>
           </div>
         </div>
@@ -231,14 +233,14 @@ export default function SummaryTab({
 
       {/* Review of systems */}
       <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px' }}>
-        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-list-check me-2 text-success"></i>Review of Systems</h6></div>
+        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-list-check me-2 text-success"></i>{t('patients.tabs.summary.reviewOfSystems')}</h6></div>
         <div className="card-body py-2">
           <div className="d-flex flex-wrap gap-2">
             {ROS_SYSTEMS.map((sys) => {
               const positive = sys.words.some((w) => haystack.includes(w));
               return (
                 <span key={sys.key} className={`badge ${positive ? 'bg-warning bg-opacity-15 text-dark' : 'bg-light text-muted'} border`} style={{ fontSize: '0.72rem' }}>
-                  {positive ? '+' : '−'} {sys.label}
+                  {positive ? '+' : '−'} {t(`patients.tabs.summary.${sys.labelKey}`)}
                 </span>
               );
             })}
@@ -248,11 +250,11 @@ export default function SummaryTab({
 
       {/* Medications */}
       <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px' }}>
-        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-capsule me-2 text-primary"></i>Current Medications</h6></div>
+        <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-capsule me-2 text-primary"></i>{t('patients.tabs.summary.currentMeds')}</h6></div>
         <div className="card-body p-0">
           {medications.length ? (
             <table className="table table-sm small mb-0">
-              <thead className="table-light"><tr><th>Medication</th><th>Dose</th><th>Route</th></tr></thead>
+              <thead className="table-light"><tr><th>{t('patients.tabs.summary.thMedication')}</th><th>{t('patients.tabs.summary.thDose')}</th><th>{t('patients.tabs.summary.thRoute')}</th></tr></thead>
               <tbody>
                 {medications.map((m: any, i: number) => (
                   <tr key={i}><td className="fw-semibold">{m.drug}</td><td>{m.dosage || '—'}</td><td>{m.route || '—'}</td></tr>
@@ -260,7 +262,7 @@ export default function SummaryTab({
               </tbody>
             </table>
           ) : (
-            <div className="text-center text-muted small py-3">No medications</div>
+            <div className="text-center text-muted small py-3">{t('patients.tabs.summary.noMedications')}</div>
           )}
         </div>
       </div>
@@ -268,13 +270,13 @@ export default function SummaryTab({
       {/* Vital signs */}
       <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-          <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-danger"></i>Vital Signs (Last 24 hrs)</h6>
-          <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={onViewTrend}><i className="bi bi-graph-up me-1"></i>View Trend</button>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-danger"></i>{t('patients.tabs.summary.vitalsLast24')}</h6>
+          <button className="btn btn-sm btn-outline-primary rounded-pill" onClick={onViewTrend}><i className="bi bi-graph-up me-1"></i>{t('patients.tabs.summary.viewTrend')}</button>
         </div>
         <div className="card-body p-0">
           {vitals.length ? (
             <table className="table table-sm small mb-0">
-              <thead className="table-light"><tr><th>Date/Time</th><th>Temp °F</th><th>HR</th><th>BP</th><th>RR</th><th>SpO₂</th><th>Weight</th></tr></thead>
+              <thead className="table-light"><tr><th>{t('patients.tabs.summary.thDateTime')}</th><th>{t('patients.tabs.summary.thTempF')}</th><th>{t('patients.tabs.summary.thHr')}</th><th>{t('patients.tabs.summary.thBp')}</th><th>{t('patients.tabs.summary.thRr')}</th><th>{t('patients.tabs.summary.thSpo2')}</th><th>{t('patients.tabs.summary.thWeight')}</th></tr></thead>
               <tbody>
                 {vitals.slice(0, 5).map((v: any, i: number) => (
                   <tr key={i}>
@@ -290,7 +292,7 @@ export default function SummaryTab({
               </tbody>
             </table>
           ) : (
-            <div className="text-center text-muted py-3 small">No vitals recorded</div>
+            <div className="text-center text-muted py-3 small">{t('patients.tabs.summary.noVitals')}</div>
           )}
         </div>
       </div>
@@ -299,21 +301,21 @@ export default function SummaryTab({
       <div className="row g-3 mt-1">
         <div className="col-md-7">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-droplet me-2 text-info"></i>Recent Lab Results</h6></div>
+            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-droplet me-2 text-info"></i>{t('patients.tabs.summary.recentLabs')}</h6></div>
             <div className="card-body p-0">
               {labResults.length ? (
                 <table className="table table-sm small mb-0">
-                  <thead className="table-light"><tr><th>Test</th><th>Result</th><th>Units</th><th>Flag</th><th>Status</th><th>Date</th></tr></thead>
+                  <thead className="table-light"><tr><th>{t('patients.tabs.summary.thTest')}</th><th>{t('patients.tabs.summary.thResult')}</th><th>{t('patients.tabs.summary.thUnits')}</th><th>{t('patients.tabs.summary.thFlag')}</th><th>{t('patients.tabs.summary.thStatus')}</th><th>{t('patients.tabs.summary.thDate')}</th></tr></thead>
                   <tbody>
                     {labResults.slice(0, 6).map((r: any, i: number) => (
                       <tr key={i}>
                         <td className="fw-semibold">{r.test_name || r.result_code}</td>
                         <td>{r.result ?? '—'}</td>
                         <td>{r.units || '—'}</td>
-                        <td>{r.abnormal && r.abnormal !== 'N' ? <span className="badge bg-danger">Abn</span> : <span className="text-muted">—</span>}</td>
+                        <td>{r.abnormal && r.abnormal !== 'N' ? <span className="badge bg-danger">{t('patients.tabs.summary.labAbnormal')}</span> : <span className="text-muted">—</span>}</td>
                         <td>
                           {r.order_status === 'validated'
-                            ? <span className="badge bg-primary">Validated</span>
+                            ? <span className="badge bg-primary">{t('patients.tabs.summary.validated')}</span>
                             : r.order_status
                               ? <span className="badge bg-light text-dark border">{r.order_status}</span>
                               : <span className="text-muted">—</span>}
@@ -324,29 +326,29 @@ export default function SummaryTab({
                   </tbody>
                 </table>
               ) : (
-                <div className="text-center text-muted small py-3">No lab results</div>
+                <div className="text-center text-muted small py-3">{t('patients.tabs.summary.noLabResults')}</div>
               )}
             </div>
           </div>
         </div>
         <div className="col-md-5">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-card-checklist me-2 text-success"></i>Active Orders</h6></div>
+            <div className="card-header bg-white py-2"><h6 className="mb-0 fw-bold"><i className="bi bi-card-checklist me-2 text-success"></i>{t('patients.tabs.summary.activeOrders')}</h6></div>
             <div className="card-body p-0">
               {labOrders.length ? (
                 <table className="table table-sm small mb-0">
-                  <thead className="table-light"><tr><th>Order</th><th>Status</th></tr></thead>
+                  <thead className="table-light"><tr><th>{t('patients.tabs.summary.thOrder')}</th><th>{t('patients.tabs.summary.thStatus')}</th></tr></thead>
                   <tbody>
                     {labOrders.slice(0, 6).map((o: any, i: number) => (
                       <tr key={i}>
-                        <td className="fw-semibold">{o.instructions || 'Lab test'}</td>
+                        <td className="fw-semibold">{o.instructions || t('patients.tabs.summary.labTest')}</td>
                         <td><span className="badge bg-light text-dark border">{o.orderStatus || 'pending'}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <div className="text-center text-muted small py-3">No active orders</div>
+                <div className="text-center text-muted small py-3">{t('patients.tabs.summary.noActiveOrders')}</div>
               )}
             </div>
           </div>

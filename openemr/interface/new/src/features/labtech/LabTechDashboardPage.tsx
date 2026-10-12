@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import RecentApprovalsPanel from '../../components/shared/RecentApprovalsPanel';
@@ -87,6 +88,7 @@ function LiveClock({ timezone, label }: { timezone: string; label: string }) {
 
 const statusColors: Record<string, string> = { pending: '#fd7e14', collected: '#0dcaf0', processing: '#6f42c1', completed: '#198754', validated: '#0d6efd', rejected: '#dc3545' };
 export default function LabTechDashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -186,16 +188,16 @@ export default function LabTechDashboardPage() {
           <div>
             <h2 className="mb-1 fw-bold">
               <i className="bi bi-flask me-2"></i>
-              Lab Technician Dashboard
+              {t('labtech.title')}
             </h2>
             <p className="mb-0 text-white text-opacity-75 small">
-              Welcome, {user?.displayName || 'Lab Tech'} — Order Processing & Results Management
+              {t('labtech.welcome', { name: user?.displayName || t('labtech.roleFallback') })}
             </p>
           </div>
           <div className="d-flex align-items-center gap-2">
-            <LiveClock timezone="Africa/Monrovia" label="Monrovia" />
+            <LiveClock timezone="Africa/Monrovia" label={t('midwife.clockMonrovia')} />
             <div className="vr opacity-50"></div>
-            <LiveClock timezone="America/New_York" label="Florida (US)" />
+            <LiveClock timezone="America/New_York" label={t('midwife.clockFlorida')} />
           </div>
         </div>
       </div>
@@ -210,7 +212,7 @@ export default function LabTechDashboardPage() {
                 <i className="bi bi-hourglass-split fs-5" style={{ color: '#0d6efd' }}></i>
               </div>
               <div>
-                <div className="text-muted small">Pending Orders</div>
+                <div className="text-muted small">{t('labtech.kpiPending')}</div>
                 <div className="fw-bold fs-5">{pendingCount}</div>
               </div>
             </div>
@@ -224,7 +226,7 @@ export default function LabTechDashboardPage() {
                 <i className="bi bi-exclamation-triangle fs-5" style={{ color: '#dc3545' }}></i>
               </div>
               <div>
-                <div className="text-muted small">Critical Results</div>
+                <div className="text-muted small">{t('labtech.kpiCritical')}</div>
                 <div className="fw-bold fs-5">{criticalCount}</div>
               </div>
             </div>
@@ -238,7 +240,7 @@ export default function LabTechDashboardPage() {
                 <i className="bi bi-graph-up fs-5" style={{ color: '#fd7e14' }}></i>
               </div>
               <div>
-                <div className="text-muted small">Abnormal</div>
+                <div className="text-muted small">{t('labtech.kpiAbnormal')}</div>
                 <div className="fw-bold fs-5">{abnormalCount}</div>
               </div>
             </div>
@@ -252,7 +254,7 @@ export default function LabTechDashboardPage() {
                 <i className="bi bi-clock-history fs-5" style={{ color: '#198754' }}></i>
               </div>
               <div>
-                <div className="text-muted small">Avg TAT</div>
+                <div className="text-muted small">{t('labtech.kpiAvgTat')}</div>
                 <div className="fw-bold fs-5">{tatStats.avgMinutes}m</div>
               </div>
             </div>
@@ -267,16 +269,16 @@ export default function LabTechDashboardPage() {
             <div className="card-header bg-white py-3 rounded-top-4">
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-graph-up me-2" style={{ color: '#6f42c1' }}></i>
-                Lab Analytics
+                {t('labtech.analytics')}
               </h6>
             </div>
             <div className="card-body">
               <div className="row g-2 mb-3">
                 {[
-                  { v: labOrders?.length || 0, l: 'Total Orders', c: '#0d6efd', i: 'bi-clipboard-check' },
-                  { v: labOrders?.filter((o:any) => o.orderStatus === 'pending').length || 0, l: 'Pending', c: '#fd7e14', i: 'bi-hourglass-split' },
-                  { v: labOrders?.filter((o:any) => o.orderStatus === 'completed').length || 0, l: 'Completed', c: '#198754', i: 'bi-check-circle' },
-                  { v: labOrders?.filter((o:any) => o.hasResults).length || 0, l: 'With Results', c: '#0d6efd', i: 'bi-file-earmark-text' },
+                  { v: labOrders?.length || 0, l: t('labtech.statTotalOrders'), c: '#0d6efd', i: 'bi-clipboard-check' },
+                  { v: labOrders?.filter((o:any) => o.orderStatus === 'pending').length || 0, l: t('labtech.statPending'), c: '#fd7e14', i: 'bi-hourglass-split' },
+                  { v: labOrders?.filter((o:any) => o.orderStatus === 'completed').length || 0, l: t('labtech.statCompleted'), c: '#198754', i: 'bi-check-circle' },
+                  { v: labOrders?.filter((o:any) => o.hasResults).length || 0, l: t('labtech.statWithResults'), c: '#0d6efd', i: 'bi-file-earmark-text' },
                 ].map(s => (
                   <div className="col-6" key={s.l}>
                     <div className="p-2 rounded-3 text-center" style={{ backgroundColor: `${s.c}10` }}>
@@ -286,7 +288,7 @@ export default function LabTechDashboardPage() {
                   </div>
                 ))}
               </div>
-              <small className="fw-bold text-muted text-uppercase">Status Distribution</small>
+              <small className="fw-bold text-muted text-uppercase">{t('labtech.statusDistribution')}</small>
               {['pending','collected','processing','completed'].map(s => {
                 const count = labOrders?.filter((o:any) => o.orderStatus === s).length || 0;
                 const total = labOrders?.length || 1;
@@ -294,7 +296,7 @@ export default function LabTechDashboardPage() {
                 const colors: Record<string,string> = { pending:'#fd7e14', collected:'#0dcaf0', processing:'#6f42c1', completed:'#198754' };
                 return (
                   <div key={s} className="d-flex align-items-center gap-2 mb-1 small">
-                    <span style={{ width: '75px', fontSize: '0.7rem' }}>{s.charAt(0).toUpperCase()+s.slice(1)}</span>
+                    <span style={{ width: '75px', fontSize: '0.7rem' }}>{t(`labtech.status.${s}`)}</span>
                     <div className="flex-grow-1 progress" style={{ height: '5px' }}>
                       <div className="progress-bar" style={{ width: `${pct}%`, backgroundColor: colors[s] || '#6c757d' }}></div>
                     </div>
@@ -313,17 +315,17 @@ export default function LabTechDashboardPage() {
             <div className="card-header bg-white py-3 rounded-top-4 d-flex justify-content-between align-items-center">
               <h6 className="mb-0 fw-bold">
                 <i className="bi bi-list-check me-2" style={{ color: '#fd7e14' }}></i>
-                Pending Lab Orders
+                {t('labtech.pendingOrders')}
               </h6>
               <span className="badge bg-warning text-dark rounded-pill">
-                {groupedPendingOrders.length} patient{groupedPendingOrders.length !== 1 ? 's' : ''} · {pendingOrders.length} tests
+                {t('labtech.patientsCount', { count: groupedPendingOrders.length })} · {t('labtech.testsCount', { count: pendingOrders.length })}
               </span>
             </div>
             <div className="card-body p-0">
               {groupedPendingOrders.length === 0 ? (
                 <div className="text-center py-4 text-muted small">
                   <i className="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>
-                  All orders processed — no pending items
+                  {t('labtech.allProcessed')}
                 </div>
               ) : (
                 <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
@@ -340,44 +342,44 @@ export default function LabTechDashboardPage() {
                         <div className="flex-grow-1 min-w-0">
                           <div className="fw-semibold small text-truncate">{g.patientName}</div>
                           <small className="text-muted" style={{ fontSize: '0.65rem' }}>
-                            PID {g.patientPid ?? g.patientId} · {g.count} test{g.count !== 1 ? 's' : ''}
+                            {t('labtech.pidLine', { pid: g.patientPid ?? g.patientId, count: t('labtech.testsCount', { count: g.count }) })}
                           </small>
                         </div>
                         {g.hasStat && (
                           <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>
-                            <i className="bi bi-exclamation-triangle me-1"></i>STAT
+                            <i className="bi bi-exclamation-triangle me-1"></i>{t('labtech.statBadge')}
                           </span>
                         )}
-                        <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.6rem' }}>{g.pendingCount} pending</span>
+                        <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.6rem' }}>{t('labtech.pendingCount', { count: g.pendingCount })}</span>
                       </div>
                       {/* All labs for this patient */}
                       {g.orders.map((o: any) => (
                         <div key={o.id} className="d-flex align-items-center gap-2 px-3 py-1 ms-3 small"
                           style={{ borderLeft: o.orderPriority === 'stat' ? '3px solid #dc3545' : '3px solid transparent', borderTop: '1px dashed #eee' }}>
                           <div className="flex-grow-1 min-w-0">
-                            <span className="fw-semibold small">{o.instructions || 'Lab Test'}</span>
+                            <span className="fw-semibold small">{o.instructions || t('labtech.labTest')}</span>
                             <span className="text-muted ms-2" style={{ fontSize: '0.65rem' }}>{formatDateHuman(o.dateOrdered)}</span>
                             <div className="mt-1"><Barcode seed={o.specimenId || `LAB-${o.id}`} width={90} height={26} /></div>
                           </div>
                           <span className={`badge rounded-pill ${o.orderPriority === 'stat' ? 'bg-danger' : 'bg-light text-dark'}`} style={{ fontSize: '0.6rem' }}>
-                            {o.orderPriority || 'routine'}
+                            {o.orderPriority || t('labtech.priorityRoutine')}
                           </span>
                           {o.billingHeld && (
-                            <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }} title="Billing hold — clear the bill before collecting">
-                              <i className="bi bi-lock-fill me-1"></i>Hold
+                            <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }} title={t('labtech.holdTitle')}>
+                              <i className="bi bi-lock-fill me-1"></i>{t('labtech.hold')}
                             </span>
                           )}
                           <span className="badge rounded-pill" style={{
                             backgroundColor: (statusColors as any)[o.orderStatus] || '#fd7e14',
                             color: '#fff', fontSize: '0.6rem',
                           }}>
-                            {o.orderStatus || 'pending'}
+                            {o.orderStatus || t('labtech.status.pending')}
                           </span>
                           <button className="btn btn-outline-danger btn-sm py-0 px-1 rounded-pill"
                             style={{ fontSize: '0.55rem' }}
                             onClick={() => updateStatus.mutate({ id: o.id, status: 'rejected' })}
                             disabled={cancelOrder.isPending}
-                            title="Reject">
+                            title={t('labtech.reject')}>
                             <i className="bi bi-x-circle"></i>
                           </button>
                         </div>
@@ -399,17 +401,17 @@ export default function LabTechDashboardPage() {
               <div className="card-header bg-white py-3 rounded-top-4 d-flex justify-content-between align-items-center">
                 <h6 className="mb-0 fw-bold">
                   <i className="bi bi-clipboard-data me-2" style={{ color: '#198754' }}></i>
-                  Recent Results
+                  {t('labtech.recentResults')}
                 </h6>
                 <span className="badge rounded-pill" style={{ backgroundColor: '#198754', fontSize: '0.7rem' }}>
-                  {groupedCompleted.length} patient{groupedCompleted.length !== 1 ? 's' : ''} · {completedCount} result{completedCount !== 1 ? 's' : ''}
+                  {t('labtech.patientsCount', { count: groupedCompleted.length })} · {t('labtech.resultsCount', { count: completedCount })}
                 </span>
               </div>
               <div className="card-body p-0">
                 {groupedCompleted.length === 0 ? (
                   <div className="text-center py-4 text-muted small">
                     <i className="bi bi-clipboard-x fs-3 d-block mb-2"></i>
-                    No results recorded yet
+                    {t('labtech.noResults')}
                   </div>
                 ) : (
                   <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -426,21 +428,21 @@ export default function LabTechDashboardPage() {
                           <div className="flex-grow-1 min-w-0">
                             <div className="fw-semibold small text-truncate">{g.patientName}</div>
                             <small className="text-muted" style={{ fontSize: '0.65rem' }}>
-                              PID {g.patientPid ?? g.patientId} · {g.count} result{g.count !== 1 ? 's' : ''}
+                              {t('labtech.pidLine', { pid: g.patientPid ?? g.patientId, count: t('labtech.resultsCount', { count: g.count }) })}
                             </small>
                           </div>
-                          <span className="badge bg-success rounded-pill" style={{ fontSize: '0.6rem' }}>✓ {g.completedCount} done</span>
+                          <span className="badge bg-success rounded-pill" style={{ fontSize: '0.6rem' }}>{t('labtech.doneCount', { count: g.completedCount })}</span>
                         </div>
                         {/* Results for this patient */}
                         {g.orders.map((o: any, i: number) => (
                           <div key={o.id || i} className="d-flex align-items-center gap-2 px-3 py-1 ms-3 small" style={{ borderTop: '1px dashed #eee' }}>
                             <div className="flex-grow-1 min-w-0">
-                              <span className="fw-semibold small">{o.instructions || 'Lab Test'}</span>
+                              <span className="fw-semibold small">{o.instructions || t('labtech.labTest')}</span>
                               <span className="text-muted ms-2" style={{ fontSize: '0.65rem' }}>{formatDateHuman(o.dateOrdered)}</span>
                             </div>
                             <span className={`badge rounded-pill ${o.hasResults ? 'bg-success' : 'bg-warning text-dark'}`}
                               style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}>
-                              {o.hasResults ? '✓ Done' : o.orderStatus}
+                              {o.hasResults ? t('labtech.done') : o.orderStatus}
                             </span>
                           </div>
                         ))}

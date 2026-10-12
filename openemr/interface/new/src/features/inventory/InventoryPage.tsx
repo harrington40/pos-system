@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -76,9 +77,10 @@ const fmtDateTime = (d: string | null) => (d ? new Date(d).toLocaleString('en-US
 const money = (v: number | null | undefined) =>
   v == null ? '—' : `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const errMsg = (err: any) => err?.response?.data?.message || err?.message || 'Something went wrong';
+const errMsg = (err: any, fallback: string) => err?.response?.data?.message || err?.message || fallback;
 
 function CategoryDonut({ data }: { data: { category: string; count: number }[] }) {
+  const { t } = useTranslation();
   const total = data.reduce((s, d) => s + d.count, 0);
   const R = 42;
   const C = 2 * Math.PI * R;
@@ -105,7 +107,7 @@ function CategoryDonut({ data }: { data: { category: string; count: number }[] }
           />
         ))}
         <text x="60" y="58" textAnchor="middle" fontSize="18" fontWeight="700" fill="#212529">{total}</text>
-        <text x="60" y="72" textAnchor="middle" fontSize="9" fill="#6c757d">items</text>
+        <text x="60" y="72" textAnchor="middle" fontSize="9" fill="#6c757d">{t('inventory.items')}</text>
       </svg>
       <div className="flex-grow-1" style={{ minWidth: '150px' }}>
         {data.map((d) => (
@@ -128,6 +130,7 @@ interface ActionForm {
 }
 
 export default function InventoryPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -202,13 +205,13 @@ export default function InventoryPage() {
   // ── Mutations ──────────────────────────────────────────────────────────
   const createMut = useMutation({
     mutationFn: (data: any) => createInventoryItem(data),
-    onSuccess: () => { invalidate(); setShowAdd(false); pushToast('Inventory item created'); },
-    onError: (e) => pushToast(errMsg(e), 'danger'),
+    onSuccess: () => { invalidate(); setShowAdd(false); pushToast(t('inventory.toasts.created')); },
+    onError: (e) => pushToast(errMsg(e, t('inventory.errGeneric')), 'danger'),
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateInventoryItem(id, data),
-    onSuccess: () => { invalidate(); setEditItem(null); pushToast('Inventory item updated'); },
-    onError: (e) => pushToast(errMsg(e), 'danger'),
+    onSuccess: () => { invalidate(); setEditItem(null); pushToast(t('inventory.toasts.updated')); },
+    onError: (e) => pushToast(errMsg(e, t('inventory.errGeneric')), 'danger'),
   });
   const stockMut = useMutation({
     mutationFn: ({ id, type, data }: { id: number; type: string; data: any }) => {
@@ -221,14 +224,14 @@ export default function InventoryPage() {
     onSuccess: () => {
       invalidate();
       setAction(null);
-      pushToast('Stock transaction recorded');
+      pushToast(t('inventory.toasts.transaction'));
     },
-    onError: (e) => pushToast(errMsg(e), 'danger'),
+    onError: (e) => pushToast(errMsg(e, t('inventory.errGeneric')), 'danger'),
   });
   const scanMut = useMutation({
     mutationFn: (code: string) => lookupInventoryBarcode(code),
     onSuccess: (item) => { setDetailId(item.id); setScan(''); },
-    onError: (e) => pushToast(errMsg(e), 'danger'),
+    onError: (e) => pushToast(errMsg(e, t('inventory.errGeneric')), 'danger'),
   });
   const importMut = useMutation({
     mutationFn: ({ file, currency }: { file: File; currency: string }) => importInventoryPriceList(file, currency),
@@ -236,9 +239,9 @@ export default function InventoryPage() {
       setImportResult(res);
       invalidate();
       queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
-      pushToast('Price list imported and applied system-wide');
+      pushToast(t('inventory.toasts.priceImported'));
     },
-    onError: (e) => pushToast(errMsg(e), 'danger'),
+    onError: (e) => pushToast(errMsg(e, t('inventory.errGeneric')), 'danger'),
   });
 
   const applyFilter = (patch: Partial<typeof filters>) => {
@@ -249,11 +252,11 @@ export default function InventoryPage() {
   const totalPages = list ? Math.max(1, Math.ceil(list.total / list.pageSize)) : 1;
 
   const kpis = [
-    { label: 'Total Items', value: dashboard?.summary.total ?? '—', icon: 'bi-box-seam', color: '#0d6efd', bg: '#0d6efd15', click: null as null | string },
-    { label: 'Low Stock', value: dashboard?.summary.lowStock ?? '—', icon: 'bi-exclamation-triangle', color: '#fd7e14', bg: '#fd7e1415', click: 'LOW_STOCK' },
-    { label: 'Out of Stock', value: dashboard?.summary.outOfStock ?? '—', icon: 'bi-x-circle', color: '#dc3545', bg: '#dc354515', click: 'OUT_OF_STOCK' },
-    { label: 'Expiring Soon', value: dashboard?.summary.expiringSoon ?? '—', icon: 'bi-hourglass-split', color: '#0dcaf0', bg: '#0dcaf015', click: 'EXPIRING_SOON' },
-    { label: 'Inventory Value', value: money(dashboard?.summary.inventoryValue), icon: 'bi-cash-stack', color: '#198754', bg: '#19875415', click: null },
+    { label: t('inventory.stats.totalItems'), value: dashboard?.summary.total ?? '—', icon: 'bi-box-seam', color: '#0d6efd', bg: '#0d6efd15', click: null as null | string },
+    { label: t('inventory.stats.lowStock'), value: dashboard?.summary.lowStock ?? '—', icon: 'bi-exclamation-triangle', color: '#fd7e14', bg: '#fd7e1415', click: 'LOW_STOCK' },
+    { label: t('inventory.stats.outOfStock'), value: dashboard?.summary.outOfStock ?? '—', icon: 'bi-x-circle', color: '#dc3545', bg: '#dc354515', click: 'OUT_OF_STOCK' },
+    { label: t('inventory.stats.expiringSoon'), value: dashboard?.summary.expiringSoon ?? '—', icon: 'bi-hourglass-split', color: '#0dcaf0', bg: '#0dcaf015', click: 'EXPIRING_SOON' },
+    { label: t('inventory.stats.inventoryValue'), value: money(dashboard?.summary.inventoryValue), icon: 'bi-cash-stack', color: '#198754', bg: '#19875415', click: null },
   ];
 
   return (
@@ -298,16 +301,16 @@ export default function InventoryPage() {
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '7rem', transform: 'rotate(10deg) translate(20px,-15px)' }}><i className="bi bi-box-seam"></i></div>
         <div className="position-relative d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
-            <h3 className="mb-1 fw-bold"><i className="bi bi-boxes me-2"></i>Inventory Management</h3>
-            <p className="mb-0 text-white text-opacity-75 small">Track stock, expiry, and movements across departments.</p>
+            <h3 className="mb-1 fw-bold"><i className="bi bi-boxes me-2"></i>{t('inventory.title')}</h3>
+            <p className="mb-0 text-white text-opacity-75 small">{t('inventory.subtitle')}</p>
           </div>
           {canManage && (
             <div className="d-flex gap-2 flex-wrap">
               <button className="btn btn-light btn-sm rounded-pill fw-semibold" onClick={() => { setShowImport(true); setImportResult(null); }}>
-                <i className="bi bi-cloud-upload me-1"></i>Import Price List
+                <i className="bi bi-cloud-upload me-1"></i>{t('inventory.importPriceList')}
               </button>
               <button className="btn btn-light btn-sm rounded-pill fw-semibold" onClick={() => { setEditItem(null); setShowAdd(true); }}>
-                <i className="bi bi-plus-lg me-1"></i>Add Inventory Item
+                <i className="bi bi-plus-lg me-1"></i>{t('inventory.addItem')}
               </button>
             </div>
           )}
@@ -320,7 +323,7 @@ export default function InventoryPage() {
           <span className="input-group-text"><i className="bi bi-upc-scan"></i></span>
           <input
             className="form-control"
-            placeholder="Scan barcode / SKU then press Enter"
+            placeholder={t('inventory.scanPlaceholder')}
             value={scan}
             onChange={(e) => setScan(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && scan.trim()) scanMut.mutate(scan.trim()); }}
@@ -329,7 +332,7 @@ export default function InventoryPage() {
         {scanMut.isPending && <span className="spinner-border spinner-border-sm text-primary" />}
         {scan && (
           <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setScan('')}>
-            <i className="bi bi-x-lg me-1"></i>Clear
+            <i className="bi bi-x-lg me-1"></i>{t('inventory.clear')}
           </button>
         )}
       </div>
@@ -345,7 +348,7 @@ export default function InventoryPage() {
           ['reports', 'Forecast & Accounting', 'bi-graph-up'],
         ] as [string, string, string][]).map(([id, label, icon]) => (
           <button key={id} className={`btn btn-sm rounded-pill ${activeTab === id ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setActiveTab(id)}>
-            <i className={`bi ${icon} me-1`}></i>{label}
+            <i className={`bi ${icon} me-1`}></i>{t('inventory.tabs.' + id, { defaultValue: label })}
           </button>
         ))}
       </div>
@@ -376,11 +379,11 @@ export default function InventoryPage() {
         <div className="col-lg-5">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-success"></i>Inventory Health</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-success"></i>{t('inventory.healthTitle')}</h6>
             </div>
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-end mb-1">
-                <span className="small text-muted">In stock</span>
+                <span className="small text-muted">{t('inventory.inStock')}</span>
                 <strong>{dashboard?.health.inStockPercent ?? 0}%</strong>
               </div>
               <div className="progress mb-3" style={{ height: '10px', borderRadius: '8px' }}>
@@ -388,10 +391,10 @@ export default function InventoryPage() {
               </div>
               <div className="row g-2 text-center">
                 {[
-                  { l: 'In Stock', v: dashboard?.health.inStockCount ?? 0, c: '#198754' },
-                  { l: 'Low Stock', v: dashboard?.health.lowStockCount ?? 0, c: '#fd7e14' },
-                  { l: 'Out of Stock', v: dashboard?.health.outOfStockCount ?? 0, c: '#dc3545' },
-                  { l: 'Expired', v: dashboard?.health.expiredCount ?? 0, c: '#212529' },
+                  { l: t('inventory.inStockLabel'), v: dashboard?.health.inStockCount ?? 0, c: '#198754' },
+                  { l: t('inventory.stats.lowStock'), v: dashboard?.health.lowStockCount ?? 0, c: '#fd7e14' },
+                  { l: t('inventory.stats.outOfStock'), v: dashboard?.health.outOfStockCount ?? 0, c: '#dc3545' },
+                  { l: t('inventory.expiredLabel'), v: dashboard?.health.expiredCount ?? 0, c: '#212529' },
                 ].map((s) => (
                   <div className="col-3" key={s.l}>
                     <div className="rounded-3 py-2" style={{ backgroundColor: `${s.c}12` }}>
@@ -407,10 +410,10 @@ export default function InventoryPage() {
         <div className="col-lg-7">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-pie-chart me-2 text-primary"></i>Inventory by Category</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-pie-chart me-2 text-primary"></i>{t('inventory.byCategory')}</h6>
             </div>
             <div className="card-body">
-              {dashLoading ? <div className="text-center py-4 text-muted">Loading…</div> : <CategoryDonut data={dashboard?.byCategory || []} />}
+              {dashLoading ? <div className="text-center py-4 text-muted">{t('inventory.loading')}</div> : <CategoryDonut data={dashboard?.byCategory || []} />}
             </div>
           </div>
         </div>
@@ -421,14 +424,14 @@ export default function InventoryPage() {
         <div className="col-lg-7">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-exclamation-triangle me-2 text-warning"></i>Low Stock</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-exclamation-triangle me-2 text-warning"></i>{t('inventory.stats.lowStock')}</h6>
               <button className="btn btn-outline-warning btn-sm rounded-pill" onClick={() => applyFilter({ stockStatus: '', expiration: '', category: '', department: '', search: '' })}>
                 View All Low Stock
               </button>
             </div>
             <div className="card-body p-0">
               {(dashboard?.lowStock || []).length === 0 ? (
-                <div className="text-center text-muted py-4 small">No low-stock items</div>
+                <div className="text-center text-muted py-4 small">{t('inventory.noLowStock')}</div>
               ) : (
                 (dashboard?.lowStock || []).map((it) => (
                   <div key={it.id} className="d-flex align-items-center gap-3 px-3 py-2 border-bottom" style={{ cursor: 'pointer' }} onClick={() => setDetailId(it.id)}>
@@ -451,14 +454,14 @@ export default function InventoryPage() {
         <div className="col-lg-5">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-calendar-x me-2 text-info"></i>Expiration Alerts</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-calendar-x me-2 text-info"></i>{t('inventory.expirationAlerts')}</h6>
             </div>
             <div className="card-body p-0">
               {[
-                { label: 'Expiring within 30 days', items: dashboard?.expiring.within30 || [], color: '#dc3545' },
-                { label: 'Expiring within 60 days', items: dashboard?.expiring.within60 || [], color: '#fd7e14' },
-                { label: 'Expiring within 90 days', items: dashboard?.expiring.within90 || [], color: '#ffc107' },
-                { label: 'Expired', items: dashboard?.expiring.expired || [], color: '#212529' },
+                { label: t('inventory.expiring.within30'), items: dashboard?.expiring.within30 || [], color: '#dc3545' },
+                { label: t('inventory.expiring.within60'), items: dashboard?.expiring.within60 || [], color: '#fd7e14' },
+                { label: t('inventory.expiring.within90'), items: dashboard?.expiring.within90 || [], color: '#ffc107' },
+                { label: t('inventory.expiring.expired'), items: dashboard?.expiring.expired || [], color: '#212529' },
               ].map((g) => (
                 <div key={g.label} className="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
                   <span className="rounded-circle flex-shrink-0" style={{ width: '10px', height: '10px', backgroundColor: g.color }}></span>
@@ -480,16 +483,16 @@ export default function InventoryPage() {
       {/* Recent activity */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-          <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-secondary"></i>Recent Inventory Activity</h6>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-secondary"></i>{t('inventory.recentActivity')}</h6>
         </div>
         <div className="card-body p-0">
           {(dashboard?.recentActivity || []).length === 0 ? (
-            <div className="text-center text-muted py-4 small">No activity recorded</div>
+            <div className="text-center text-muted py-4 small">{t('inventory.noActivity')}</div>
           ) : (
             <div className="table-responsive">
               <table className="table table-hover small mb-0 align-middle">
                 <thead className="table-light"><tr>
-                  <th>Action</th><th>Item</th><th className="text-end">Qty</th><th>User</th><th>Location</th><th>Date / Time</th>
+                  <th>{t('inventory.activityCols.action')}</th><th>{t('inventory.activityCols.item')}</th><th className="text-end">{t('inventory.activityCols.qty')}</th><th>{t('inventory.activityCols.user')}</th><th>{t('inventory.activityCols.location')}</th><th>{t('inventory.activityCols.dateTime')}</th>
                 </tr></thead>
                 <tbody>
                   {(dashboard?.recentActivity || []).map((t: InventoryTransaction) => (
@@ -512,7 +515,7 @@ export default function InventoryPage() {
       {/* Main inventory table */}
       <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-          <h6 className="mb-0 fw-bold"><i className="bi bi-list-ul me-2 text-primary"></i>Inventory Items</h6>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-list-ul me-2 text-primary"></i>{t('inventory.itemsTitle')}</h6>
         </div>
         <div className="card-body">
           {/* Toolbar */}
@@ -520,37 +523,37 @@ export default function InventoryPage() {
             <div className="col-md-4">
               <div className="input-group input-group-sm">
                 <span className="input-group-text bg-white border-end-0"><i className="bi bi-search text-muted"></i></span>
-                <input className="form-control border-start-0" placeholder="Search item, SKU, lot, supplier…" value={filters.search}
+                <input className="form-control border-start-0" placeholder={t('inventory.searchPlaceholder')} value={filters.search}
                   onChange={(e) => applyFilter({ search: e.target.value })} />
               </div>
             </div>
             <div className="col-6 col-md-2">
               <select className="form-select form-select-sm" value={filters.category} onChange={(e) => applyFilter({ category: e.target.value })}>
-                <option value="">All categories</option>
+                <option value="">{t('inventory.allCategories')}</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="col-6 col-md-2">
               <select className="form-select form-select-sm" value={filters.department} onChange={(e) => applyFilter({ department: e.target.value })}>
-                <option value="">All departments</option>
+                <option value="">{t('inventory.allDepartments')}</option>
                 {departments.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div className="col-6 col-md-2">
               <select className="form-select form-select-sm" value={filters.stockStatus} onChange={(e) => applyFilter({ stockStatus: e.target.value })}>
-                <option value="">All stock status</option>
-                <option value="IN_STOCK">In Stock</option>
-                <option value="LOW_STOCK">Low Stock</option>
-                <option value="OUT_OF_STOCK">Out of Stock</option>
+                <option value="">{t('inventory.allStockStatus')}</option>
+                <option value="IN_STOCK">{t('inventory.inStockLabel')}</option>
+                <option value="LOW_STOCK">{t('inventory.stats.lowStock')}</option>
+                <option value="OUT_OF_STOCK">{t('inventory.stats.outOfStock')}</option>
               </select>
             </div>
             <div className="col-6 col-md-2">
               <select className="form-select form-select-sm" value={filters.expiration} onChange={(e) => applyFilter({ expiration: e.target.value })}>
-                <option value="">All expiration</option>
-                <option value="EXPIRING_SOON">Expiring Soon</option>
-                <option value="EXPIRED">Expired</option>
-                <option value="OK">Valid</option>
-                <option value="NO_EXPIRATION">No Expiration</option>
+                <option value="">{t('inventory.allExpiration')}</option>
+                <option value="EXPIRING_SOON">{t('inventory.expiringSoonOpt')}</option>
+                <option value="EXPIRED">{t('inventory.expiredLabel')}</option>
+                <option value="OK">{t('inventory.valid')}</option>
+                <option value="NO_EXPIRATION">{t('inventory.noExpiration')}</option>
               </select>
             </div>
           </div>
@@ -567,9 +570,9 @@ export default function InventoryPage() {
                 <table className="table table-hover small align-middle mb-0">
                   <thead className="table-light">
                     <tr>
-                      <th>Item</th><th>SKU</th><th>Category</th><th>Department</th><th>Location</th>
-                      <th className="text-end">Qty</th><th className="text-end">Min</th><th>Unit</th>
-                      <th>Lot</th><th>Expiration</th><th>Status</th><th></th>
+                      <th>{t('inventory.itemCols.item')}</th><th>{t('inventory.itemCols.sku')}</th><th>{t('inventory.itemCols.category')}</th><th>{t('inventory.itemCols.department')}</th><th>{t('inventory.itemCols.location')}</th>
+                      <th className="text-end">{t('inventory.itemCols.qty')}</th><th className="text-end">{t('inventory.itemCols.min')}</th><th>{t('inventory.itemCols.unit')}</th>
+                      <th>{t('inventory.itemCols.lot')}</th><th>{t('inventory.itemCols.expiration')}</th><th>{t('inventory.itemCols.status')}</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -587,7 +590,7 @@ export default function InventoryPage() {
                         <td className="text-nowrap">{fmtDate(it.expiration_date)}</td>
                         <td><StatusBadge status={it.status} /></td>
                         <td className="text-nowrap text-end">
-                          <button className="btn btn-outline-secondary btn-sm" onClick={(e) => { e.stopPropagation(); setDetailId(it.id); }} title="View details"><i className="bi bi-eye" /></button>
+                          <button className="btn btn-outline-secondary btn-sm" onClick={(e) => { e.stopPropagation(); setDetailId(it.id); }} title={t('inventory.viewDetails')}><i className="bi bi-eye" /></button>
                           {canManage && (
                             <button className="btn btn-outline-secondary btn-sm ms-1" onClick={(e) => { e.stopPropagation(); setEditItem(it); setShowAdd(true); }} title="Edit"><i className="bi bi-pencil" /></button>
                           )}
@@ -658,18 +661,18 @@ export default function InventoryPage() {
               </div>
               <div className="row g-2 small">
                 {[
-                  ['Current Qty', `${detail.current_quantity} ${detail.unit || ''}`],
-                  ['Minimum', `${detail.minimum_quantity} ${detail.unit || ''}`],
-                  ['Unit Cost', money(detail.unit_cost)],
-                  ['Department', detail.department || '—'],
-                  ['Storage', detail.storage_location || '—'],
-                  ['Supplier', detail.supplier || '—'],
-                  ['Lot / Batch', detail.lot_number || '—'],
-                  ['Barcode', detail.barcode || '—'],
-                  ['RFID Tag', detail.rfid_tag || '—'],
-                  ['Expiration', fmtDate(detail.expiration_date)],
-                  ['Created', fmtDateTime(detail.created_at)],
-                  ['Last Updated', fmtDateTime(detail.updated_at)],
+                  [t('inventory.detail.currentQty'), `${detail.current_quantity} ${detail.unit || ''}`],
+                  [t('inventory.detail.minimum'), `${detail.minimum_quantity} ${detail.unit || ''}`],
+                  [t('inventory.detail.unitCost'), money(detail.unit_cost)],
+                  [t('inventory.detail.department'), detail.department || '—'],
+                  [t('inventory.detail.storage'), detail.storage_location || '—'],
+                  [t('inventory.detail.supplier'), detail.supplier || '—'],
+                  [t('inventory.detail.lotBatch'), detail.lot_number || '—'],
+                  [t('inventory.detail.barcode'), detail.barcode || '—'],
+                  [t('inventory.detail.rfidTag'), detail.rfid_tag || '—'],
+                  [t('inventory.detail.expiration'), fmtDate(detail.expiration_date)],
+                  [t('inventory.detail.created'), fmtDateTime(detail.created_at)],
+                  [t('inventory.detail.lastUpdated'), fmtDateTime(detail.updated_at)],
                 ].map(([l, v]) => (
                   <div className="col-6" key={l}>
                     <div className="text-muted" style={{ fontSize: '0.68rem' }}>{l}</div>
@@ -689,23 +692,23 @@ export default function InventoryPage() {
 
             {/* Actions */}
             <div className="p-3 border-bottom">
-              <small className="text-muted d-block mb-2 text-uppercase fw-semibold" style={{ fontSize: '0.68rem' }}>Stock Actions</small>
+              <small className="text-muted d-block mb-2 text-uppercase fw-semibold" style={{ fontSize: '0.68rem' }}>{t('inventory.detail.stockActions')}</small>
               <div className="d-flex flex-wrap gap-1">
-                {canReceive && <button className="btn btn-outline-success btn-sm" onClick={() => setAction({ type: 'receive', item: detail })}><i className="bi bi-box-arrow-in-down me-1"></i>Receive</button>}
-                {canIssue && <button className="btn btn-outline-danger btn-sm" onClick={() => setAction({ type: 'issue', item: detail })}><i className="bi bi-box-arrow-up me-1"></i>Issue</button>}
-                {canTransfer && <button className="btn btn-outline-primary btn-sm" onClick={() => setAction({ type: 'transfer', item: detail })}><i className="bi bi-arrow-left-right me-1"></i>Transfer</button>}
-                {canReturn && <button className="btn btn-outline-secondary btn-sm" onClick={() => setAction({ type: 'return', item: detail })}><i className="bi bi-arrow-return-left me-1"></i>Return</button>}
-                {canAdjust && <button className="btn btn-outline-warning btn-sm" onClick={() => setAction({ type: 'adjust', item: detail })}><i className="bi bi-sliders me-1"></i>Adjust</button>}
-                {canManage && <button className="btn btn-outline-secondary btn-sm" onClick={() => { setEditItem(detail); setShowAdd(true); }}><i className="bi bi-pencil me-1"></i>Edit</button>}
+                {canReceive && <button className="btn btn-outline-success btn-sm" onClick={() => setAction({ type: 'receive', item: detail })}><i className="bi bi-box-arrow-in-down me-1"></i>{t('inventory.actions.receive')}</button>}
+                {canIssue && <button className="btn btn-outline-danger btn-sm" onClick={() => setAction({ type: 'issue', item: detail })}><i className="bi bi-box-arrow-up me-1"></i>{t('inventory.actions.issue')}</button>}
+                {canTransfer && <button className="btn btn-outline-primary btn-sm" onClick={() => setAction({ type: 'transfer', item: detail })}><i className="bi bi-arrow-left-right me-1"></i>{t('inventory.actions.transfer')}</button>}
+                {canReturn && <button className="btn btn-outline-secondary btn-sm" onClick={() => setAction({ type: 'return', item: detail })}><i className="bi bi-arrow-return-left me-1"></i>{t('inventory.actions.return')}</button>}
+                {canAdjust && <button className="btn btn-outline-warning btn-sm" onClick={() => setAction({ type: 'adjust', item: detail })}><i className="bi bi-sliders me-1"></i>{t('inventory.actions.adjust')}</button>}
+                {canManage && <button className="btn btn-outline-secondary btn-sm" onClick={() => { setEditItem(detail); setShowAdd(true); }}><i className="bi bi-pencil me-1"></i>{t('common.edit')}</button>}
               </div>
             </div>
 
             {/* Transaction history */}
             <div className="flex-grow-1 overflow-auto">
               <div className="p-3">
-                <small className="text-muted d-block mb-2 text-uppercase fw-semibold" style={{ fontSize: '0.68rem' }}>Transaction History</small>
+                <small className="text-muted d-block mb-2 text-uppercase fw-semibold" style={{ fontSize: '0.68rem' }}>{t('inventory.detail.transactionHistory')}</small>
                 {detailTx.length === 0 ? (
-                  <div className="text-center text-muted small py-3">No transactions recorded</div>
+                  <div className="text-center text-muted small py-3">{t('inventory.detail.noTransactions')}</div>
                 ) : (
                   detailTx.map((t: InventoryTransaction) => (
                     <div key={t.id} className="d-flex gap-2 py-2 border-bottom small">
@@ -772,6 +775,7 @@ function ItemFormModal({ item, busy, onClose, onSubmit }: {
   onClose: () => void;
   onSubmit: (data: any) => void;
 }) {
+  const { t } = useTranslation();
   const [f, setF] = useState<any>(() => (item ? {
     item_name: item.item_name, item_code: item.item_code || '', description: item.description || '',
     category: item.category, department: item.department || '', storage_location: item.storage_location || '',
@@ -785,8 +789,8 @@ function ItemFormModal({ item, busy, onClose, onSubmit }: {
   const set = (k: string, v: any) => setF((prev: any) => ({ ...prev, [k]: v }));
 
   const submit = () => {
-    if (!f.item_name.trim()) { alert('Item name is required'); return; }
-    if (!f.category) { alert('Category is required'); return; }
+    if (!f.item_name.trim()) { alert(t('inventory.alerts.itemNameRequired')); return; }
+    if (!f.category) { alert(t('inventory.alerts.categoryRequired')); return; }
     onSubmit({
       item_name: f.item_name.trim(),
       item_code: f.item_code.trim(),
@@ -813,54 +817,54 @@ function ItemFormModal({ item, busy, onClose, onSubmit }: {
       <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div className="modal-content" style={{ borderRadius: '18px' }}>
           <div className="modal-header">
-            <h6 className="modal-title fw-bold">{item ? 'Edit Inventory Item' : 'Add Inventory Item'}</h6>
+            <h6 className="modal-title fw-bold">{item ? t('inventory.itemModal.editTitle') : t('inventory.itemModal.addTitle')}</h6>
             <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
           <div className="modal-body">
             <div className="row g-2">
-              <div className="col-md-6"><label className="form-label small mb-0">Item Name *</label>
+              <div className="col-md-6"><label className="form-label small mb-0">{t('inventory.itemModal.itemName')}</label>
                 <input className="form-control form-control-sm" value={f.item_name} onChange={(e) => set('item_name', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Item Code / SKU</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.itemCode')}</label>
                 <input className="form-control form-control-sm" value={f.item_code} onChange={(e) => set('item_code', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Category *</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.category')}</label>
                 <select className="form-select form-select-sm" value={f.category} onChange={(e) => set('category', e.target.value)}>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Department</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.itemModal.department')}</label>
                 <select className="form-select form-select-sm" value={f.department} onChange={(e) => set('department', e.target.value)}>
                   <option value="">—</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Storage Location</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.itemModal.storageLocation')}</label>
                 <input className="form-control form-control-sm" value={f.storage_location} onChange={(e) => set('storage_location', e.target.value)} /></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Unit</label>
-                <input className="form-control form-control-sm" placeholder="e.g. boxes, capsules" value={f.unit} onChange={(e) => set('unit', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">{item ? 'Current Qty' : 'Quantity'}</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.itemModal.unit')}</label>
+                <input className="form-control form-control-sm" placeholder={t('inventory.itemModal.unitPlaceholder')} value={f.unit} onChange={(e) => set('unit', e.target.value)} /></div>
+              <div className="col-md-3"><label className="form-label small mb-0">{item ? t('inventory.detail.currentQty') : t('inventory.itemModal.quantity')}</label>
                 <input type="number" min="0" className="form-control form-control-sm" value={f.quantity} onChange={(e) => set('quantity', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Minimum Qty</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.minimumQty')}</label>
                 <input type="number" min="0" className="form-control form-control-sm" value={f.minimum_quantity} onChange={(e) => set('minimum_quantity', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Reorder Qty</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.reorderQty')}</label>
                 <input type="number" min="0" className="form-control form-control-sm" value={f.reorder_quantity} onChange={(e) => set('reorder_quantity', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Unit Cost</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.unitCost')}</label>
                 <input type="number" min="0" step="0.01" className="form-control form-control-sm" value={f.unit_cost} onChange={(e) => set('unit_cost', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Lot / Batch</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.lotBatch')}</label>
                 <input className="form-control form-control-sm" value={f.lot_number} onChange={(e) => set('lot_number', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Barcode</label>
-                <input className="form-control form-control-sm" placeholder="Auto if blank" value={f.barcode} onChange={(e) => set('barcode', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">RFID Tag</label>
-                <input className="form-control form-control-sm" placeholder="Optional" value={f.rfid_tag} onChange={(e) => set('rfid_tag', e.target.value)} /></div>
-              <div className="col-md-6"><label className="form-label small mb-0">Supplier</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.barcode')}</label>
+                <input className="form-control form-control-sm" placeholder={t('inventory.itemModal.barcodePlaceholder')} value={f.barcode} onChange={(e) => set('barcode', e.target.value)} /></div>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.rfidTag')}</label>
+                <input className="form-control form-control-sm" placeholder={t('inventory.itemModal.rfidPlaceholder')} value={f.rfid_tag} onChange={(e) => set('rfid_tag', e.target.value)} /></div>
+              <div className="col-md-6"><label className="form-label small mb-0">{t('inventory.itemModal.supplier')}</label>
                 <input className="form-control form-control-sm" value={f.supplier} onChange={(e) => set('supplier', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Expiration Date</label>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.expirationDate')}</label>
                 <input type="date" className="form-control form-control-sm" value={f.expiration_date} onChange={(e) => set('expiration_date', e.target.value)} />
-                <small className="text-muted" style={{ fontSize: '0.65rem' }}>Leave blank for non-expiring items (e.g. equipment)</small></div>
-              <div className="col-md-3"><label className="form-label small mb-0">Description</label>
+                <small className="text-muted" style={{ fontSize: '0.65rem' }}>{t('inventory.itemModal.noExpirationHint')}</small></div>
+              <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.itemModal.description')}</label>
                 <input className="form-control form-control-sm" value={f.description} onChange={(e) => set('description', e.target.value)} /></div>
-              <div className="col-md-12"><label className="form-label small mb-0">Notes</label>
+              <div className="col-md-12"><label className="form-label small mb-0">{t('inventory.itemModal.notes')}</label>
                 <textarea className="form-control form-control-sm" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></div>
             </div>
           </div>
           <div className="modal-footer">
-            <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>Cancel</button>
+            <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>{t('common.cancel')}</button>
             <button className="btn btn-primary btn-sm" onClick={submit} disabled={busy}>
               {busy ? <span className="spinner-border spinner-border-sm" /> : item ? 'Save Changes' : 'Add Item'}
             </button>
@@ -879,6 +883,7 @@ function PriceImportModal({ busy, result, onClose, onImport }: {
   onClose: () => void;
   onImport: (file: File, currency: string) => void;
 }) {
+  const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [currency, setCurrency] = useState('LRD');
 
@@ -887,38 +892,38 @@ function PriceImportModal({ busy, result, onClose, onImport }: {
       <div className="modal-dialog modal-lg modal-dialog-scrollable">
         <div className="modal-content" style={{ borderRadius: '16px' }}>
           <div className="modal-header">
-            <h5 className="modal-title"><i className="bi bi-cloud-upload me-2 text-primary"></i>Import Price List</h5>
+            <h5 className="modal-title"><i className="bi bi-cloud-upload me-2 text-primary"></i>{t('inventory.import.title')}</h5>
             <button className="btn-close" onClick={onClose}></button>
           </div>
           <div className="modal-body">
             <div className="alert alert-info small py-2">
               <i className="bi bi-info-circle me-1"></i>
-              Upload an Excel (.xlsx/.csv) or Word (.docx) document with columns <strong>No</strong>, <strong>Description</strong>, and <strong>Unit Price</strong>.
-              Prices are converted to USD at the current system exchange rate and applied system-wide to billing.
+              {t('inventory.import.body')} <strong>{t('inventory.import.colNo')}</strong>, <strong>{t('inventory.import.colDescription')}</strong>, {t('inventory.import.and')} <strong>{t('inventory.import.colUnitPrice')}</strong>.
+              {t('inventory.import.pricesConverted')}
             </div>
 
             {!result ? (
               <>
                 <div className="row g-3">
                   <div className="col-md-7">
-                    <label className="form-label small">Document</label>
+                    <label className="form-label small">{t('inventory.import.document')}</label>
                     <input type="file" className="form-control form-control-sm" accept=".xlsx,.xlsm,.xls,.csv,.txt,.docx"
                       onChange={(e) => setFile(e.target.files?.[0] || null)} />
                     {file && <div className="small text-muted mt-1"><i className="bi bi-paperclip me-1"></i>{file.name} ({(file.size / 1024).toFixed(1)} KB)</div>}
                   </div>
                   <div className="col-md-5">
-                    <label className="form-label small">Prices are in</label>
+                    <label className="form-label small">{t('inventory.import.pricesIn')}</label>
                     <select className="form-select form-select-sm" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                      <option value="LRD">Liberian Dollars (LRD) — default</option>
-                      <option value="USD">US Dollars (USD)</option>
+                      <option value="LRD">{t('inventory.import.lrdDefault')}</option>
+                      <option value="USD">{t('inventory.import.usd')}</option>
                     </select>
                   </div>
                 </div>
                 <div className="mt-3 d-flex justify-content-end gap-2">
-                  <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>Cancel</button>
+                  <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>{t('common.cancel')}</button>
                   <button className="btn btn-primary btn-sm" disabled={!file || busy}
                     onClick={() => file && onImport(file, currency)}>
-                    {busy ? <><span className="spinner-border spinner-border-sm me-1"></span>Importing...</> : <><i className="bi bi-cloud-upload me-1"></i>Upload & Apply</>}
+                    {busy ? <><span className="spinner-border spinner-border-sm me-1"></span>{t('inventory.import.importing')}</> : <><i className="bi bi-cloud-upload me-1"></i>{t('inventory.import.uploadApply')}</>}
                   </button>
                 </div>
               </>
@@ -930,14 +935,14 @@ function PriceImportModal({ busy, result, onClose, onImport }: {
                   <span className="badge bg-light text-dark border">Source: {result.sourceCurrency}</span>
                 </div>
                 <div className="row g-2 small mb-3">
-                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">Catalog updated<div className="fw-bold text-primary">{result.catalogUpdated}</div></div></div>
-                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">Catalog created<div className="fw-bold text-primary">{result.catalogCreated}</div></div></div>
-                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">Inventory updated<div className="fw-bold text-success">{result.inventoryUpdated}</div></div></div>
-                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">Inventory created<div className="fw-bold text-success">{result.inventoryCreated}</div></div></div>
+                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">{t('inventory.import.resultCatalogUpdated')}<div className="fw-bold text-primary">{result.catalogUpdated}</div></div></div>
+                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">{t('inventory.import.resultCatalogCreated')}<div className="fw-bold text-primary">{result.catalogCreated}</div></div></div>
+                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">{t('inventory.import.resultInventoryUpdated')}<div className="fw-bold text-success">{result.inventoryUpdated}</div></div></div>
+                  <div className="col-6 col-md-3"><div className="border rounded-3 p-2">{t('inventory.import.resultInventoryCreated')}<div className="fw-bold text-success">{result.inventoryCreated}</div></div></div>
                 </div>
                 {result.preview && (
                   <details className="border rounded-3 p-2 small mb-3">
-                    <summary className="fw-semibold text-muted" style={{ cursor: 'pointer' }}>Extracted content preview</summary>
+                    <summary className="fw-semibold text-muted" style={{ cursor: 'pointer' }}>{t('inventory.import.preview')}</summary>
                     <pre className="mb-0 mt-2" style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem', color: '#495057' }}>{result.preview}</pre>
                   </details>
                 )}
@@ -945,7 +950,7 @@ function PriceImportModal({ busy, result, onClose, onImport }: {
                   <div className="table-responsive" style={{ maxHeight: '280px' }}>
                     <table className="table table-sm small mb-0">
                       <thead className="table-light sticky-top">
-                        <tr><th>No</th><th>Description</th><th>Category</th><th className="text-end">LRD</th><th className="text-end">USD</th><th>Catalog</th></tr>
+                        <tr><th>{t('inventory.import.previewNo')}</th><th>{t('inventory.import.previewDescription')}</th><th>{t('inventory.import.previewCategory')}</th><th className="text-end">LRD</th><th className="text-end">USD</th><th>{t('inventory.import.catalog')}</th></tr>
                       </thead>
                       <tbody>
                         {result.rows.map((r, i) => (
@@ -963,7 +968,7 @@ function PriceImportModal({ busy, result, onClose, onImport }: {
                   </div>
                 )}
                 <div className="mt-3 d-flex justify-content-end">
-                  <button className="btn btn-primary btn-sm" onClick={onClose}>Done</button>
+                  <button className="btn btn-primary btn-sm" onClick={onClose}>{t('inventory.import.done')}</button>
                 </div>
               </>
             )}
@@ -977,13 +982,14 @@ function PriceImportModal({ busy, result, onClose, onImport }: {
 // ── Barcode label print modal ─────────────────────────────────────────────
 
 function BarcodePrintModal({ item, onClose }: { item: InventoryItem; onClose: () => void }) {
+  const { t } = useTranslation();
   const barcode = item.barcode || item.item_code || `INV-${item.id}`;
   return (
     <div className="modal d-block" style={{ background: 'rgba(0,0,0,0.45)' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-dialog modal-sm modal-dialog-centered">
         <div className="modal-content" style={{ borderRadius: '16px' }}>
           <div className="modal-header">
-            <h6 className="modal-title mb-0">Barcode Label</h6>
+            <h6 className="modal-title mb-0">{t('inventory.barcode.title')}</h6>
             <button className="btn-close" onClick={onClose}></button>
           </div>
           <div className="modal-body">
@@ -1000,14 +1006,14 @@ function BarcodePrintModal({ item, onClose }: { item: InventoryItem; onClose: ()
               <BarcodeSvg value={barcode} height={52} fontSize={11} />
               <div className="small" style={{ fontFamily: 'monospace' }}>{barcode}</div>
               <div className="d-flex justify-content-center gap-3 small mt-2 flex-wrap">
-                {item.lot_number && <span>Lot: <b>{item.lot_number}</b></span>}
-                {item.expiration_date && <span>Exp: <b>{fmtDate(item.expiration_date)}</b></span>}
-                {item.unit_price != null && <span>Price: <b>${Number(item.unit_price).toFixed(2)}</b></span>}
+                {item.lot_number && <span>{t('inventory.barcode.lot', { value: '' })}<b>{item.lot_number}</b></span>}
+                {item.expiration_date && <span>{t('inventory.barcode.exp', { value: '' })}<b>{fmtDate(item.expiration_date)}</b></span>}
+                {item.unit_price != null && <span>{t('inventory.barcode.price', { value: `$${Number(item.unit_price).toFixed(2)}` })}</span>}
               </div>
             </div>
             <div className="d-flex justify-content-end gap-2 mt-3">
-              <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>Close</button>
-              <button className="btn btn-primary btn-sm" onClick={() => window.print()}><i className="bi bi-printer me-1"></i>Print</button>
+              <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>{t('common.close')}</button>
+              <button className="btn btn-primary btn-sm" onClick={() => window.print()}><i className="bi bi-printer me-1"></i>{t('inventory.barcode.print')}</button>
             </div>
           </div>
         </div>
@@ -1025,6 +1031,7 @@ function StockActionModal({ action, items, busy, onClose, onSubmit }: {
   onClose: () => void;
   onSubmit: (data: any) => void;
 }) {
+  const { t } = useTranslation();
   const { item, type } = action;
   const [qty, setQty] = useState('');
   const [reason, setReason] = useState('');
@@ -1033,17 +1040,17 @@ function StockActionModal({ action, items, busy, onClose, onSubmit }: {
   const [destinationLocation, setDestinationLocation] = useState('');
 
   const labels: Record<string, string> = {
-    receive: 'Receive Stock',
-    issue: 'Issue Stock',
-    transfer: 'Transfer Stock',
-    return: 'Return Stock',
-    adjust: 'Adjust Quantity',
+    receive: t('inventory.stock.receive'),
+    issue: t('inventory.stock.issue'),
+    transfer: t('inventory.stock.transfer'),
+    return: t('inventory.stock.return'),
+    adjust: t('inventory.stock.adjust'),
   };
 
   const submit = () => {
     const quantity = Number(qty);
     if (type !== 'adjust' && (!Number.isFinite(quantity) || quantity <= 0)) {
-      alert('Enter a positive quantity'); return;
+      alert(t('inventory.stock.positiveQuantity')); return;
     }
     const base = { reason: reason.trim() || undefined, notes: notes || undefined };
     if (type === 'receive') onSubmit({ quantity, ...base });
@@ -1051,12 +1058,12 @@ function StockActionModal({ action, items, busy, onClose, onSubmit }: {
     if (type === 'return') onSubmit({ quantity, ...base });
     if (type === 'adjust') {
       const target = Number(qty);
-      if (!Number.isFinite(target) || target < 0) { alert('Enter a valid target quantity'); return; }
-      if (!reason.trim()) { alert('A reason is required for adjustments'); return; }
+      if (!Number.isFinite(target) || target < 0) { alert(t('inventory.stock.validTarget')); return; }
+      if (!reason.trim()) { alert(t('inventory.stock.reasonRequired')); return; }
       onSubmit({ newQuantity: target, reason: reason.trim(), notes: notes || undefined });
     }
     if (type === 'transfer') {
-      if (!destinationItemId) { alert('Select a destination item'); return; }
+      if (!destinationItemId) { alert(t('inventory.stock.selectDestinationAlert')); return; }
       onSubmit({ quantity, destinationItemId: Number(destinationItemId), ...base });
     }
   };
@@ -1070,20 +1077,20 @@ function StockActionModal({ action, items, busy, onClose, onSubmit }: {
             <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
           <div className="modal-body">
-            <div className="small text-muted mb-2">{item.item_name} — current stock: <strong>{item.current_quantity} {item.unit || ''}</strong></div>
+            <div className="small text-muted mb-2">{item.item_name} — {t('inventory.stock.currentStock')} <strong>{item.current_quantity} {item.unit || ''}</strong></div>
 
             {type === 'adjust' ? (
-              <div className="mb-2"><label className="form-label small mb-0">Target Quantity *</label>
+              <div className="mb-2"><label className="form-label small mb-0">{t('inventory.stock.targetQuantity')}</label>
                 <input type="number" min="0" className="form-control form-control-sm" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
             ) : (
-              <div className="mb-2"><label className="form-label small mb-0">Quantity *</label>
+              <div className="mb-2"><label className="form-label small mb-0">{t('inventory.stock.quantity')}</label>
                 <input type="number" min="1" className="form-control form-control-sm" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
             )}
 
             {type === 'transfer' && (
-              <div className="mb-2"><label className="form-label small mb-0">Destination Item *</label>
+              <div className="mb-2"><label className="form-label small mb-0">{t('inventory.stock.destinationItem')}</label>
                 <select className="form-select form-select-sm" value={destinationItemId} onChange={(e) => setDestinationItemId(e.target.value)}>
-                  <option value="">Select destination item…</option>
+                  <option value="">{t('inventory.stock.selectDestination')}</option>
                   {items.filter((i) => i.id !== item.id).map((i) => (
                     <option key={i.id} value={i.id}>{i.item_name} ({i.department || '—'})</option>
                   ))}
@@ -1091,17 +1098,17 @@ function StockActionModal({ action, items, busy, onClose, onSubmit }: {
             )}
 
             {type === 'issue' && (
-              <div className="mb-2"><label className="form-label small mb-0">Issued To (department/location)</label>
-                <input className="form-control form-control-sm" placeholder="e.g. Emergency" value={destinationLocation} onChange={(e) => setDestinationLocation(e.target.value)} /></div>
+              <div className="mb-2"><label className="form-label small mb-0">{t('inventory.stock.issuedTo')}</label>
+                <input className="form-control form-control-sm" placeholder={t('inventory.stock.destinationPlaceholder')} value={destinationLocation} onChange={(e) => setDestinationLocation(e.target.value)} /></div>
             )}
 
             <div className="mb-2"><label className="form-label small mb-0">Reason{type === 'adjust' ? ' *' : ''}</label>
               <input className="form-control form-control-sm" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
-            <div className="mb-0"><label className="form-label small mb-0">Notes</label>
+            <div className="mb-0"><label className="form-label small mb-0">{t('inventory.stock.notes')}</label>
               <textarea className="form-control form-control-sm" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
           </div>
           <div className="modal-footer">
-            <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>Cancel</button>
+            <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>{t('common.cancel')}</button>
             <button className="btn btn-primary btn-sm" onClick={submit} disabled={busy}>
               {busy ? <span className="spinner-border spinner-border-sm" /> : 'Submit'}
             </button>
@@ -1132,6 +1139,7 @@ function PoStatusBadge({ status }: { status: string }) {
 }
 
 function PurchaseOrdersTab({ canManage }: { canManage: boolean }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [vendorId, setVendorId] = useState('');
@@ -1149,20 +1157,20 @@ function PurchaseOrdersTab({ canManage }: { canManage: boolean }) {
 
   const createMut = useMutation({
     mutationFn: (d: any) => createPurchaseOrder(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setShowForm(false); setMsg('Purchase order created'); },
-    onError: (e) => setMsg(errMsg(e)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setShowForm(false); setMsg(t('inventory.toasts.poCreated')); },
+    onError: (e) => setMsg(errMsg(e, t('inventory.errGeneric'))),
   });
   const receiveMut = useMutation({
     mutationFn: (id: number) => receivePurchaseOrder(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg('Purchase order received — stock updated'); },
-    onError: (e) => setMsg(errMsg(e)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg(t('inventory.toasts.poReceived')); },
+    onError: (e) => setMsg(errMsg(e, t('inventory.errGeneric'))),
   });
 
   const submit = () => {
     const clean = lines
       .filter((l) => l.inventory_item_id && Number(l.quantity) > 0)
       .map((l) => ({ inventory_item_id: Number(l.inventory_item_id), quantity: Number(l.quantity) }));
-    if (!clean.length) { setMsg('Add at least one line item with a positive quantity'); return; }
+    if (!clean.length) { setMsg(t('inventory.po.needLine')); return; }
     createMut.mutate({
       vendor_id: vendorId ? Number(vendorId) : null,
       expected_date: expectedDate || null,
@@ -1174,8 +1182,8 @@ function PurchaseOrdersTab({ canManage }: { canManage: boolean }) {
   return (
     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
       <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-        <h6 className="mb-0 fw-bold"><i className="bi bi-receipt me-2 text-primary"></i>Purchase Orders</h6>
-        {canManage && <button className="btn btn-primary btn-sm rounded-pill" onClick={() => { setMsg(''); setShowForm((v) => !v); }}><i className="bi bi-plus-lg me-1"></i>New PO</button>}
+        <h6 className="mb-0 fw-bold"><i className="bi bi-receipt me-2 text-primary"></i>{t('inventory.po.title')}</h6>
+        {canManage && <button className="btn btn-primary btn-sm rounded-pill" onClick={() => { setMsg(''); setShowForm((v) => !v); }}><i className="bi bi-plus-lg me-1"></i>{t('inventory.po.newPo')}</button>}
       </div>
       <div className="card-body p-0">
         {msg && <div className="alert alert-warning py-2 px-3 mx-3 mt-3 mb-0 small">{msg}</div>}
@@ -1183,32 +1191,32 @@ function PurchaseOrdersTab({ canManage }: { canManage: boolean }) {
         {showForm && (
           <div className="p-3 border-bottom" style={{ backgroundColor: '#f8f9fa' }}>
             <div className="row g-2 mb-2">
-              <div className="col-md-4"><label className="form-label small mb-0">Vendor</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.po.vendor')}</label>
                 <select className="form-select form-select-sm" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
-                  <option value="">— None —</option>
+                  <option value="">{t('inventory.po.none')}</option>
                   {vendors.map((v: Vendor) => <option key={v.id} value={v.id}>{v.name}</option>)}
                 </select></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Expected Date</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.po.expectedDate')}</label>
                 <input type="date" className="form-control form-control-sm" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} /></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Notes</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.po.notes')}</label>
                 <input className="form-control form-control-sm" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
             </div>
 
             {lines.map((line, idx) => (
               <div className="row g-2 mb-1" key={idx}>
-                <div className="col-md-8"><label className="form-label small mb-0">Item</label>
+                <div className="col-md-8"><label className="form-label small mb-0">{t('inventory.po.item')}</label>
                   <select className="form-select form-select-sm" value={line.inventory_item_id} onChange={(e) => setLines((ls) => ls.map((l, i) => i === idx ? { ...l, inventory_item_id: e.target.value } : l))}>
-                    <option value="">Select item…</option>
+                    <option value="">{t('inventory.po.selectItem')}</option>
                     {poItems.map((it) => <option key={it.id} value={it.id}>{it.item_name} ({it.item_code || '—'})</option>)}
                   </select></div>
-                <div className="col-md-3"><label className="form-label small mb-0">Qty</label>
+                <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.po.qty')}</label>
                   <input type="number" min="1" className="form-control form-control-sm" value={line.quantity} onChange={(e) => setLines((ls) => ls.map((l, i) => i === idx ? { ...l, quantity: e.target.value } : l))} /></div>
                 <div className="col-md-1 d-flex align-items-end">
                   <button className="btn btn-outline-danger btn-sm" onClick={() => setLines((ls) => ls.filter((_, i) => i !== idx))}><i className="bi bi-x" /></button>
                 </div>
               </div>
             ))}
-            <button className="btn btn-outline-secondary btn-sm mb-2" onClick={() => setLines((ls) => [...ls, { inventory_item_id: '', quantity: '' }])}><i className="bi bi-plus me-1"></i>Add line</button>
+            <button className="btn btn-outline-secondary btn-sm mb-2" onClick={() => setLines((ls) => [...ls, { inventory_item_id: '', quantity: '' }])}><i className="bi bi-plus me-1"></i>{t('inventory.po.addLine')}</button>
             <div>
               <button className="btn btn-primary btn-sm" onClick={submit} disabled={createMut.isPending}>
                 {createMut.isPending ? <span className="spinner-border spinner-border-sm" /> : 'Create PO'}
@@ -1220,11 +1228,11 @@ function PurchaseOrdersTab({ canManage }: { canManage: boolean }) {
         {isLoading ? (
           <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
         ) : pos.length === 0 ? (
-          <div className="text-center text-muted py-5"><i className="bi bi-receipt fs-1 d-block mb-2 opacity-50"></i>No purchase orders</div>
+          <div className="text-center text-muted py-5"><i className="bi bi-receipt fs-1 d-block mb-2 opacity-50"></i>{t('inventory.po.empty')}</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-hover small align-middle mb-0">
-              <thead className="table-light"><tr><th>PO #</th><th>Vendor</th><th>Status</th><th className="text-end">Total</th><th className="text-center">Items</th><th>Created</th><th></th></tr></thead>
+              <thead className="table-light"><tr><th>{t('inventory.po.cols.poNum')}</th><th>{t('inventory.po.cols.vendor')}</th><th>{t('inventory.po.cols.status')}</th><th className="text-end">{t('inventory.po.cols.total')}</th><th className="text-center">{t('inventory.po.cols.items')}</th><th>{t('inventory.po.cols.created')}</th><th></th></tr></thead>
               <tbody>
                 {pos.map((po: PurchaseOrder) => (
                   <tr key={po.id}>
@@ -1236,7 +1244,7 @@ function PurchaseOrdersTab({ canManage }: { canManage: boolean }) {
                     <td>{fmtDateTime(po.order_date)}</td>
                     <td className="text-end">
                       {canManage && !['RECEIVED', 'CANCELLED'].includes(po.status) && (
-                        <button className="btn btn-outline-success btn-sm" disabled={receiveMut.isPending} onClick={() => receiveMut.mutate(po.id)}>Receive</button>
+                        <button className="btn btn-outline-success btn-sm" disabled={receiveMut.isPending} onClick={() => receiveMut.mutate(po.id)}>{t('inventory.po.receive')}</button>
                       )}
                     </td>
                   </tr>
@@ -1253,6 +1261,7 @@ function PurchaseOrdersTab({ canManage }: { canManage: boolean }) {
 // ── Vendors tab ──────────────────────────────────────────────────────────
 
 function VendorsTab({ canManage }: { canManage: boolean }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<any>({ name: '', contact_name: '', email: '', phone: '', address: '', categories: '' });
@@ -1261,7 +1270,7 @@ function VendorsTab({ canManage }: { canManage: boolean }) {
   const createMut = useMutation({
     mutationFn: (d: any) => createVendor(d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setShowForm(false); setForm({ name: '', contact_name: '', email: '', phone: '', address: '', categories: '' }); },
-    onError: (e) => alert(errMsg(e)),
+    onError: (e) => alert(errMsg(e, t('inventory.errGeneric'))),
   });
 
   const portalUrl = (v: Vendor) => `${window.location.origin}/vendor/portal/${v.access_token}`;
@@ -1269,27 +1278,27 @@ function VendorsTab({ canManage }: { canManage: boolean }) {
   return (
     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
       <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-        <h6 className="mb-0 fw-bold"><i className="bi bi-truck me-2 text-success"></i>Vendors</h6>
-        {canManage && <button className="btn btn-primary btn-sm rounded-pill" onClick={() => setShowForm((v) => !v)}><i className="bi bi-plus-lg me-1"></i>Add Vendor</button>}
+        <h6 className="mb-0 fw-bold"><i className="bi bi-truck me-2 text-success"></i>{t('inventory.vendors.title')}</h6>
+        {canManage && <button className="btn btn-primary btn-sm rounded-pill" onClick={() => setShowForm((v) => !v)}><i className="bi bi-plus-lg me-1"></i>{t('inventory.vendors.add')}</button>}
       </div>
       <div className="card-body p-0">
         {showForm && (
           <div className="p-3 border-bottom" style={{ backgroundColor: '#f8f9fa' }}>
             <div className="row g-2">
-              <div className="col-md-6"><label className="form-label small mb-0">Name *</label>
+              <div className="col-md-6"><label className="form-label small mb-0">{t('inventory.vendors.name')}</label>
                 <input className="form-control form-control-sm" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div className="col-md-6"><label className="form-label small mb-0">Contact Name</label>
+              <div className="col-md-6"><label className="form-label small mb-0">{t('inventory.vendors.contactName')}</label>
                 <input className="form-control form-control-sm" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} /></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Email</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.vendors.email')}</label>
                 <input className="form-control form-control-sm" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Phone</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.vendors.phone')}</label>
                 <input className="form-control form-control-sm" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div className="col-md-4"><label className="form-label small mb-0">Categories</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.vendors.categories')}</label>
                 <input className="form-control form-control-sm" value={form.categories} onChange={(e) => setForm({ ...form, categories: e.target.value })} /></div>
-              <div className="col-md-12"><label className="form-label small mb-0">Address</label>
+              <div className="col-md-12"><label className="form-label small mb-0">{t('inventory.vendors.address')}</label>
                 <input className="form-control form-control-sm" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
             </div>
-            <button className="btn btn-primary btn-sm mt-2" disabled={createMut.isPending} onClick={() => { if (!form.name.trim()) { alert('Vendor name is required'); return; } createMut.mutate(form); }}>
+            <button className="btn btn-primary btn-sm mt-2" disabled={createMut.isPending} onClick={() => { if (!form.name.trim()) { alert(t('inventory.vendors.nameRequired')); return; } createMut.mutate(form); }}>
               {createMut.isPending ? <span className="spinner-border spinner-border-sm" /> : 'Save Vendor'}
             </button>
           </div>
@@ -1298,11 +1307,11 @@ function VendorsTab({ canManage }: { canManage: boolean }) {
         {isLoading ? (
           <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
         ) : vendors.length === 0 ? (
-          <div className="text-center text-muted py-5"><i className="bi bi-truck fs-1 d-block mb-2 opacity-50"></i>No vendors</div>
+          <div className="text-center text-muted py-5"><i className="bi bi-truck fs-1 d-block mb-2 opacity-50"></i>{t('inventory.vendors.empty')}</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-hover small align-middle mb-0">
-              <thead className="table-light"><tr><th>Vendor</th><th>Contact</th><th>Email / Phone</th><th>Categories</th><th>Portal Link</th></tr></thead>
+              <thead className="table-light"><tr><th>{t('inventory.vendors.cols.vendor')}</th><th>{t('inventory.vendors.cols.contact')}</th><th>{t('inventory.vendors.cols.emailPhone')}</th><th>{t('inventory.vendors.cols.categories')}</th><th>{t('inventory.vendors.cols.portalLink')}</th></tr></thead>
               <tbody>
                 {vendors.map((v: Vendor) => (
                   <tr key={v.id}>
@@ -1313,8 +1322,8 @@ function VendorsTab({ canManage }: { canManage: boolean }) {
                     <td>
                       <div className="input-group input-group-sm" style={{ minWidth: '220px' }}>
                         <input className="form-control" readOnly value={portalUrl(v)} style={{ fontSize: '0.68rem' }} />
-                        <button className="btn btn-outline-secondary" title="Copy link" onClick={() => navigator.clipboard?.writeText(portalUrl(v))}><i className="bi bi-clipboard" /></button>
-                        <a className="btn btn-outline-primary" title="Open portal" href={portalUrl(v)} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /></a>
+                        <button className="btn btn-outline-secondary" title={t('inventory.vendors.copyLink')} onClick={() => navigator.clipboard?.writeText(portalUrl(v))}><i className="bi bi-clipboard" /></button>
+                        <a className="btn btn-outline-primary" title={t('inventory.vendors.openPortal')} href={portalUrl(v)} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /></a>
                       </div>
                     </td>
                   </tr>
@@ -1331,19 +1340,20 @@ function VendorsTab({ canManage }: { canManage: boolean }) {
 // ── Reorder tab ──────────────────────────────────────────────────────────
 
 function ReorderTab({ canManage }: { canManage: boolean }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [msg, setMsg] = useState('');
   const { data: suggestions = [], isLoading } = useQuery({ queryKey: ['inventory', 'reorder'], queryFn: getReorderSuggestions });
 
   const createMut = useMutation({
     mutationFn: (d: any) => createPurchaseOrder(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg('Reorder PO created as DRAFT — review in Purchase Orders tab'); },
-    onError: (e) => setMsg(errMsg(e)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg(t('inventory.toasts.reorderPo')); },
+    onError: (e) => setMsg(errMsg(e, t('inventory.errGeneric'))),
   });
   const requestMut = useMutation({
     mutationFn: (d: any) => createInventoryRequest(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg('Reorder request created — review in Requests tab for approval'); },
-    onError: (e) => setMsg(errMsg(e)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg(t('inventory.toasts.reorderRequest')); },
+    onError: (e) => setMsg(errMsg(e, t('inventory.errGeneric'))),
   });
 
   const createPoFromSuggestions = () => {
@@ -1355,7 +1365,7 @@ function ReorderTab({ canManage }: { canManage: boolean }) {
     if (!suggestions.length) return;
     requestMut.mutate({
       department: 'General Store',
-      reason: 'Auto reorder — stock at or below reorder point',
+      reason: t('inventory.reorder.reason'),
       items: suggestions.map((s) => ({ inventory_item_id: s.id, quantity: s.suggested_quantity })),
     });
   };
@@ -1363,14 +1373,14 @@ function ReorderTab({ canManage }: { canManage: boolean }) {
   return (
     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
       <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-        <h6 className="mb-0 fw-bold"><i className="bi bi-arrow-repeat me-2 text-warning"></i>Auto-Reorder Suggestions</h6>
+        <h6 className="mb-0 fw-bold"><i className="bi bi-arrow-repeat me-2 text-warning"></i>{t('inventory.reorder.title')}</h6>
         {canManage && suggestions.length > 0 && (
           <div className="d-flex gap-1 flex-wrap">
             <button className="btn btn-outline-warning btn-sm rounded-pill" disabled={requestMut.isPending} onClick={createRequestFromSuggestions}>
-              <i className="bi bi-clipboard-check me-1"></i>Create Request
+              <i className="bi bi-clipboard-check me-1"></i>{t('inventory.reorder.createRequest')}
             </button>
             <button className="btn btn-warning btn-sm rounded-pill" disabled={createMut.isPending} onClick={createPoFromSuggestions}>
-              <i className="bi bi-receipt me-1"></i>Generate Reorder PO
+              <i className="bi bi-receipt me-1"></i>{t('inventory.reorder.generatePo')}
             </button>
           </div>
         )}
@@ -1380,11 +1390,11 @@ function ReorderTab({ canManage }: { canManage: boolean }) {
         {isLoading ? (
           <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
         ) : suggestions.length === 0 ? (
-          <div className="text-center text-muted py-5"><i className="bi bi-check2-circle fs-1 d-block mb-2 opacity-50"></i>All items are above their reorder point</div>
+          <div className="text-center text-muted py-5"><i className="bi bi-check2-circle fs-1 d-block mb-2 opacity-50"></i>{t('inventory.reorder.allAbove')}</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-hover small align-middle mb-0">
-              <thead className="table-light"><tr><th>Item</th><th>Department</th><th className="text-end">Current</th><th className="text-end">Minimum</th><th className="text-end">Reorder To</th><th className="text-end">Suggested Qty</th><th>Status</th></tr></thead>
+              <thead className="table-light"><tr><th>{t('inventory.reorder.cols.item')}</th><th>{t('inventory.reorder.cols.department')}</th><th className="text-end">{t('inventory.reorder.cols.current')}</th><th className="text-end">{t('inventory.reorder.cols.minimum')}</th><th className="text-end">{t('inventory.reorder.cols.reorderTo')}</th><th className="text-end">{t('inventory.reorder.cols.suggestedQty')}</th><th>{t('inventory.reorder.cols.status')}</th></tr></thead>
               <tbody>
                 {suggestions.map((s: ReorderSuggestion) => (
                   <tr key={s.id}>
@@ -1409,6 +1419,7 @@ function ReorderTab({ canManage }: { canManage: boolean }) {
 // ── Forecast & accounting tab ────────────────────────────────────────────
 
 function ReportsTab() {
+  const { t } = useTranslation();
   const { data: forecast = [], isLoading: fLoading } = useQuery({ queryKey: ['inventory', 'forecast'], queryFn: getForecast });
   const { data: accounting } = useQuery({ queryKey: ['inventory', 'accounting'], queryFn: getAccountingSummary });
 
@@ -1472,22 +1483,22 @@ function ReportsTab() {
    * the remaining labels come from the runway.
    */
   const fRisk = (f: ForecastRow) => {
-    if (!(f.avg_daily_usage > 0)) return { label: 'No usage', cls: 'bg-light text-muted border' };
+    if (!(f.avg_daily_usage > 0)) return { label: t('inventory.risk.noUsage'), cls: 'bg-light text-muted border' };
     const d = f.days_remaining;
-    if (f.projected_shortage) return { label: 'Reorder now', cls: 'bg-danger' };
-    if (d != null && d <= 7) return { label: 'Critical', cls: 'bg-danger' };
-    if (d != null && d <= 14) return { label: 'Low', cls: 'bg-warning text-dark' };
-    if (d != null && d <= 30) return { label: 'Watch', cls: 'bg-info text-dark' };
-    return { label: 'Adequate', cls: 'bg-success' };
+    if (f.projected_shortage) return { label: t('inventory.risk.reorderNow'), cls: 'bg-danger' };
+    if (d != null && d <= 7) return { label: t('inventory.risk.critical'), cls: 'bg-danger' };
+    if (d != null && d <= 14) return { label: t('inventory.risk.low'), cls: 'bg-warning text-dark' };
+    if (d != null && d <= 30) return { label: t('inventory.risk.watch'), cls: 'bg-info text-dark' };
+    return { label: t('inventory.risk.adequate'), cls: 'bg-success' };
   };
 
   return (
     <div>
       <div className="row g-3 mb-3">
         {[
-          { label: 'Inventory Value', value: money(accounting?.inventoryValue), icon: 'bi-cash-stack', color: '#198754' },
-          { label: 'PO Spend (approved)', value: money(accounting?.purchaseOrderSpend), icon: 'bi-receipt', color: '#0d6efd' },
-          { label: 'Issued Value', value: money(accounting?.issuedValue), icon: 'bi-box-arrow-up', color: '#fd7e14' },
+          { label: t('inventory.stats.inventoryValue'), value: money(accounting?.inventoryValue), icon: 'bi-cash-stack', color: '#198754' },
+          { label: t('inventory.reports.poSpend'), value: money(accounting?.purchaseOrderSpend), icon: 'bi-receipt', color: '#0d6efd' },
+          { label: t('inventory.reports.issuedValue'), value: money(accounting?.issuedValue), icon: 'bi-box-arrow-up', color: '#fd7e14' },
         ].map((k) => (
           <div className="col-md-4" key={k.label}>
             <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
@@ -1506,7 +1517,7 @@ function ReportsTab() {
         <div className="col-lg-5">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-pie-chart me-2 text-primary"></i>Value by Category</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-pie-chart me-2 text-primary"></i>{t('inventory.reports.valueByCategory')}</h6>
             </div>
             <div className="card-body">
               {(accounting?.byCategoryValue || []).map((c) => (
@@ -1515,7 +1526,7 @@ function ReportsTab() {
                   <span className="fw-semibold">{money(c.value)}</span>
                 </div>
               ))}
-              {(!accounting?.byCategoryValue || accounting.byCategoryValue.length === 0) && <div className="text-muted small">No data</div>}
+              {(!accounting?.byCategoryValue || accounting.byCategoryValue.length === 0) && <div className="text-muted small">{t('inventory.reports.noData')}</div>}
             </div>
           </div>
         </div>
@@ -1523,8 +1534,8 @@ function ReportsTab() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
               <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h6 className="mb-0 fw-bold"><i className="bi bi-graph-up me-2 text-info"></i>Demand Forecast (90-day avg usage)</h6>
-                <span className="text-muted small">{forecast.length} items tracked</span>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-graph-up me-2 text-info"></i>{t('inventory.reports.demandForecast')}</h6>
+                <span className="text-muted small">{t('inventory.reports.itemsTracked', { count: forecast.length })}</span>
               </div>
             </div>
 
@@ -1535,10 +1546,10 @@ function ReportsTab() {
                 {/* Focus switch — only what needs action is shown to begin with. */}
                 <div className="px-3 pt-3 d-flex flex-wrap align-items-center gap-2">
                   {([
-                    ['attention', 'Needs attention', fAttention.length, 'bg-danger'],
-                    ['inuse', 'In use', fInUse.length, 'bg-primary'],
-                    ['nouse', 'No usage', fNoUse.length, 'bg-secondary'],
-                    ['all', 'All', fSorted.length, 'bg-dark'],
+                    ['attention', t('inventory.reports.needsAttention'), fAttention.length, 'bg-danger'],
+                    ['inuse', t('inventory.reports.inUse'), fInUse.length, 'bg-primary'],
+                    ['nouse', t('inventory.reports.noUsage'), fNoUse.length, 'bg-secondary'],
+                    ['all', t('inventory.reports.all'), fSorted.length, 'bg-dark'],
                   ] as const).map(([key, label, count, tone]) => (
                     <button
                       key={key}
@@ -1554,7 +1565,7 @@ function ReportsTab() {
                     <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
                     <input
                       className="form-control"
-                      placeholder="Find an item…"
+                      placeholder={t('inventory.reports.findItem')}
                       value={fSearch}
                       onChange={e => { setFSearch(e.target.value); setFShowAll(false); }}
                     />
@@ -1566,10 +1577,10 @@ function ReportsTab() {
                     <div className="text-center text-muted small py-4">
                       <i className={`bi ${fSearch ? 'bi-search' : 'bi-check2-circle'} me-1`}></i>
                       {fSearch
-                        ? 'No item matches that search.'
+                        ? t('inventory.reports.noItemMatch')
                         : fFilter === 'attention'
-                          ? 'Nothing needs attention in the next 14 days.'
-                          : 'Nothing to show here.'}
+                          ? t('inventory.reports.nothingAttention')
+                          : t('inventory.reports.nothingHere')}
                     </div>
                   ) : (
                     <>
@@ -1577,11 +1588,11 @@ function ReportsTab() {
                         <table className="table table-hover table-sm small align-middle mb-0">
                           <thead className="table-light">
                             <tr>
-                              <th>Item</th>
-                              <th className="text-end">Current</th>
-                              <th className="text-end">Avg / day</th>
-                              <th className="text-end">Days left</th>
-                              <th className="text-center">Status</th>
+                              <th>{t('inventory.reports.cols.item')}</th>
+                              <th className="text-end">{t('inventory.reports.cols.current')}</th>
+                              <th className="text-end">{t('inventory.reports.cols.avgPerDay')}</th>
+                              <th className="text-end">{t('inventory.reports.cols.daysLeft')}</th>
+                              <th className="text-center">{t('inventory.reports.cols.status')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1615,7 +1626,7 @@ function ReportsTab() {
                             className="btn btn-sm btn-link text-decoration-none"
                             onClick={() => setFShowAll(v => !v)}
                           >
-                            {fShowAll ? 'Show fewer' : `Show all ${fVisible.length}`}
+                            {fShowAll ? t('inventory.reports.showFewer') : t('inventory.reports.showAll', { count: fVisible.length })}
                             <i className={`bi bi-chevron-${fShowAll ? 'up' : 'down'} ms-1`}></i>
                           </button>
                         </div>
@@ -1656,6 +1667,7 @@ function RequestStatusBadge({ status }: { status: string }) {
 }
 
 function RequestsTab({ canManage }: { canManage: boolean }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [department, setDepartment] = useState('Nursing');
@@ -1671,34 +1683,34 @@ function RequestsTab({ canManage }: { canManage: boolean }) {
 
   const createMut = useMutation({
     mutationFn: (d: any) => createInventoryRequest(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setShowForm(false); setMsg('Request submitted — awaiting approval'); },
-    onError: (e) => setMsg(errMsg(e)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setShowForm(false); setMsg(t('inventory.toasts.requestSubmitted')); },
+    onError: (e) => setMsg(errMsg(e, t('inventory.errGeneric'))),
   });
   const statusMut = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => updateInventoryRequestStatus(id, status),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg('Request updated'); },
-    onError: (e) => setMsg(errMsg(e)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg(t('inventory.toasts.requestUpdated')); },
+    onError: (e) => setMsg(errMsg(e, t('inventory.errGeneric'))),
   });
   const orderMut = useMutation({
     mutationFn: (id: number) => orderInventoryRequest(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg('Purchase order created from request'); },
-    onError: (e) => setMsg(errMsg(e)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); setMsg(t('inventory.toasts.poFromRequest')); },
+    onError: (e) => setMsg(errMsg(e, t('inventory.errGeneric'))),
   });
 
   const submit = () => {
     const clean = lines
       .filter((l) => l.inventory_item_id && Number(l.quantity) > 0)
       .map((l) => ({ inventory_item_id: Number(l.inventory_item_id), quantity: Number(l.quantity) }));
-    if (!clean.length) { setMsg('Add at least one item with a positive quantity'); return; }
-    if (!department) { setMsg('Department is required'); return; }
+    if (!clean.length) { setMsg(t('inventory.requests.needItem')); return; }
+    if (!department) { setMsg(t('inventory.requests.departmentRequired')); return; }
     createMut.mutate({ department, reason: reason || null, items: clean });
   };
 
   return (
     <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
       <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-        <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard-check me-2 text-primary"></i>Inventory Requests</h6>
-        {canManage && <button className="btn btn-primary btn-sm rounded-pill" onClick={() => { setMsg(''); setShowForm((v) => !v); }}><i className="bi bi-plus-lg me-1"></i>New Request</button>}
+        <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard-check me-2 text-primary"></i>{t('inventory.requests.title')}</h6>
+        {canManage && <button className="btn btn-primary btn-sm rounded-pill" onClick={() => { setMsg(''); setShowForm((v) => !v); }}><i className="bi bi-plus-lg me-1"></i>{t('inventory.requests.newRequest')}</button>}
       </div>
       <div className="card-body p-0">
         {msg && <div className="alert alert-info py-2 px-3 mx-3 mt-3 mb-0 small">{msg}</div>}
@@ -1706,28 +1718,28 @@ function RequestsTab({ canManage }: { canManage: boolean }) {
         {showForm && (
           <div className="p-3 border-bottom" style={{ backgroundColor: '#f8f9fa' }}>
             <div className="row g-2 mb-2">
-              <div className="col-md-4"><label className="form-label small mb-0">Department *</label>
+              <div className="col-md-4"><label className="form-label small mb-0">{t('inventory.requests.department')}</label>
                 <select className="form-select form-select-sm" value={department} onChange={(e) => setDepartment(e.target.value)}>
                   {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select></div>
-              <div className="col-md-8"><label className="form-label small mb-0">Reason</label>
-                <input className="form-control form-control-sm" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Weekly ward restock" /></div>
+              <div className="col-md-8"><label className="form-label small mb-0">{t('inventory.requests.reason')}</label>
+                <input className="form-control form-control-sm" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('inventory.requests.reasonPlaceholder')} /></div>
             </div>
             {lines.map((line, idx) => (
               <div className="row g-2 mb-1" key={idx}>
-                <div className="col-md-8"><label className="form-label small mb-0">Item</label>
+                <div className="col-md-8"><label className="form-label small mb-0">{t('inventory.po.item')}</label>
                   <select className="form-select form-select-sm" value={line.inventory_item_id} onChange={(e) => setLines((ls) => ls.map((l, i) => i === idx ? { ...l, inventory_item_id: e.target.value } : l))}>
-                    <option value="">Select item…</option>
+                    <option value="">{t('inventory.po.selectItem')}</option>
                     {reqItems.map((it) => <option key={it.id} value={it.id}>{it.item_name} ({it.item_code || '—'})</option>)}
                   </select></div>
-                <div className="col-md-3"><label className="form-label small mb-0">Qty</label>
+                <div className="col-md-3"><label className="form-label small mb-0">{t('inventory.po.qty')}</label>
                   <input type="number" min="1" className="form-control form-control-sm" value={line.quantity} onChange={(e) => setLines((ls) => ls.map((l, i) => i === idx ? { ...l, quantity: e.target.value } : l))} /></div>
                 <div className="col-md-1 d-flex align-items-end">
                   <button className="btn btn-outline-danger btn-sm" onClick={() => setLines((ls) => ls.filter((_, i) => i !== idx))}><i className="bi bi-x" /></button>
                 </div>
               </div>
             ))}
-            <button className="btn btn-outline-secondary btn-sm mb-2" onClick={() => setLines((ls) => [...ls, { inventory_item_id: '', quantity: '' }])}><i className="bi bi-plus me-1"></i>Add line</button>
+            <button className="btn btn-outline-secondary btn-sm mb-2" onClick={() => setLines((ls) => [...ls, { inventory_item_id: '', quantity: '' }])}><i className="bi bi-plus me-1"></i>{t('inventory.po.addLine')}</button>
             <div><button className="btn btn-primary btn-sm" onClick={submit} disabled={createMut.isPending}>{createMut.isPending ? <span className="spinner-border spinner-border-sm" /> : 'Submit Request'}</button></div>
           </div>
         )}
@@ -1735,11 +1747,11 @@ function RequestsTab({ canManage }: { canManage: boolean }) {
         {isLoading ? (
           <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
         ) : requests.length === 0 ? (
-          <div className="text-center text-muted py-5"><i className="bi bi-clipboard-check fs-1 d-block mb-2 opacity-50"></i>No inventory requests</div>
+          <div className="text-center text-muted py-5"><i className="bi bi-clipboard-check fs-1 d-block mb-2 opacity-50"></i>{t('inventory.requests.empty')}</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-hover small align-middle mb-0">
-              <thead className="table-light"><tr><th>Request #</th><th>Department</th><th>Requested By</th><th>Status</th><th>Approved By</th><th className="text-center">Items</th><th>Created</th><th></th></tr></thead>
+              <thead className="table-light"><tr><th>{t('inventory.requests.cols.requestNum')}</th><th>{t('inventory.requests.cols.department')}</th><th>{t('inventory.requests.cols.requestedBy')}</th><th>{t('inventory.requests.cols.status')}</th><th>{t('inventory.requests.cols.approvedBy')}</th><th className="text-center">{t('inventory.requests.cols.items')}</th><th>{t('inventory.requests.cols.created')}</th><th></th></tr></thead>
               <tbody>
                 {requests.map((r: InventoryRequest) => (
                   <tr key={r.id}>
@@ -1753,7 +1765,7 @@ function RequestsTab({ canManage }: { canManage: boolean }) {
                           <span className="fw-semibold">{r.approved_by_name}</span>
                           <br /><small className="text-muted">{fmtDateTime(r.approved_at)}</small>
                           {r.status === 'APPROVED' && (
-                            <span className="badge bg-primary bg-opacity-10 text-primary ms-1" style={{ fontSize: '0.6rem' }}>→ Pharmacy</span>
+                            <span className="badge bg-primary bg-opacity-10 text-primary ms-1" style={{ fontSize: '0.6rem' }}>{t('inventory.requests.toPharmacy')}</span>
                           )}
                         </>
                       ) : (
@@ -1765,12 +1777,12 @@ function RequestsTab({ canManage }: { canManage: boolean }) {
                     <td className="text-end text-nowrap">
                       {canManage && r.status === 'PENDING' && (
                         <>
-                          <button className="btn btn-outline-success btn-sm me-1" onClick={() => statusMut.mutate({ id: r.id, status: 'APPROVED' })}>Approve</button>
-                          <button className="btn btn-outline-danger btn-sm me-1" onClick={() => statusMut.mutate({ id: r.id, status: 'REJECTED' })}>Reject</button>
+                          <button className="btn btn-outline-success btn-sm me-1" onClick={() => statusMut.mutate({ id: r.id, status: 'APPROVED' })}>{t('inventory.requests.approve')}</button>
+                          <button className="btn btn-outline-danger btn-sm me-1" onClick={() => statusMut.mutate({ id: r.id, status: 'REJECTED' })}>{t('inventory.requests.reject')}</button>
                         </>
                       )}
                       {canManage && r.status === 'APPROVED' && (
-                        <button className="btn btn-outline-primary btn-sm" onClick={() => orderMut.mutate(r.id)}>Convert to PO</button>
+                        <button className="btn btn-outline-primary btn-sm" onClick={() => orderMut.mutate(r.id)}>{t('inventory.requests.convertToPo')}</button>
                       )}
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import nestClient from '../../api/nest-client';
 import PhoneInput from '../../components/shared/PhoneInput';
@@ -9,6 +10,7 @@ import CitySelect from '../../components/shared/CitySelect';
 const calendarColors = ['#0d6efd', '#198754', '#dc3545', '#fd7e14', '#6f42c1', '#20c997', '#0dcaf0', '#ffc107', '#e83e8c'];
 
 export default function ProvidersPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -194,28 +196,28 @@ export default function ProvidersPage() {
         <div className="position-relative">
           <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
-              <h2 className="mb-1 fw-bold"><i className="bi bi-person-badge me-2"></i>Provider Directory</h2>
+              <h2 className="mb-1 fw-bold"><i className="bi bi-person-badge me-2"></i>{t('provider.dir.title')}</h2>
               <p className="mb-0 text-white text-opacity-75 small">
-                {activeCount} active · {providers.length} total · Manage credentials, specialties & scheduling
+                {t('provider.dir.subtitle', { active: activeCount, total: providers.length })}
               </p>
             </div>
             {canEditProviders && (
               <button className="btn btn-light btn-lg rounded-pill shadow-sm" onClick={() => { setShowForm(true); setEditProvider(null); }}>
-                <i className="bi bi-plus-lg me-2"></i>Add Provider
+                <i className="bi bi-plus-lg me-2"></i>{t('provider.dir.addProvider')}
               </button>
             )}
             {!canEditProviders && user?.role === 'front_desk' && (
               <div className="alert alert-warning py-1 px-3 mb-0 rounded-pill" style={{ fontSize: '0.8rem' }}>
                 <i className="bi bi-info-circle me-1"></i>
-                You need admin permission to add or edit providers.
+                {t('provider.dir.permissionNotice')}
               </div>
             )}
           </div>
           <div className="row g-2 mt-3">
             {[
-              { v: activeCount, l: 'Active', c: '#198754', i: 'bi-check-circle' },
-              { v: withNpi, l: 'With NPI', c: '#0dcaf0', i: 'bi-upc' },
-              { v: withSpecialty, l: 'Specialized', c: '#ffc107', i: 'bi-star' },
+              { v: activeCount, l: t('provider.dir.statActive'), c: '#198754', i: 'bi-check-circle' },
+              { v: withNpi, l: t('provider.dir.statWithNpi'), c: '#0dcaf0', i: 'bi-upc' },
+              { v: withSpecialty, l: t('provider.dir.statSpecialized'), c: '#ffc107', i: 'bi-star' },
             ].map(s => (
               <div className="col-auto" key={s.l}>
                 <div className="d-flex align-items-center gap-2 bg-white bg-opacity-15 rounded-pill px-3 py-1">
@@ -235,17 +237,17 @@ export default function ProvidersPage() {
           <span className="input-group-text bg-white border-end-0 rounded-pill-start">
             <i className="bi bi-search text-muted"></i>
           </span>
-          <input className="form-control border-start-0 rounded-pill-end" placeholder="Search by name, specialty, NPI..."
+          <input className="form-control border-start-0 rounded-pill-end" placeholder={t('provider.dir.searchPlaceholder')}
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <button
           className={`btn rounded-pill ${showInactive ? 'btn-secondary' : 'btn-outline-secondary'}`}
           onClick={() => setShowInactive(!showInactive)}>
           <i className={`bi ${showInactive ? 'bi-eye-slash' : 'bi-eye'} me-1`}></i>
-          {showInactive ? 'Hide Inactive' : 'Show All'}
+          {showInactive ? t('provider.dir.hideInactive') : t('provider.dir.showAll')}
         </button>
         <span className="badge bg-primary rounded-pill fs-6 ms-auto d-flex align-items-center px-3">
-          {filtered.length} provider{filtered.length !== 1 ? 's' : ''}
+          {t('provider.dir.providerCount', { count: filtered.length })}
         </span>
       </div>
 
@@ -286,7 +288,7 @@ export default function ProvidersPage() {
                         style={{ width: '28px', height: '28px', padding: 0, fontSize: '0.7rem', transform: 'translate(4px, 4px)' }}
                         onClick={() => handleAvatarClick(p.id)}
                         disabled={isUploading}
-                        title="Upload profile photo"
+                        title={t('provider.dir.uploadPhotoTitle')}
                       >
                         {isUploading ? (
                           <span className="spinner-border spinner-border-sm" style={{ width: '12px', height: '12px' }}></span>
@@ -313,7 +315,7 @@ export default function ProvidersPage() {
                           </span>
                         )}
                         <span className={`badge ${p.active ? 'bg-success' : 'bg-secondary'}`} style={{ fontSize: '0.7rem' }}>
-                          {p.active ? 'Active' : 'Inactive'}
+                          {p.active ? t('common.active') : t('common.inactive')}
                         </span>
                       </div>
                     </div>
@@ -348,7 +350,7 @@ export default function ProvidersPage() {
                     {p.state_license_number && (
                       <div className="d-flex align-items-center gap-2">
                         <i className="bi bi-shield-check text-warning" style={{ width: '18px' }}></i>
-                        <span>License: {p.state_license_number}</span>
+                        <span>{t('provider.licensePrefix', { number: p.state_license_number })}</span>
                       </div>
                     )}
                   </div>
@@ -359,7 +361,7 @@ export default function ProvidersPage() {
                   {canEditProviders && (
                     <button className="btn btn-outline-primary btn-sm rounded-pill flex-grow-1"
                       onClick={() => startEdit(p)}>
-                      <i className="bi bi-pencil me-1"></i>Edit
+                      <i className="bi bi-pencil me-1"></i>{t('common.edit')}
                     </button>
                   )}
                   <button className="btn btn-outline-info btn-sm rounded-pill"
@@ -380,7 +382,7 @@ export default function ProvidersPage() {
         {filtered.length === 0 && (
           <div className="col-12 text-center py-5 text-muted">
             <i className="bi bi-person-x fs-1 d-block mb-2 opacity-25"></i>
-            <p>No providers found{search ? ` matching "${search}"` : ''}.</p>
+            <p>{search ? t('provider.dir.noProvidersMatching', { query: search }) : t('provider.dir.noProviders')}</p>
           </div>
         )}
       </div>
@@ -399,7 +401,7 @@ export default function ProvidersPage() {
             <div className="d-flex justify-content-between align-items-center">
               <h5 className="mb-0 fw-bold">
                 <i className={`bi ${editProvider ? 'bi-pencil' : 'bi-person-plus'} me-2`}></i>
-                {editProvider ? `Edit: ${editProvider.fname} ${editProvider.lname}` : 'Add New Provider'}
+                {editProvider ? t('provider.dir.editProviderTitle', { name: `${editProvider.fname} ${editProvider.lname}` }) : t('provider.dir.addNewProvider')}
               </h5>
               <button className="btn btn-sm btn-outline-light rounded-circle" style={{ width: '36px', height: '36px' }}
                 onClick={resetForm}>
@@ -432,17 +434,17 @@ export default function ProvidersPage() {
                     <i className="bi bi-camera small"></i>
                   </button>
                 </div>
-                <div className="small text-muted mt-1">Click to upload profile photo</div>
+                <div className="small text-muted mt-1">{t('provider.dir.clickToUpload')}</div>
               </div>
             )}
 
             {/* Personal Info */}
             <h6 className="text-uppercase small fw-bold text-primary mb-2">
-              <i className="bi bi-person me-2"></i>Personal Information
+              <i className="bi bi-person me-2"></i>{t('provider.dir.personalInformation')}
             </h6>
             <div className="row g-2 mb-3">
               <div className="col-6 col-md-3">
-                <label className="form-label small fw-semibold">Title</label>
+                <label className="form-label small fw-semibold">{t('provider.dir.titleLabel')}</label>
                 <select className="form-select form-select-sm" value={form.title} onChange={e => setField('title', e.target.value)}>
                   <option value="">—</option>
                   <option value="Dr.">Dr.</option><option value="MD">MD</option><option value="DO">DO</option>
@@ -450,12 +452,12 @@ export default function ProvidersPage() {
                   <option value="LPN">LPN</option><option value="Mr.">Mr.</option><option value="Ms.">Ms.</option>
                 </select>
               </div>
-              <div className="col-6 col-md-3"><label className="form-label small fw-semibold">Username *</label><input className="form-control form-control-sm" value={form.username} onChange={e => setField('username', e.target.value)} /></div>
-              <div className="col-6 col-md-3"><label className="form-label small fw-semibold">First Name *</label><input className="form-control form-control-sm" value={form.fname} onChange={e => setField('fname', e.target.value)} /></div>
-              <div className="col-6 col-md-3"><label className="form-label small fw-semibold">Last Name *</label><input className="form-control form-control-sm" value={form.lname} onChange={e => setField('lname', e.target.value)} /></div>
-              <div className="col-6 col-md-3"><label className="form-label small">Middle</label><input className="form-control form-control-sm" value={form.mname} onChange={e => setField('mname', e.target.value)} /></div>
+              <div className="col-6 col-md-3"><label className="form-label small fw-semibold">{t('provider.dir.usernameLabel')}</label><input className="form-control form-control-sm" value={form.username} onChange={e => setField('username', e.target.value)} /></div>
+              <div className="col-6 col-md-3"><label className="form-label small fw-semibold">{t('provider.dir.firstNameLabel')}</label><input className="form-control form-control-sm" value={form.fname} onChange={e => setField('fname', e.target.value)} /></div>
+              <div className="col-6 col-md-3"><label className="form-label small fw-semibold">{t('provider.dir.lastNameLabel')}</label><input className="form-control form-control-sm" value={form.lname} onChange={e => setField('lname', e.target.value)} /></div>
+              <div className="col-6 col-md-3"><label className="form-label small">{t('provider.dir.middleLabel')}</label><input className="form-control form-control-sm" value={form.mname} onChange={e => setField('mname', e.target.value)} /></div>
               <div className="col-6 col-md-3">
-                <label className="form-label small">Suffix</label>
+                <label className="form-label small">{t('provider.dir.suffixLabel')}</label>
                 <select className="form-select form-select-sm" value={form.suffix} onChange={e => setField('suffix', e.target.value)}>
                   <option value="">—</option><option value="Jr.">Jr.</option><option value="Sr.">Sr.</option>
                   <option value="II">II</option><option value="III">III</option>
@@ -464,22 +466,22 @@ export default function ProvidersPage() {
             </div>
 
             {/* Credentials */}
-            <h6 className="text-uppercase small fw-bold text-primary mb-2"><i className="bi bi-award me-2"></i>Credentials & Taxonomy</h6>
+            <h6 className="text-uppercase small fw-bold text-primary mb-2"><i className="bi bi-award me-2"></i>{t('provider.dir.credentialsTaxonomy')}</h6>
             <div className="row g-2 mb-3">
               <div className="col-md-4">
-                <label className="form-label small fw-semibold">Physician Type</label>
+                <label className="form-label small fw-semibold">{t('provider.dir.physicianType')}</label>
                 <select className="form-select form-select-sm" value={form.physician_type} onChange={e => setField('physician_type', e.target.value)}>
-                  <option value="">— Select —</option>
+                  <option value="">{t('provider.dir.selectPlaceholder')}</option>
                   {physicianTypes.map((pt: any) => (<option key={pt.option_id} value={pt.option_id}>{pt.title}</option>))}
                 </select>
               </div>
               <div className="col-md-4">
-                <label className="form-label small fw-semibold">Specialty</label>
-                <input className="form-control form-control-sm" list="specialty-list" value={form.specialty} onChange={e => setField('specialty', e.target.value)} placeholder="e.g. Family Medicine" />
+                <label className="form-label small fw-semibold">{t('provider.dir.specialty')}</label>
+                <input className="form-control form-control-sm" list="specialty-list" value={form.specialty} onChange={e => setField('specialty', e.target.value)} placeholder={t('provider.dir.specialtyPlaceholder')} />
                 <datalist id="specialty-list">{existingSpecialties.map((s: any) => <option key={s.specialty} value={s.specialty} />)}</datalist>
               </div>
               <div className="col-md-4">
-                <label className="form-label small fw-semibold">Calendar Color</label>
+                <label className="form-label small fw-semibold">{t('provider.dir.calendarColor')}</label>
                 <div className="d-flex gap-1 flex-wrap mb-1">
                   {calendarColors.map(c => (
                     <span key={c} className="rounded-circle shadow-sm" style={{
@@ -490,44 +492,44 @@ export default function ProvidersPage() {
                   ))}
                 </div>
               </div>
-              <div className="col-md-3"><label className="form-label small fw-semibold">NPI Number</label><input className="form-control form-control-sm" value={form.npi} onChange={e => setField('npi', e.target.value)} placeholder="1234567890" /></div>
-              <div className="col-md-3"><label className="form-label small fw-semibold">UPIN</label><input className="form-control form-control-sm" value={form.upin} onChange={e => setField('upin', e.target.value)} /></div>
+              <div className="col-md-3"><label className="form-label small fw-semibold">{t('provider.dir.npiNumber')}</label><input className="form-control form-control-sm" value={form.npi} onChange={e => setField('npi', e.target.value)} placeholder="1234567890" /></div>
+              <div className="col-md-3"><label className="form-label small fw-semibold">{t('provider.dir.upin')}</label><input className="form-control form-control-sm" value={form.upin} onChange={e => setField('upin', e.target.value)} /></div>
               <div className="col-md-3">
-                <label className="form-label small fw-semibold">Taxonomy Code</label>
+                <label className="form-label small fw-semibold">{t('provider.dir.taxonomyCode')}</label>
                 <select className="form-select form-select-sm" value={form.taxonomy} onChange={e => setField('taxonomy', e.target.value)}>
                   <option value="207Q00000X">207Q00000X — Family Medicine</option>
                   {taxonomyCodes.map((tc: any) => (<option key={tc.option_id} value={tc.option_id}>{tc.option_id} — {tc.title}</option>))}
                 </select>
               </div>
-              <div className="col-md-3"><label className="form-label small fw-semibold">State License #</label><input className="form-control form-control-sm" value={form.state_license_number} onChange={e => setField('state_license_number', e.target.value)} /></div>
-              <div className="col-md-3"><label className="form-label small fw-semibold">Federal Drug ID</label><input className="form-control form-control-sm" value={form.federaldrugid} onChange={e => setField('federaldrugid', e.target.value)} /></div>
+              <div className="col-md-3"><label className="form-label small fw-semibold">{t('provider.dir.stateLicense')}</label><input className="form-control form-control-sm" value={form.state_license_number} onChange={e => setField('state_license_number', e.target.value)} /></div>
+              <div className="col-md-3"><label className="form-label small fw-semibold">{t('provider.federalDrugId')}</label><input className="form-control form-control-sm" value={form.federaldrugid} onChange={e => setField('federaldrugid', e.target.value)} /></div>
             </div>
 
             {/* Contact */}
-            <h6 className="text-uppercase small fw-bold text-primary mb-2"><i className="bi bi-telephone me-2"></i>Contact Information</h6>
+            <h6 className="text-uppercase small fw-bold text-primary mb-2"><i className="bi bi-telephone me-2"></i>{t('provider.contactInformation')}</h6>
             <div className="row g-2 mb-3">
-              <div className="col-md-4"><label className="form-label small fw-semibold">Email</label><input className="form-control form-control-sm" type="email" value={form.email} onChange={e => setField('email', e.target.value)} /></div>
-              <div className="col-md-4"><label className="form-label small fw-semibold">Direct Email (HISP)</label><input className="form-control form-control-sm" type="email" value={form.email_direct} onChange={e => setField('email_direct', e.target.value)} /></div>
-              <div className="col-md-4"><label className="form-label small fw-semibold">Phone</label><PhoneInput value={form.phone} onChange={v => setField('phone', v)} /></div>
-              <div className="col-md-4"><label className="form-label small">Work Phone</label><PhoneInput value={form.phonew1} onChange={v => setField('phonew1', v)} /></div>
-              <div className="col-md-4"><label className="form-label small">Cell</label><PhoneInput value={form.phonecell} onChange={v => setField('phonecell', v)} /></div>
-              <div className="col-md-4"><label className="form-label small">Fax</label><input className="form-control form-control-sm" value={form.fax} onChange={e => setField('fax', e.target.value)} /></div>
+              <div className="col-md-4"><label className="form-label small fw-semibold">{t('provider.email')}</label><input className="form-control form-control-sm" type="email" value={form.email} onChange={e => setField('email', e.target.value)} /></div>
+              <div className="col-md-4"><label className="form-label small fw-semibold">{t('provider.dir.directEmailHisp')}</label><input className="form-control form-control-sm" type="email" value={form.email_direct} onChange={e => setField('email_direct', e.target.value)} /></div>
+              <div className="col-md-4"><label className="form-label small fw-semibold">{t('provider.phone')}</label><PhoneInput value={form.phone} onChange={v => setField('phone', v)} /></div>
+              <div className="col-md-4"><label className="form-label small">{t('provider.dir.workPhone')}</label><PhoneInput value={form.phonew1} onChange={v => setField('phonew1', v)} /></div>
+              <div className="col-md-4"><label className="form-label small">{t('provider.cell')}</label><PhoneInput value={form.phonecell} onChange={v => setField('phonecell', v)} /></div>
+              <div className="col-md-4"><label className="form-label small">{t('provider.fax')}</label><input className="form-control form-control-sm" value={form.fax} onChange={e => setField('fax', e.target.value)} /></div>
             </div>
 
             {/* Address & Facility */}
-            <h6 className="text-uppercase small fw-bold text-primary mb-2"><i className="bi bi-geo-alt me-2"></i>Address & Facility</h6>
+            <h6 className="text-uppercase small fw-bold text-primary mb-2"><i className="bi bi-geo-alt me-2"></i>{t('provider.dir.addressFacility')}</h6>
             <div className="row g-2 mb-3">
-              <div className="col-md-6"><label className="form-label small fw-semibold">Street</label><input className="form-control form-control-sm" value={form.street} onChange={e => setField('street', e.target.value)} /></div>
-              <div className="col-md-6"><label className="form-label small">City</label><CitySelect value={form.city} onChange={v => setField('city', v)} /></div>
+              <div className="col-md-6"><label className="form-label small fw-semibold">{t('provider.dir.street')}</label><input className="form-control form-control-sm" value={form.street} onChange={e => setField('street', e.target.value)} /></div>
+              <div className="col-md-6"><label className="form-label small">{t('provider.dir.city')}</label><CitySelect value={form.city} onChange={v => setField('city', v)} /></div>
               <div className="col-md-4">
-                <label className="form-label small fw-semibold">Primary Facility</label>
+                <label className="form-label small fw-semibold">{t('provider.dir.primaryFacility')}</label>
                 <select className="form-select form-select-sm" value={form.facility_id} onChange={e => setField('facility_id', e.target.value)}>
-                  <option value="">— None —</option>
+                  <option value="">{t('provider.dir.noneOption')}</option>
                   {facilities.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
-              <div className="col-md-4"><label className="form-label small">Organization</label><input className="form-control form-control-sm" value={form.organization} onChange={e => setField('organization', e.target.value)} /></div>
-              <div className="col-md-4"><label className="form-label small">Assistant</label><input className="form-control form-control-sm" value={form.assistant} onChange={e => setField('assistant', e.target.value)} /></div>
+              <div className="col-md-4"><label className="form-label small">{t('provider.organization')}</label><input className="form-control form-control-sm" value={form.organization} onChange={e => setField('organization', e.target.value)} /></div>
+              <div className="col-md-4"><label className="form-label small">{t('provider.assistant')}</label><input className="form-control form-control-sm" value={form.assistant} onChange={e => setField('assistant', e.target.value)} /></div>
             </div>
 
             <div className="d-flex gap-2 pt-3 border-top">
@@ -535,10 +537,10 @@ export default function ProvidersPage() {
                 onClick={() => editProvider ? updateProvider.mutate(form) : createProvider.mutate(form)}
                 disabled={createProvider.isPending || updateProvider.isPending || !form.username || !form.fname || !form.lname}>
                 {createProvider.isPending || updateProvider.isPending ? (
-                  <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</>
-                ) : (<><i className={`bi ${editProvider ? 'bi-check-lg' : 'bi-plus-lg'} me-1`}></i>{editProvider ? 'Update Provider' : 'Add Provider'}</>)}
+                  <><span className="spinner-border spinner-border-sm me-1"></span>{t('provider.dir.saving')}</>
+                ) : (<><i className={`bi ${editProvider ? 'bi-check-lg' : 'bi-plus-lg'} me-1`}></i>{editProvider ? t('provider.dir.updateProvider') : t('provider.dir.addProvider')}</>)}
               </button>
-              <button className="btn btn-outline-secondary rounded-pill" onClick={resetForm}>Cancel</button>
+              <button className="btn btn-outline-secondary rounded-pill" onClick={resetForm}>{t('common.cancel')}</button>
             </div>
           </div>
         </div>

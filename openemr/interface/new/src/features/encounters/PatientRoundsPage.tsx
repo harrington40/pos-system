@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
@@ -12,6 +14,7 @@ const PAIN_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const SPO2_ALERT_THRESHOLD = 92; // clinic-configurable escalation threshold
 
 export default function PatientRoundsPage() {
+  const { t } = useTranslation();
   const { pid } = useParams<{ pid: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -76,8 +79,8 @@ export default function PatientRoundsPage() {
     return [...(vitals as any[])]
       .filter((v: any) => {
         if (!v.date) return false;
-        const t = new Date(String(v.date).replace(' ', 'T')).getTime();
-        return Number.isFinite(t) && now - t <= hours * 3600 * 1000;
+        const when = new Date(String(v.date).replace(' ', 'T')).getTime();
+        return Number.isFinite(when) && now - when <= hours * 3600 * 1000;
       })
       .sort(
         (a: any, b: any) =>
@@ -89,7 +92,7 @@ export default function PatientRoundsPage() {
   const checkEscalation = () => {
     const spo2 = Number(form.oxygen_saturation);
     if (Number.isFinite(spo2) && spo2 > 0 && spo2 < SPO2_ALERT_THRESHOLD) {
-      setEscalation(`SpO₂ entered: ${spo2}% — this value meets the clinic's configured escalation criteria.`);
+      setEscalation(t('encounters.rounds.escalation', { spo2 }));
     } else {
       setEscalation(null);
     }
@@ -103,17 +106,17 @@ export default function PatientRoundsPage() {
       <div className="rounded-4 p-3 mb-3 text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #4b2d8e 50%, #6f42c1 100%)' }}>
         <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <div className="text-uppercase small opacity-75 fw-semibold">Patient Rounds</div>
+            <div className="text-uppercase small opacity-75 fw-semibold">{t('encounters.rounds.banner')}</div>
             <h4 className="mb-1 fw-bold">{formatPatientName(patient)}</h4>
             <div className="small text-white text-opacity-75">
-              DOB: {formatDateOnly(patient?.DOB)} · {patient?.sex || '—'}{age != null ? ` · ${age} yrs` : ''}
+              {t('encounters.rounds.dobLabel')} {formatDateOnly(patient?.DOB)} · {patient?.sex || '—'}{age != null ? t('encounters.rounds.ageYears', { count: age }) : ''}
             </div>
           </div>
           <div className="small text-end">
             {allergyNames.length > 0 && (
-              <div className="badge bg-warning text-dark mb-1 d-block"><i className="bi bi-exclamation-triangle me-1"></i>ALLERGIES: {allergyNames.join(', ')}</div>
+              <div className="badge bg-warning text-dark mb-1 d-block"><i className="bi bi-exclamation-triangle me-1"></i>{t('encounters.rounds.allergies', { list: allergyNames.join(', ') })}</div>
             )}
-            {patient?.provider_name && <div><i className="bi bi-person-check me-1"></i>Attending: {patient.provider_name}</div>}
+            {patient?.provider_name && <div><i className="bi bi-person-check me-1"></i>{t('encounters.rounds.attending', { name: patient.provider_name })}</div>}
           </div>
         </div>
       </div>
@@ -121,20 +124,20 @@ export default function PatientRoundsPage() {
       {/* ── Current round ── */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center" style={{ borderRadius: '16px 16px 0 0' }}>
-          <h6 className="mb-0 fw-bold small">CURRENT ROUND</h6>
-          <span className="text-muted small">{user?.displayName || 'Staff'} · {new Date().toLocaleString()}</span>
+          <h6 className="mb-0 fw-bold small">{t('encounters.rounds.currentRound')}</h6>
+          <span className="text-muted small">{user?.displayName || t('encounters.rounds.staff')} · {new Date().toLocaleString()}</span>
         </div>
         <div className="card-body">
           <div className="row g-2">
-            <div className="col-6 col-md-2"><label className="form-label small mb-0">Weight (kg)</label><input type="number" className="form-control form-control-sm" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} /></div>
-            <div className="col-6 col-md-2"><label className="form-label small mb-0">BP Sys</label><input type="number" className="form-control form-control-sm" value={form.bps} onChange={e => setForm({...form, bps: e.target.value})} /></div>
-            <div className="col-6 col-md-2"><label className="form-label small mb-0">BP Dia</label><input type="number" className="form-control form-control-sm" value={form.bpd} onChange={e => setForm({...form, bpd: e.target.value})} /></div>
-            <div className="col-6 col-md-2"><label className="form-label small mb-0">Pulse (bpm)</label><input type="number" className="form-control form-control-sm" value={form.pulse} onChange={e => setForm({...form, pulse: e.target.value})} /></div>
-            <div className="col-6 col-md-2"><label className="form-label small mb-0">Resp (/min)</label><input type="number" className="form-control form-control-sm" value={form.respiration} onChange={e => setForm({...form, respiration: e.target.value})} /></div>
-            <div className="col-6 col-md-2"><label className="form-label small mb-0">Temp (°C)</label><input type="number" step="any" className="form-control form-control-sm" value={form.temperature} onChange={e => setForm({...form, temperature: e.target.value})} /></div>
-            <div className="col-6 col-md-2"><label className="form-label small mb-0">SpO₂ (%)</label><input type="number" className="form-control form-control-sm" value={form.oxygen_saturation} onChange={e => setForm({...form, oxygen_saturation: e.target.value})} onBlur={checkEscalation} /></div>
+            <div className="col-6 col-md-2"><label className="form-label small mb-0">{t('encounters.rounds.lWeight')}</label><input type="number" className="form-control form-control-sm" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} /></div>
+            <div className="col-6 col-md-2"><label className="form-label small mb-0">{t('encounters.rounds.lBpSys')}</label><input type="number" className="form-control form-control-sm" value={form.bps} onChange={e => setForm({...form, bps: e.target.value})} /></div>
+            <div className="col-6 col-md-2"><label className="form-label small mb-0">{t('encounters.rounds.lBpDia')}</label><input type="number" className="form-control form-control-sm" value={form.bpd} onChange={e => setForm({...form, bpd: e.target.value})} /></div>
+            <div className="col-6 col-md-2"><label className="form-label small mb-0">{t('encounters.rounds.lPulse')}</label><input type="number" className="form-control form-control-sm" value={form.pulse} onChange={e => setForm({...form, pulse: e.target.value})} /></div>
+            <div className="col-6 col-md-2"><label className="form-label small mb-0">{t('encounters.rounds.lResp')}</label><input type="number" className="form-control form-control-sm" value={form.respiration} onChange={e => setForm({...form, respiration: e.target.value})} /></div>
+            <div className="col-6 col-md-2"><label className="form-label small mb-0">{t('encounters.rounds.lTemp')}</label><input type="number" step="any" className="form-control form-control-sm" value={form.temperature} onChange={e => setForm({...form, temperature: e.target.value})} /></div>
+            <div className="col-6 col-md-2"><label className="form-label small mb-0">{t('encounters.rounds.lSpo2')}</label><input type="number" className="form-control form-control-sm" value={form.oxygen_saturation} onChange={e => setForm({...form, oxygen_saturation: e.target.value})} onBlur={checkEscalation} /></div>
             <div className="col-12">
-              <label className="form-label small mb-1">Pain (0–10)</label>
+              <label className="form-label small mb-1">{t('encounters.rounds.lPain')}</label>
               <div className="d-flex gap-1 flex-wrap">
                 {PAIN_LEVELS.map(p => (
                   <button key={p} type="button"
@@ -145,24 +148,24 @@ export default function PatientRoundsPage() {
               </div>
             </div>
             <div className="col-12">
-              <label className="form-label small mb-0">Diagnosis / Plan / Meds / Notes</label>
-              <textarea className="form-control form-control-sm" rows={3} placeholder="Patient awake and responsive…" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+              <label className="form-label small mb-0">{t('encounters.rounds.lNotes')}</label>
+              <textarea className="form-control form-control-sm" rows={3} placeholder={t('encounters.rounds.notesPlaceholder')} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
             </div>
           </div>
 
           {escalation && (
             <div className="alert alert-warning small mt-3 mb-0 d-flex align-items-center gap-2">
               <i className="bi bi-exclamation-triangle-fill"></i>
-              <div className="flex-grow-1"><strong>ATTENTION REQUIRED</strong> — {escalation}</div>
-              <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setEscalation(null)}>Recheck Measurement</button>
-              <button className="btn btn-warning btn-sm rounded-pill" onClick={() => { /* notify nurse */ setEscalation(`${escalation} — Nurse notified.`); }}>Notify Nurse</button>
+              <div className="flex-grow-1"><strong>{t('encounters.rounds.attentionRequired')}</strong> — {escalation}</div>
+              <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setEscalation(null)}>{t('encounters.rounds.recheck')}</button>
+              <button className="btn btn-warning btn-sm rounded-pill" onClick={() => { /* notify nurse */ setEscalation(t('encounters.rounds.nurseNotified', { msg: escalation })); }}>{t('encounters.rounds.notifyNurse')}</button>
             </div>
           )}
 
           <div className="d-flex gap-2 mt-3">
-            <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setForm({ weight: '', bps: '', bpd: '', pulse: '', respiration: '', temperature: '', oxygen_saturation: '', pain: '', notes: '' })}>Save Draft</button>
+            <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setForm({ weight: '', bps: '', bpd: '', pulse: '', respiration: '', temperature: '', oxygen_saturation: '', pain: '', notes: '' })}>{t('encounters.rounds.saveDraft')}</button>
             <button className="btn btn-success btn-sm rounded-pill px-3" disabled={saveRound.isPending} onClick={() => saveRound.mutate()}>
-              {saveRound.isPending ? 'Saving…' : 'Complete Round'}
+              {saveRound.isPending ? t('encounters.rounds.saving') : t('encounters.rounds.completeRound')}
             </button>
           </div>
         </div>
@@ -171,7 +174,7 @@ export default function PatientRoundsPage() {
       {/* ── Trends ── */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center" style={{ borderRadius: '16px 16px 0 0' }}>
-          <h6 className="mb-0 fw-bold small">Trends</h6>
+          <h6 className="mb-0 fw-bold small">{t('encounters.rounds.trends')}</h6>
           <div className="btn-group btn-group-sm">
             {(['24h', '48h', '7d'] as const).map(w => (
               <button key={w} className={`btn ${trendWindow === w ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setTrendWindow(w)}>{w}</button>
@@ -180,7 +183,7 @@ export default function PatientRoundsPage() {
         </div>
         <div className="card-body">
           {trendVitals.length === 0 ? (
-            <div className="text-muted small">No vitals recorded in the last {trendWindow}.</div>
+            <div className="text-muted small">{t('encounters.rounds.noVitalsInWindow', { window: trendWindow })}</div>
           ) : (
             <VitalsTrend vitals={trendVitals} height={240} />
           )}
@@ -190,12 +193,12 @@ export default function PatientRoundsPage() {
       {/* ── Previous rounds ── */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white py-2" style={{ borderRadius: '16px 16px 0 0' }}>
-          <h6 className="mb-0 fw-bold small">Previous Rounds</h6>
+          <h6 className="mb-0 fw-bold small">{t('encounters.rounds.previousRounds')}</h6>
         </div>
         <div className="card-body p-0">
           <div className="table-responsive">
             <table className="table table-sm table-hover mb-0 small">
-              <thead className="table-light"><tr><th>Time</th><th>Staff</th><th>Wt.</th><th>B/P</th><th>Pulse</th><th>Resp</th><th>Temp</th><th>SpO₂</th><th>Pain</th><th>Notes</th></tr></thead>
+              <thead className="table-light"><tr><th>{t('encounters.rounds.thTime')}</th><th>{t('encounters.rounds.thStaff')}</th><th>{t('encounters.rounds.thWt')}</th><th>{t('encounters.rounds.thBp')}</th><th>{t('encounters.rounds.thPulse')}</th><th>{t('encounters.rounds.thResp')}</th><th>{t('encounters.rounds.thTemp')}</th><th>{t('encounters.rounds.thSpo2')}</th><th>{t('encounters.rounds.thPain')}</th><th>{t('encounters.rounds.thNotes')}</th></tr></thead>
               <tbody>
                 {(vitals as any[]).slice(0, 20).map((v: any) => (
                   <tr key={v.id}>
@@ -208,17 +211,17 @@ export default function PatientRoundsPage() {
                     <td>{formatVital(v.temperature, 1)}</td>
                     <td>{formatVital(v.oxygen_saturation)}%</td>
                     <td>{v.pain ?? '—'}</td>
-                    <td><button className="btn btn-link btn-sm p-0" onClick={() => alert('View round (read-only)')}>View</button></td>
+                    <td><button className="btn btn-link btn-sm p-0" onClick={() => alert(t('encounters.rounds.viewRound'))}>{t('encounters.rounds.view')}</button></td>
                   </tr>
                 ))}
-                {!(vitals as any[]).length && <tr><td colSpan={10} className="text-center text-muted py-3">No previous rounds recorded.</td></tr>}
+                {!(vitals as any[]).length && <tr><td colSpan={10} className="text-center text-muted py-3">{t('encounters.rounds.nonePrevious')}</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => navigate(-1)}><i className="bi bi-arrow-left me-1"></i>Back</button>
+      <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => navigate(-1)}><i className="bi bi-arrow-left me-1"></i>{t('encounters.rounds.back')}</button>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
@@ -35,6 +36,7 @@ const initials = (name: string) => {
 };
 
 export default function PatientChatPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -208,11 +210,11 @@ export default function PatientChatPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #0dcaf0 0%, #0d6efd 55%, #6610f2 100%)' }}>
         <div className="d-flex justify-content-between align-items-center">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-chat-heart me-2"></i>Patient Chat</h2>
-            <p className="mb-0 text-white text-opacity-75 small">Message your patients in real time</p>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-chat-heart me-2"></i>{t('patientChat.title')}</h2>
+            <p className="mb-0 text-white text-opacity-75 small">{t('patientChat.subtitle')}</p>
           </div>
           <span className="badge bg-white bg-opacity-25 rounded-pill fs-6">
-            <i className="bi bi-people me-1"></i>{patients.length} patients
+            <i className="bi bi-people me-1"></i>{t('patientChat.patients', { count: patients.length })}
           </span>
         </div>
       </div>
@@ -226,7 +228,7 @@ export default function PatientChatPage() {
                 <span className="input-group-text bg-transparent border-end-0"><i className="bi bi-search"></i></span>
                 <input
                   className="form-control border-start-0"
-                  placeholder="Search patients..."
+                  placeholder={t('patientChat.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -281,16 +283,16 @@ export default function PatientChatPage() {
                   <div className="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '90px', height: '90px' }}>
                     <i className="bi bi-chat-dots fs-1 text-primary"></i>
                   </div>
-                  <h5 className="fw-bold text-dark">Your patient conversations</h5>
-                  <p className="small">Select a patient from the list to view or send messages.</p>
+                  <h5 className="fw-bold text-dark">{t('patientChat.yourConversations')}</h5>
+                  <p className="small">{t('patientChat.selectPatientHint')}</p>
                 </div>
               </div>
             ) : access === 'none' ? (
               <div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ background: 'radial-gradient(circle at 50% 30%, #eef4ff 0%, #ffffff 70%)' }}>
                 <div className="text-center text-muted p-5">
                   <i className="bi bi-lock fs-1 text-secondary d-block mb-3"></i>
-                  <h5 className="fw-bold text-dark">Patient chat is locked</h5>
-                  <p className="small mb-0">Only doctors/physicians can access patient chat. Ask an administrator or physician to share this conversation with you.</p>
+                  <h5 className="fw-bold text-dark">{t('patientChat.locked')}</h5>
+                  <p className="small mb-0">{t('patientChat.lockedHint')}</p>
                 </div>
               </div>
             ) : (
@@ -300,7 +302,7 @@ export default function PatientChatPage() {
                   {avatar(patientName, '#20c997')}
                   <div className="flex-grow-1">
                     <div className="fw-bold">{patientName}</div>
-                    <small className="text-success"><i className="bi bi-circle-fill me-1" style={{ fontSize: '0.5rem' }}></i>Patient</small>
+                    <small className="text-success"><i className="bi bi-circle-fill me-1" style={{ fontSize: '0.5rem' }}></i>{t('patientChat.patientBadge')}</small>
                   </div>
                   {canShare && (
                     <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={() => setShowShare(true)}>
@@ -317,12 +319,12 @@ export default function PatientChatPage() {
                   {isLoading ? (
                     <div className="text-center text-muted py-5">
                       <div className="spinner-border text-primary mb-2"></div>
-                      <p>Loading conversation...</p>
+                      <p>{t('patientChat.loadingConversation')}</p>
                     </div>
                   ) : !messages.length ? (
                     <div className="text-center text-muted py-5">
                       <i className="bi bi-chat-left-text fs-1 d-block mb-2 opacity-25"></i>
-                      <p>No messages yet. Say hello below.</p>
+                      <p>{t('patientChat.noMessages')}</p>
                     </div>
                   ) : (
                     messages.map((m) => {
@@ -342,7 +344,7 @@ export default function PatientChatPage() {
                               <div style={{ whiteSpace: 'pre-wrap' }}>{m.body}</div>
                             </div>
                             <small className="text-muted" style={{ fontSize: '0.7rem' }}>
-                              {isProvider ? 'You' : patientName} · {fmtTime(m.date)}
+                              {isProvider ? t('patientChat.you') : patientName} · {fmtTime(m.date)}
                             </small>
                           </div>
                           {isProvider && avatar(user?.displayName || user?.username || 'DR', '#0d6efd', '26px', '0.65rem')}
@@ -368,7 +370,7 @@ export default function PatientChatPage() {
                             handleSend();
                           }
                         }}
-                        placeholder={`Message ${patientName}...`}
+                        placeholder={t('patientChat.messagePlaceholder', { name: patientName })}
                       />
                       <button
                         className="btn btn-primary rounded-pill px-3 d-flex align-items-center"
@@ -406,28 +408,28 @@ export default function PatientChatPage() {
               <div className="modal-body">
                 <div className="row g-2 align-items-end mb-3">
                   <div className="col-6">
-                    <label className="form-label small mb-0">User</label>
+                    <label className="form-label small mb-0">{t('patientChat.user')}</label>
                     <select className="form-select form-select-sm" value={shareUserId} onChange={(e) => setShareUserId(e.target.value)}>
-                      <option value="">Select user…</option>
+                      <option value="">{t('patientChat.selectUser')}</option>
                       {shareUsers.map((u: any) => (
                         <option key={u.id} value={u.id}>{`${u.fname || ''} ${u.lname || ''}`.trim() || u.username} ({u.main_menu_role || 'user'})</option>
                       ))}
                     </select>
                   </div>
                   <div className="col-3">
-                    <label className="form-label small mb-0">Access</label>
+                    <label className="form-label small mb-0">{t('patientChat.access')}</label>
                     <select className="form-select form-select-sm" value={shareAccess} onChange={(e) => setShareAccess(e.target.value)}>
-                      <option value="read">Read</option>
-                      <option value="write">Read & Write</option>
+                      <option value="read">{t('patientChat.readOnly')}</option>
+                      <option value="write">{t('patientChat.readWrite')}</option>
                     </select>
                   </div>
                   <div className="col-3">
-                    <button className="btn btn-primary btn-sm w-100 rounded-pill" disabled={!shareUserId || addShare.isPending} onClick={() => addShare.mutate()}>Grant</button>
+                    <button className="btn btn-primary btn-sm w-100 rounded-pill" disabled={!shareUserId || addShare.isPending} onClick={() => addShare.mutate()}>{t('patientChat.grant')}</button>
                   </div>
                 </div>
-                <div className="small text-muted mb-1">People with access</div>
+                <div className="small text-muted mb-1">{t('patientChat.peopleWithAccess')}</div>
                 {shares.length === 0 ? (
-                  <div className="text-muted small">Not shared with anyone yet. Doctors and administrators always have access.</div>
+                  <div className="text-muted small">{t('patientChat.notShared')}</div>
                 ) : (
                   <div className="list-group list-group-flush">
                     {shares.map((s: any) => (

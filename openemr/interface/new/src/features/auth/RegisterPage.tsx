@@ -1,11 +1,13 @@
 
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 import PhoneInput from '../../components/shared/PhoneInput';
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     username: '', password: '', confirmPassword: '',
     fname: '', lname: '', title: '', specialty: '',
@@ -64,10 +66,9 @@ export default function RegisterPage() {
                 <i className="bi bi-check-lg text-white fs-1"></i>
               </div>
             </div>
-            <h4 className="mb-2">Registration Submitted!</h4>
+            <h4 className="mb-2">{t('auth.registrationSubmitted')}</h4>
             <p className="text-muted mb-3">
-              Your application has been received. An administrator will review it within <strong>30 days</strong>.
-              You'll be able to log in once approved.
+              {t('auth.registrationReceived')} <strong>{t('auth.days30')}</strong>. {t('auth.registrationApprovedNote')}
             </p>
             <div className="alert alert-info small py-2">
               <i className="bi bi-info-circle me-1"></i>
@@ -89,9 +90,9 @@ export default function RegisterPage() {
       <div className="card shadow-lg border-0 position-relative" style={{ maxWidth: '620px', width: '100%', borderRadius: '24px', background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.6)' }}>
         <div className="card-header bg-primary text-white text-center py-3">
           <h4 className="mb-1">
-            <i className="bi bi-person-plus me-2"></i>Staff Registration
+            <i className="bi bi-person-plus me-2"></i>{t('auth.staffRegistration')}
           </h4>
-          <p className="mb-0 small opacity-75">Create your OpenRx account — pending admin approval</p>
+          <p className="mb-0 small opacity-75">{t('auth.registerSubtitle')}</p>
         </div>
         <div className="card-body p-4">
           {error && (
@@ -102,35 +103,35 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit}>
             {/* Account Info */}
-            <h6 className="text-muted text-uppercase small border-bottom pb-1 mb-2">Account Credentials</h6>
+            <h6 className="text-muted text-uppercase small border-bottom pb-1 mb-2">{t('auth.accountCredentials')}</h6>
             <div className="row g-2 mb-3">
               <div className="col-md-6">
-                <label className="form-label small">Username <span className="text-danger">*</span></label>
+                <label className="form-label small">{t('auth.username')} <span className="text-danger">*</span></label>
                 <input className="form-control form-control-sm" value={form.username}
                   onChange={e => update('username', e.target.value)} required />
               </div>
               <div className="col-md-6">
-                <label className="form-label small">Email</label>
+                <label className="form-label small">{t('auth.email')}</label>
                 <input className="form-control form-control-sm" type="email" value={form.email}
                   onChange={e => update('email', e.target.value)} />
               </div>
               <div className="col-md-6">
-                <label className="form-label small">Password <span className="text-danger">*</span></label>
+                <label className="form-label small">{t('auth.password')} <span className="text-danger">*</span></label>
                 <input className="form-control form-control-sm" type="password" value={form.password}
                   onChange={e => update('password', e.target.value)} required minLength={6} />
               </div>
               <div className="col-md-6">
-                <label className="form-label small">Confirm Password <span className="text-danger">*</span></label>
+                <label className="form-label small">{t('auth.confirmPassword')} <span className="text-danger">*</span></label>
                 <input className="form-control form-control-sm" type="password" value={form.confirmPassword}
                   onChange={e => update('confirmPassword', e.target.value)} required />
               </div>
             </div>
 
             {/* Personal Info */}
-            <h6 className="text-muted text-uppercase small border-bottom pb-1 mb-2">Personal Information</h6>
+            <h6 className="text-muted text-uppercase small border-bottom pb-1 mb-2">{t('auth.personalInfo')}</h6>
             <div className="row g-2 mb-3">
               <div className="col-md-3">
-                <label className="form-label small">Title</label>
+                <label className="form-label small">{t('auth.titleLabel')}</label>
                 <select className="form-select form-select-sm" value={form.title}
                   onChange={e => update('title', e.target.value)}>
                   <option value="">—</option>
@@ -140,48 +141,48 @@ export default function RegisterPage() {
                 </select>
               </div>
               <div className="col-md-5">
-                <label className="form-label small">First Name <span className="text-danger">*</span></label>
+                <label className="form-label small">{t('auth.firstName')} <span className="text-danger">*</span></label>
                 <input className="form-control form-control-sm" value={form.fname}
                   onChange={e => update('fname', e.target.value)} required />
               </div>
               <div className="col-md-4">
-                <label className="form-label small">Last Name <span className="text-danger">*</span></label>
+                <label className="form-label small">{t('auth.lastName')} <span className="text-danger">*</span></label>
                 <input className="form-control form-control-sm" value={form.lname}
                   onChange={e => update('lname', e.target.value)} required />
               </div>
             </div>
 
             {/* Professional Info */}
-            <h6 className="text-muted text-uppercase small border-bottom pb-1 mb-2">Professional Details (optional)</h6>
+            <h6 className="text-muted text-uppercase small border-bottom pb-1 mb-2">{t('auth.professionalDetails')}</h6>
             <div className="row g-2 mb-3">
               <div className="col-md-6">
-                <label className="form-label small">Specialty</label>
+                <label className="form-label small">{t('auth.specialty')}</label>
                 <input className="form-control form-control-sm" value={form.specialty}
-                  onChange={e => update('specialty', e.target.value)} placeholder="e.g. Family Medicine" />
+                  onChange={e => update('specialty', e.target.value)} placeholder={t('auth.specialtyPlaceholder')} />
               </div>
               <div className="col-md-6">
-                <label className="form-label small">Physician Type</label>
+                <label className="form-label small">{t('auth.physicianType')}</label>
                 <select className="form-select form-select-sm" value={form.physician_type}
                   onChange={e => update('physician_type', e.target.value)}>
-                  <option value="">— Select —</option>
-                  <option value="attending_physician">Attending physician</option>
-                  <option value="general_physician">General physician</option>
-                  <option value="consultant_physician">Consultant physician</option>
+                  <option value="">{t('auth.selectPlaceholder')}</option>
+                  <option value="attending_physician">{t('auth.physicianTypes.attending')}</option>
+                  <option value="general_physician">{t('auth.physicianTypes.general')}</option>
+                  <option value="consultant_physician">{t('auth.physicianTypes.consultant')}</option>
                   <option value="physician">Physician</option>
-                  <option value="resident_physician">Resident physician</option>
-                  <option value="specialized_physician">Specialized physician</option>
-                  <option value="community_health_physician">Community health physician</option>
-                  <option value="occupational_physician">Occupational physician</option>
-                  <option value="public_health_physician">Public health physician</option>
+                  <option value="resident_physician">{t('auth.physicianTypes.resident')}</option>
+                  <option value="specialized_physician">{t('auth.physicianTypes.specialized')}</option>
+                  <option value="community_health_physician">{t('auth.physicianTypes.community')}</option>
+                  <option value="occupational_physician">{t('auth.physicianTypes.occupational')}</option>
+                  <option value="public_health_physician">{t('auth.physicianTypes.publicHealth')}</option>
                 </select>
               </div>
               <div className="col-md-4">
-                <label className="form-label small">NPI Number</label>
+                <label className="form-label small">{t('auth.npi')}</label>
                 <input className="form-control form-control-sm" value={form.npi}
-                  onChange={e => update('npi', e.target.value)} placeholder="1234567890" />
+                  onChange={e => update('npi', e.target.value)} placeholder={t('auth.npiPlaceholder')} />
               </div>
               <div className="col-md-4">
-                <label className="form-label small">Phone</label>
+                <label className="form-label small">{t('auth.phone')}</label>
                 <PhoneInput value={form.phone} onChange={v => update('phone', v)} />
               </div>
             </div>
@@ -192,13 +193,13 @@ export default function RegisterPage() {
               ) : (
                 <i className="bi bi-person-plus me-1"></i>
               )}
-              Submit Registration
+              {t('auth.submitRegistration')}
             </button>
           </form>
 
           <div className="text-center mt-3">
             <small className="text-muted">
-              Already have an account? <NavLink to="/login">Log in</NavLink>
+              {t('auth.alreadyAccount')} <NavLink to="/login">{t('auth.logIn')}</NavLink>
             </small>
           </div>
         </div>

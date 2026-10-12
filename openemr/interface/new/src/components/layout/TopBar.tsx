@@ -1,8 +1,11 @@
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyAvatar } from '../../hooks/useMyAvatar';
+import LanguageSwitcher from '../shared/LanguageSwitcher';
 
 export default function TopBar() {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { data: myAvatar } = useMyAvatar();
   const myAvatarUrl = myAvatar?.url || undefined;
@@ -27,12 +30,13 @@ export default function TopBar() {
         {/* Breadcrumb or page title — filled by child routes via Outlet context */}
       </div>
       <div className="d-flex align-items-center gap-3">
+        <LanguageSwitcher />
         {user && (
           canOpenProfile ? (
             <NavLink
               to={`/providers/${myAvatar!.userId}`}
               className="d-flex align-items-center gap-2 text-decoration-none"
-              title={myAvatarUrl ? 'My profile & photo' : 'Add your photo'}
+              title={myAvatarUrl ? t('shell.myProfilePhoto') : t('shell.addYourPhoto')}
             >
               {avatar}
               <span className="text-muted small">{user.displayName}</span>
@@ -46,7 +50,7 @@ export default function TopBar() {
         )}
         <button className="btn btn-outline-secondary btn-sm" onClick={logout}>
           <i className="bi bi-box-arrow-right me-1"></i>
-          Logout
+          {t('auth.logout')}
         </button>
       </div>
     </header>

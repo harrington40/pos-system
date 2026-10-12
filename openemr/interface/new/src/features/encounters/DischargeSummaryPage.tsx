@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+
 import nestClient from '../../api/nest-client';
 import { formatPatientName } from '../../utils/patientName';
 
 export default function DischargeSummaryPage() {
+  const { t } = useTranslation();
   const { pid } = useParams<{ pid: string }>();
   const navigate = useNavigate();
   const [synced, setSynced] = useState(false);
@@ -24,7 +27,7 @@ export default function DischargeSummaryPage() {
   });
 
   if (isLoading) return <div className="text-center p-5"><span className="spinner-border"></span></div>;
-  if (!data) return <div className="alert alert-danger">Could not load discharge summary</div>;
+  if (!data) return <div className="alert alert-danger">{t('encounters.discharge.couldNotLoad')}</div>;
 
   const printDoc = () => window.print();
 
@@ -34,25 +37,25 @@ export default function DischargeSummaryPage() {
       <div className="rounded-3 p-3 mb-3 text-white" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #198754 100%)' }}>
         <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div>
-            <h5 className="mb-0 fw-bold"><i className="bi bi-file-earmark-text me-2"></i>Discharge Summary</h5>
+            <h5 className="mb-0 fw-bold"><i className="bi bi-file-earmark-text me-2"></i>{t('encounters.discharge.title')}</h5>
             <small className="text-white text-opacity-75">
               {formatPatientName(data.patient)} · {data.patient?.DOB} · {data.patient?.sex}
             </small>
           </div>
           <div className="d-flex gap-2">
             <button className="btn btn-outline-light btn-sm rounded-pill" onClick={() => navigate(-1)}>
-              <i className="bi bi-arrow-left me-1"></i>Back
+              <i className="bi bi-arrow-left me-1"></i>{t('encounters.discharge.back')}
             </button>
             <button className="btn btn-light btn-sm rounded-pill" onClick={printDoc}>
-              <i className="bi bi-printer me-1"></i>Print
+              <i className="bi bi-printer me-1"></i>{t('encounters.discharge.print')}
             </button>
             {!synced && (
               <button className="btn btn-success btn-sm rounded-pill"
                 onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
-                {syncMutation.isPending ? 'Syncing...' : <><i className="bi bi-cloud-upload me-1"></i>Sync to Documents</>}
+                {syncMutation.isPending ? t('encounters.discharge.syncing') : <><i className="bi bi-cloud-upload me-1"></i>{t('encounters.discharge.sync')}</>}
               </button>
             )}
-            {synced && <span className="badge bg-success rounded-pill"><i className="bi bi-check me-1"></i>Synced</span>}
+            {synced && <span className="badge bg-success rounded-pill"><i className="bi bi-check me-1"></i>{t('encounters.discharge.synced')}</span>}
           </div>
         </div>
       </div>
@@ -62,7 +65,7 @@ export default function DischargeSummaryPage() {
         style={{ borderRadius: '10px', fontSize: '0.85rem' }}>
         <i className={`bi ${data.dischargeStatus === 'CLEARED' ? 'bi-check-circle' : 'bi-exclamation-triangle'} fs-5`}></i>
         <div>
-          <strong>Discharge Status: {data.dischargeStatus}</strong>
+          <strong>{t('encounters.discharge.status', { status: data.dischargeStatus })}</strong>
           {data.blockers?.length > 0 && (
             <div className="small mt-1">
               {data.blockers.map((b: string, i: number) => <div key={i}>• {b}</div>)}
@@ -77,7 +80,7 @@ export default function DischargeSummaryPage() {
           {/* Clinical Summary */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
             <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard-pulse me-2 text-primary"></i>Clinical Summary</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard-pulse me-2 text-primary"></i>{t('encounters.discharge.clinicalSummary')}</h6>
             </div>
             <div className="card-body py-2">
               <p className="small mb-0" style={{ lineHeight: 1.6 }}>{data.clinicalSummary}</p>
@@ -87,7 +90,7 @@ export default function DischargeSummaryPage() {
           {/* Discharge Instructions */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
             <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-list-check me-2 text-success"></i>Discharge Instructions</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-list-check me-2 text-success"></i>{t('encounters.discharge.instructions')}</h6>
             </div>
             <div className="card-body py-2">
               <pre className="small mb-0" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6 }}>
@@ -100,11 +103,11 @@ export default function DischargeSummaryPage() {
           {data.medications?.length > 0 && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
               <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-capsule me-2 text-primary"></i>Discharge Medications</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-capsule me-2 text-primary"></i>{t('encounters.discharge.medications')}</h6>
               </div>
               <div className="card-body p-0">
                 <table className="table table-sm mb-0 small">
-                  <thead className="table-light"><tr><th>Drug</th><th>Dosage</th><th>Route</th><th>Frequency</th></tr></thead>
+                  <thead className="table-light"><tr><th>{t('encounters.discharge.thDrug')}</th><th>{t('encounters.discharge.thDosage')}</th><th>{t('encounters.discharge.thRoute')}</th><th>{t('encounters.discharge.thFrequency')}</th></tr></thead>
                   <tbody>
                     {data.medications.map((m: any, i: number) => (
                       <tr key={i}><td className="fw-semibold">{m.drug}</td><td>{m.dosage}</td><td>{m.route || '—'}</td><td>{m.frequency || '—'}</td></tr>
@@ -119,17 +122,17 @@ export default function DischargeSummaryPage() {
           {data.vitals && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
               <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-danger"></i>Last Vital Signs</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-heart-pulse me-2 text-danger"></i>{t('encounters.discharge.lastVitals')}</h6>
               </div>
               <div className="card-body py-2">
                 <div className="d-flex flex-wrap gap-3 small">
-                  {data.vitals.temp_f && <span><strong>Temp:</strong> {data.vitals.temp_f}°F</span>}
-                  {data.vitals.bp_systolic && <span><strong>BP:</strong> {data.vitals.bp_systolic}/{data.vitals.bp_diastolic}</span>}
-                  {data.vitals.pulse && <span><strong>HR:</strong> {data.vitals.pulse} bpm</span>}
-                  {data.vitals.respiration && <span><strong>RR:</strong> {data.vitals.respiration}/min</span>}
-                  {data.vitals.oxygen_saturation && <span><strong>O2:</strong> {data.vitals.oxygen_saturation}%</span>}
-                  {data.vitals.weight && <span><strong>Wt:</strong> {data.vitals.weight} kg</span>}
-                  {data.vitals.bmi && <span><strong>BMI:</strong> {data.vitals.bmi}</span>}
+                  {data.vitals.temp_f && <span><strong>{t('encounters.discharge.vTemp')}</strong> {data.vitals.temp_f}°F</span>}
+                  {data.vitals.bp_systolic && <span><strong>{t('encounters.discharge.vBp')}</strong> {data.vitals.bp_systolic}/{data.vitals.bp_diastolic}</span>}
+                  {data.vitals.pulse && <span><strong>{t('encounters.discharge.vHr')}</strong> {data.vitals.pulse} bpm</span>}
+                  {data.vitals.respiration && <span><strong>{t('encounters.discharge.vRr')}</strong> {data.vitals.respiration}/min</span>}
+                  {data.vitals.oxygen_saturation && <span><strong>{t('encounters.discharge.vO2')}</strong> {data.vitals.oxygen_saturation}%</span>}
+                  {data.vitals.weight && <span><strong>{t('encounters.discharge.vWt')}</strong> {data.vitals.weight} kg</span>}
+                  {data.vitals.bmi && <span><strong>{t('encounters.discharge.vBmi')}</strong> {data.vitals.bmi}</span>}
                 </div>
               </div>
             </div>
@@ -139,7 +142,7 @@ export default function DischargeSummaryPage() {
           {data.labResults?.length > 0 && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
               <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-flask me-2 text-success"></i>Lab Results</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-flask me-2 text-success"></i>{t('encounters.discharge.labResults')}</h6>
               </div>
               <div className="card-body p-0">
                 {data.labResults.map((l: any, i: number) => (
@@ -158,14 +161,14 @@ export default function DischargeSummaryPage() {
           {/* Patient Info */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
             <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-person me-2 text-info"></i>Patient</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-person me-2 text-info"></i>{t('encounters.discharge.patient')}</h6>
             </div>
             <div className="card-body py-2 small">
-              <div><strong>Name:</strong> {formatPatientName(data.patient)}</div>
-              <div><strong>DOB:</strong> {data.patient?.DOB}</div>
-              <div><strong>Sex:</strong> {data.patient?.sex}</div>
-              {data.patient?.phone_contact && <div><strong>Phone:</strong> {data.patient.phone_contact}</div>}
-              {data.patient?.street && <div><strong>Address:</strong> {[data.patient.street, data.patient.city].filter(Boolean).join(', ')}</div>}
+              <div><strong>{t('encounters.discharge.name')}</strong> {formatPatientName(data.patient)}</div>
+              <div><strong>{t('encounters.discharge.dob')}</strong> {data.patient?.DOB}</div>
+              <div><strong>{t('encounters.discharge.sex')}</strong> {data.patient?.sex}</div>
+              {data.patient?.phone_contact && <div><strong>{t('encounters.discharge.phone')}</strong> {data.patient.phone_contact}</div>}
+              {data.patient?.street && <div><strong>{t('encounters.discharge.address')}</strong> {[data.patient.street, data.patient.city].filter(Boolean).join(', ')}</div>}
             </div>
           </div>
 
@@ -173,7 +176,7 @@ export default function DischargeSummaryPage() {
           {data.diagnoses?.length > 0 && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
               <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard2-pulse me-2 text-warning"></i>Diagnoses</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-clipboard2-pulse me-2 text-warning"></i>{t('encounters.discharge.diagnoses')}</h6>
               </div>
               <div className="card-body py-2 small">
                 {data.diagnoses.map((d: any, i: number) => (
@@ -187,7 +190,7 @@ export default function DischargeSummaryPage() {
           {data.allergies?.length > 0 && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
               <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-exclamation-triangle me-2 text-danger"></i>Allergies</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-exclamation-triangle me-2 text-danger"></i>{t('encounters.discharge.allergies')}</h6>
               </div>
               <div className="card-body py-2 small">
                 {data.allergies.map((a: any, i: number) => (
@@ -203,14 +206,14 @@ export default function DischargeSummaryPage() {
           {/* Financial Summary */}
           <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
             <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-cash-stack me-2" style={{ color: '#C8102E' }}></i>Financial Summary</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-cash-stack me-2" style={{ color: '#C8102E' }}></i>{t('encounters.discharge.financial')}</h6>
             </div>
             <div className="card-body py-2 small">
-              <div className="d-flex justify-content-between mb-1"><span>Total Charges:</span><strong>${data.financialSummary?.totalCharges?.toFixed(2)}</strong></div>
-              <div className="d-flex justify-content-between mb-1"><span>Total Payments:</span><strong className="text-success">${data.financialSummary?.totalPayments?.toFixed(2)}</strong></div>
-              <div className="d-flex justify-content-between mb-1"><span>Balance:</span><strong className={data.financialSummary?.balance > 0 ? 'text-danger' : 'text-success'}>${data.financialSummary?.balance?.toFixed(2)}</strong></div>
-              <div className="d-flex justify-content-between mb-1"><span>Insurance Covered:</span><span>${data.financialSummary?.insuranceCovered?.toFixed(2)}</span></div>
-              <div className="d-flex justify-content-between"><span>Patient Obligation:</span><strong>${data.financialSummary?.patientObligation?.toFixed(2)}</strong></div>
+              <div className="d-flex justify-content-between mb-1"><span>{t('encounters.discharge.totalCharges')}</span><strong>${data.financialSummary?.totalCharges?.toFixed(2)}</strong></div>
+              <div className="d-flex justify-content-between mb-1"><span>{t('encounters.discharge.totalPayments')}</span><strong className="text-success">${data.financialSummary?.totalPayments?.toFixed(2)}</strong></div>
+              <div className="d-flex justify-content-between mb-1"><span>{t('encounters.discharge.balance')}</span><strong className={data.financialSummary?.balance > 0 ? 'text-danger' : 'text-success'}>${data.financialSummary?.balance?.toFixed(2)}</strong></div>
+              <div className="d-flex justify-content-between mb-1"><span>{t('encounters.discharge.insuranceCovered')}</span><span>${data.financialSummary?.insuranceCovered?.toFixed(2)}</span></div>
+              <div className="d-flex justify-content-between"><span>{t('encounters.discharge.patientObligation')}</span><strong>${data.financialSummary?.patientObligation?.toFixed(2)}</strong></div>
             </div>
           </div>
 
@@ -218,11 +221,11 @@ export default function DischargeSummaryPage() {
           {data.recentEncounters?.length > 1 && (
             <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
               <div className="card-header bg-white py-2" style={{ borderRadius: '12px 12px 0 0' }}>
-                <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-info"></i>Recent Encounters</h6>
+                <h6 className="mb-0 fw-bold"><i className="bi bi-clock-history me-2 text-info"></i>{t('encounters.discharge.recentEncounters')}</h6>
               </div>
               <div className="card-body py-2 small">
                 {data.recentEncounters.map((e: any, i: number) => (
-                  <div key={i} className="mb-1">{e.date?.split(' ')[0]}: {e.reason || 'Visit'} <span className="text-muted">({e.disposition || 'N/A'})</span></div>
+                  <div key={i} className="mb-1">{e.date?.split(' ')[0]}: {e.reason || t('encounters.discharge.visitFallback')} <span className="text-muted">({e.disposition || t('encounters.discharge.naFallback')})</span></div>
                 ))}
               </div>
             </div>

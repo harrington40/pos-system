@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 
 interface WikiSection {
@@ -187,6 +188,7 @@ const WIKI_CONTENT: WikiSection[] = [
 ];
 
 export default function WikiPage() {
+  const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState('getting-started');
   const [search, setSearch] = useState('');
 
@@ -253,7 +255,7 @@ export default function WikiPage() {
           <input
             className="form-control form-control-sm"
             style={{ width: '250px' }}
-            placeholder="Search wiki..."
+            placeholder={t('help.wiki.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -265,7 +267,7 @@ export default function WikiPage() {
         <div className="col-md-3">
           <div className="card shadow-sm">
             <div className="card-header bg-primary text-white py-2">
-              <h6 className="mb-0 small"><i className="bi bi-list me-2"></i>Contents</h6>
+              <h6 className="mb-0 small"><i className="bi bi-list me-2"></i>{t('help.wiki.contents')}</h6>
             </div>
             <div className="card-body p-0" style={{ maxHeight: '70vh', overflow: 'auto' }}>
               <nav className="nav flex-column">
@@ -314,7 +316,7 @@ export default function WikiPage() {
 
                 {/* Quick Links */}
                 <div className="mt-4 pt-3 border-top">
-                  <h6 className="text-muted small mb-2">Related Links</h6>
+                  <h6 className="text-muted small mb-2">{t('help.wiki.relatedLinks')}</h6>
                   <div className="d-flex flex-wrap gap-2">
                     <NavLink to="/documents" className="btn btn-outline-primary btn-sm">
                       <i className="bi bi-shield-lock me-1"></i>Secure Documents

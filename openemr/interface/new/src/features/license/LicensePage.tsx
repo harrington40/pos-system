@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 
@@ -43,6 +44,7 @@ const PLANS = [
 ];
 
 export default function LicensePage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [key, setKey] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -115,12 +117,12 @@ export default function LicensePage() {
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div className="mb-3">
             <span className="badge bg-white bg-opacity-25 px-3 py-2" style={{ fontSize: '0.8rem' }}>
-              <i className="bi bi-shield-check me-1"></i>SECURE LICENSING
+              <i className="bi bi-shield-check me-1"></i>{t('license.secureLicensing')}
             </span>
           </div>
-          <h1 className="display-4 fw-bold mb-2">OpenRx License</h1>
+          <h1 className="display-4 fw-bold mb-2">{t('license.title')}</h1>
           <p className="lead mb-0 opacity-75" style={{ maxWidth: '600px', margin: '0 auto' }}>
-            Choose the plan that fits your practice. All plans include offline validation and automatic updates.
+            {t('license.subtitle')}
           </p>
         </div>
       </div>
@@ -141,27 +143,27 @@ export default function LicensePage() {
                 <div className="d-flex align-items-center gap-2">
                   <span className="badge fw-semibold" style={{
                     background: tierInfo.color, fontSize: '0.75rem', padding: '4px 10px' }}>
-                    {tierInfo.label}
+                    {t('license.tiers.' + status.tier, { defaultValue: tierInfo.label })}
                   </span>
                   <span className="badge bg-success" style={{ fontSize: '0.7rem' }}>
-                    <i className="bi bi-check-circle me-1"></i>Active
+                    <i className="bi bi-check-circle me-1"></i>{t('license.active')}
                   </span>
                 </div>
                 <div className="small text-muted mt-1">
                   {status.customerName && <span className="fw-semibold">{status.customerName}</span>}
-                  {status.maxUsers && <span> · Up to {status.maxUsers} users</span>}
+                  {status.maxUsers && <span> · {t('license.upTo')} {status.maxUsers} {t('license.users')}</span>}
                 </div>
               </div>
             </div>
             <div className="ms-auto d-flex align-items-center gap-4">
               <div className="text-center">
-                <div className="small text-muted text-uppercase">Days Left</div>
+                <div className="small text-muted text-uppercase">{t('license.daysLeft')}</div>
                 <div className={`fs-4 fw-bold ${status.daysRemaining! > 30 ? 'text-success' : status.daysRemaining! > 7 ? 'text-warning' : 'text-danger'}`}>
                   {status.daysRemaining}
                 </div>
               </div>
               <div className="text-center">
-                <div className="small text-muted text-uppercase">Expires</div>
+                <div className="small text-muted text-uppercase">{t('license.expires')}</div>
                 <div className="small fw-semibold">{formatDate(status.expiresAt!)}</div>
               </div>
             </div>
@@ -184,23 +186,23 @@ export default function LicensePage() {
           border: '2px solid #ffc10740',
         }}>
           <i className="bi bi-exclamation-triangle text-warning" style={{ fontSize: '2rem' }}></i>
-          <h5 className="mt-2 text-warning">No Active License</h5>
-          <p className="text-muted small mb-0">Enter your license key below or choose a plan to get started.</p>
+          <h5 className="mt-2 text-warning">{t('license.noLicense')}</h5>
+          <p className="text-muted small mb-0">{t('license.noLicenseMsg')}</p>
         </div>
       )}
 
       {/* Pricing Cards */}
       <div className="mb-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <h3 className="mb-0 fw-bold">Plans & Pricing</h3>
+          <h3 className="mb-0 fw-bold">{t('license.plans')}</h3>
           <div className="btn-group" style={{ background: '#f0f0f0', borderRadius: '10px', padding: 3 }}>
             <button className={`btn btn-sm ${billingCycle === 'monthly' ? 'btn-primary' : 'btn-light'}`}
               style={{ borderRadius: '8px', border: 'none' }}
-              onClick={() => setBillingCycle('monthly')}>Monthly</button>
+              onClick={() => setBillingCycle('monthly')}>{t('license.monthly')}</button>
             <button className={`btn btn-sm ${billingCycle === 'yearly' ? 'btn-primary' : 'btn-light'}`}
               style={{ borderRadius: '8px', border: 'none' }}
               onClick={() => setBillingCycle('yearly')}>
-              Yearly <span className="badge bg-success ms-1" style={{ fontSize: '0.6rem' }}>Save 20%</span>
+              {t('license.yearly')} <span className="badge bg-success ms-1" style={{ fontSize: '0.6rem' }}>{t('license.saveTwenty')}</span>
             </button>
           </div>
         </div>
@@ -223,35 +225,39 @@ export default function LicensePage() {
                     <div className="text-center py-1" style={{
                       background: 'linear-gradient(90deg, #0d6efd, #6610f2)', color: 'white',
                       fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px',
-                    }}>Most Popular</div>
+                    }}>{t('license.mostPopular')}</div>
                   )}
                   {isActive && (
                     <div className="text-center py-1" style={{
                       background: '#198754', color: 'white',
                       fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px',
-                    }}>Current Plan</div>
+                    }}>{t('license.currentPlan')}</div>
                   )}
                   <div className="card-body d-flex flex-column p-4">
                     <div className="text-center mb-3">
                       <i className={`bi ${TIER_INFO[plan.tier]?.icon || 'bi-star'} fs-3`}
                         style={{ color: TIER_INFO[plan.tier]?.color || '#0d6efd' }}></i>
-                      <h5 className="mt-2 mb-0 fw-bold">{TIER_INFO[plan.tier]?.label || plan.tier}</h5>
+                      <h5 className="mt-2 mb-0 fw-bold">{t('license.tiers.' + plan.tier, { defaultValue: TIER_INFO[plan.tier]?.label || plan.tier })}</h5>
                     </div>
                     <div className="text-center mb-3">
                       <span className="display-5 fw-bold">${price}</span>
-                      <span className="text-muted">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                      <span className="text-muted">{billingCycle === 'monthly' ? t('license.perMonth') : t('license.perYear')}</span>
                     </div>
                     <div className="text-center mb-3">
-                      <span className="badge bg-light text-dark">Up to {plan.users} users</span>
+                      <span className="badge bg-light text-dark">{t('license.upTo')} {plan.users} {t('license.users')}</span>
                     </div>
                     <ul className="list-unstyled small mb-4 flex-grow-1">
-                      {plan.features.map((f) => (
+                      {(Array.isArray(t('license.features_' + plan.tier, { returnObjects: true }))
+                        ? (t('license.features_' + plan.tier, { returnObjects: true }) as string[])
+                        : plan.features).map((f) => (
                         <li key={f} className="mb-2 d-flex align-items-center gap-2">
                           <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '0.8rem' }}></i>
                           <span>{f}</span>
                         </li>
                       ))}
-                      {plan.excluded.map((f) => (
+                      {(Array.isArray(t('license.excluded_' + plan.tier, { returnObjects: true }))
+                        ? (t('license.excluded_' + plan.tier, { returnObjects: true }) as string[])
+                        : plan.excluded).map((f) => (
                         <li key={f} className="mb-2 d-flex align-items-center gap-2 text-muted opacity-50">
                           <i className="bi bi-dash-circle" style={{ fontSize: '0.8rem' }}></i>
                           <span>{f}</span>
@@ -261,7 +267,7 @@ export default function LicensePage() {
                     <button className={`btn w-100 ${isActive ? 'btn-success' : plan.recommended ? 'btn-primary' : 'btn-outline-primary'}`}
                       style={{ borderRadius: '10px' }} disabled={isActive}
                       onClick={() => document.getElementById('activate-section')?.scrollIntoView({ behavior: 'smooth' })}>
-                      {isActive ? 'Current Plan' : 'Get Started'}
+                      {isActive ? t('license.currentPlan') : t('license.getStarted')}
                     </button>
                   </div>
                 </div>
@@ -281,23 +287,23 @@ export default function LicensePage() {
               style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #0d6efd, #6610f2)' }}>
               <i className="bi bi-key-fill text-white small"></i>
             </div>
-            {status?.valid ? 'Renew or Upgrade License' : 'Activate Your License'}
+            {status?.valid ? t('license.renewUpgrade') : t('license.activateLicense')}
           </h5>
         </div>
         <div className="card-body p-4">
           <div className="row g-3 align-items-end">
             <div className="col-md-7">
-              <label className="form-label small fw-semibold text-uppercase text-muted">License Key</label>
+              <label className="form-label small fw-semibold text-uppercase text-muted">{t('license.licenseKey')}</label>
               <input className="form-control form-control-lg"
                 style={{ fontFamily: 'monospace', letterSpacing: '0.08em', borderRadius: '12px', fontSize: '0.95rem' }}
-                placeholder="OPENRX-XXXX-XXXX-XXXX"
+                placeholder={t('license.licenseKeyPlaceholder')}
                 value={key}
                 onChange={(e) => { setKey(e.target.value.toUpperCase()); setError(''); setSuccess(''); }} />
             </div>
             <div className="col-md-5">
-              <label className="form-label small fw-semibold text-uppercase text-muted">Organization (optional)</label>
+              <label className="form-label small fw-semibold text-uppercase text-muted">{t('license.organization')} ({t('license.optional')})</label>
               <input className="form-control" style={{ borderRadius: '12px' }}
-                placeholder="Your Clinic or Practice Name"
+                placeholder={t('license.organizationPlaceholder')}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)} />
             </div>
@@ -318,21 +324,21 @@ export default function LicensePage() {
             onClick={() => { if (key) activateMutation.mutate(); }}
             disabled={!key || activateMutation.isPending}>
             {activateMutation.isPending ? (
-              <><span className="spinner-border spinner-border-sm me-2"></span>Activating...</>
+              <><span className="spinner-border spinner-border-sm me-2"></span>{t('license.activating')}</>
             ) : (
-              <><i className="bi bi-shield-check me-2"></i>{status?.valid ? 'Activate New License' : 'Activate License'}</>
+              <><i className="bi bi-shield-check me-2"></i>{status?.valid ? t('license.activateNew') : t('license.activateLicense')}</>
             )}
           </button>
 
           <div className="d-flex justify-content-center gap-4 mt-3">
             <small className="text-muted">
-              <i className="bi bi-wifi-off me-1"></i>Works offline
+              <i className="bi bi-wifi-off me-1"></i>{t('license.worksOffline')}
             </small>
             <small className="text-muted">
-              <i className="bi bi-shield-lock me-1"></i>HMAC-SHA256 secured
+              <i className="bi bi-shield-lock me-1"></i>{t('license.hmacSecured')}
             </small>
             <small className="text-muted">
-              <i className="bi bi-arrow-repeat me-1"></i>Instant activation
+              <i className="bi bi-arrow-repeat me-1"></i>{t('license.instantActivation')}
             </small>
           </div>
         </div>
@@ -340,13 +346,13 @@ export default function LicensePage() {
 
       {/* FAQ */}
       <div className="text-center mb-4" style={{ padding: '2rem', background: '#f8f9fa', borderRadius: '16px' }}>
-        <h5 className="fw-bold mb-3">Frequently Asked Questions</h5>
+        <h5 className="fw-bold mb-3">{t('license.faqTitle')}</h5>
         <div className="row g-3 text-start">
           {[
-            { q: 'How does licensing work?', a: 'Each license key is tied to a specific tier and duration. The key is validated offline using HMAC-SHA256 — no internet required after activation.' },
-            { q: 'Can I switch plans?', a: 'Yes! Simply activate a new license key for your desired tier. The new plan takes effect immediately.' },
-            { q: 'What happens when my license expires?', a: 'You\'ll see a warning banner 7 days before expiry. After expiration, some features may be limited until you renew.' },
-            { q: 'Is my data safe?', a: 'Absolutely. Your clinical data is never shared. The license only controls feature access — all patient data stays on your servers.' },
+            { q: t('license.faq.q1'), a: t('license.faq.a1') },
+            { q: t('license.faq.q2'), a: t('license.faq.a2') },
+            { q: t('license.faq.q3'), a: t('license.faq.a3') },
+            { q: t('license.faq.q4'), a: t('license.faq.a4') },
           ].map((faq, i) => (
             <div className="col-md-6" key={i}>
               <div className="small">

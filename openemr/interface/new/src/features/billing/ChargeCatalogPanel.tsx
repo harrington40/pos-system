@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import nestClient from '../../api/nest-client';
 import { useAuth } from '../../hooks/useAuth';
@@ -26,6 +27,7 @@ const marginBadge = (m: number | null) => {
 };
 
 export default function ChargeCatalogPanel() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { currency, exchangeRate } = useCurrency();
@@ -59,7 +61,7 @@ export default function ChargeCatalogPanel() {
       queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
       setForm({ code: '', code_type: 'CPT4', description: '', category: 'general', cost: '', fee: '' });
       const n = Number(res?.data?.repricedCharges ?? res?.repricedCharges ?? 0);
-      setNotice(n > 0 ? `Saved — ${n} existing charge${n === 1 ? '' : 's'} re-priced to the new price.` : 'Charge saved.');
+      setNotice(n > 0 ? t('billing.catalog.noticeRepriced', { count: n }) : t('billing.catalog.noticeSaved'));
     },
   });
 
@@ -68,7 +70,7 @@ export default function ChargeCatalogPanel() {
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['price-catalog'] });
       const n = Number(res?.data?.repricedCharges ?? res?.repricedCharges ?? 0);
-      setNotice(n > 0 ? `Price updated — ${n} existing charge${n === 1 ? '' : 's'} updated to the new price.` : 'Price updated.');
+      setNotice(n > 0 ? t('billing.catalog.noticePriceRepriced', { count: n }) : t('billing.catalog.noticePriceUpdated'));
     },
   });
 
@@ -81,10 +83,10 @@ export default function ChargeCatalogPanel() {
       queryClient.invalidateQueries({ queryKey: ['accounts-receivable'] });
       const n = Number(res?.data?.repriced ?? res?.repriced ?? 0);
       setNotice(n > 0
-        ? `Re-synced — ${n} charge${n === 1 ? '' : 's'} updated to catalogue prices.`
-        : 'All posted charges already match the catalogue.');
+        ? t('billing.catalog.noticeResynced', { count: n })
+        : t('billing.catalog.noticeAllMatch'));
     },
-    onError: (e: any) => setNotice(e?.response?.data?.message || 'Re-sync failed.'),
+    onError: (e: any) => setNotice(e?.response?.data?.message || t('billing.catalog.resyncFailed')),
   });
 
   const deleteMutation = useMutation({
@@ -218,7 +220,7 @@ export default function ChargeCatalogPanel() {
       {/* Charge Catalog */}
       <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-          <h6 className="mb-0 fw-bold"><i className="bi bi-tags me-2 text-primary"></i>Charge Catalog & Pricing</h6>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-tags me-2 text-primary"></i>{t('billing.catalog.title')}</h6>
           <div className="d-flex align-items-center gap-3">
             <CurrencySwitcher />
             {canEditCharges && (
@@ -227,15 +229,15 @@ export default function ChargeCatalogPanel() {
                 className="btn btn-sm btn-outline-primary rounded-pill"
                 disabled={resyncMutation.isPending}
                 onClick={() => resyncMutation.mutate()}
-                title="Re-price every already-posted charge to match the catalogue"
+                title={t('billing.catalog.repriceTitle')}
               >
                 {resyncMutation.isPending
                   ? <span className="spinner-border spinner-border-sm me-1"></span>
                   : <i className="bi bi-arrow-repeat me-1"></i>}
-                Re-sync all charges
+                {t('billing.catalog.resync')}
               </button>
             )}
-            <span className="badge bg-primary rounded-pill">{catalog.length} charges</span>
+            <span className="badge bg-primary rounded-pill">{t('billing.catalog.charges', { count: catalog.length })}</span>
           </div>
         </div>
         <div className="card-body">
@@ -249,28 +251,28 @@ export default function ChargeCatalogPanel() {
           {!canEditCharges && (
             <div className="alert alert-warning py-2 px-3 small d-flex align-items-center rounded-3 mb-3">
               <i className="bi bi-lock-fill me-2"></i>
-              Read-only — only a supervisor or a user with charge-edit permission can add or change charges.
+              {t('billing.catalog.readOnlyNotice')}
             </div>
           )}
           {canEditCharges && (
           <div className="row g-2 align-items-end mb-3">
-            <div className="col-md-2"><label className="form-label small mb-0">Code *</label><input className="form-control form-control-sm" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="99213" /></div>
-            <div className="col-md-2"><label className="form-label small mb-0">Type</label>
+            <div className="col-md-2"><label className="form-label small mb-0">{t('billing.catalog.codeLabel')}</label><input className="form-control form-control-sm" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder={t('billing.catalog.codePlaceholder')} /></div>
+            <div className="col-md-2"><label className="form-label small mb-0">{t('billing.catalog.type')}</label>
               <select className="form-select form-select-sm" value={form.code_type} onChange={(e) => setForm({ ...form, code_type: e.target.value })}>
                 <option>CPT4</option><option>HCPCS</option><option>ICD10</option>
               </select>
             </div>
-            <div className="col-md-2"><label className="form-label small mb-0">Category</label>
+            <div className="col-md-2"><label className="form-label small mb-0">{t('billing.catalog.category')}</label>
               <select className="form-select form-select-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {CATEGORIES.map(([v, l]) => <option key={v} value={v}>{t('billing.categories.' + v, { defaultValue: l })}</option>)}
               </select>
             </div>
-            <div className="col-md-2"><label className="form-label small mb-0">Description</label><input className="form-control form-control-sm" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-            <div className="col-md-1"><label className="form-label small mb-0">Cost</label><input className="form-control form-control-sm" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></div>
-            <div className="col-md-1"><label className="form-label small mb-0">Fee</label><input className="form-control form-control-sm" value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })} /></div>
+            <div className="col-md-2"><label className="form-label small mb-0">{t('billing.catalog.description')}</label><input className="form-control form-control-sm" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+            <div className="col-md-1"><label className="form-label small mb-0">{t('billing.catalog.cost')}</label><input className="form-control form-control-sm" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></div>
+            <div className="col-md-1"><label className="form-label small mb-0">{t('billing.catalog.fee')}</label><input className="form-control form-control-sm" value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })} /></div>
             <div className="col-md-2 d-flex gap-1">
-              <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={handleSuggest} disabled={suggestMutation.isPending} title="Smart price from cost">✨</button>
-              <button className="btn btn-primary btn-sm rounded-pill" onClick={handleAdd} disabled={!form.code.trim() || createMutation.isPending}>Add</button>
+              <button className="btn btn-outline-primary btn-sm rounded-pill" onClick={handleSuggest} disabled={suggestMutation.isPending} title={t('billing.catalog.smartPrice')}>✨</button>
+              <button className="btn btn-primary btn-sm rounded-pill" onClick={handleAdd} disabled={!form.code.trim() || createMutation.isPending}>{t('billing.catalog.add')}</button>
             </div>
           </div>
           )}
@@ -279,22 +281,22 @@ export default function ChargeCatalogPanel() {
           <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
             <div className="input-group input-group-sm" style={{ maxWidth: '280px' }}>
               <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
-              <input className="form-control" placeholder="Search code, description…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input className="form-control" placeholder={t('billing.catalog.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <select className="form-select form-select-sm rounded-pill" style={{ width: '170px' }} value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
-              <option value="all">All categories</option>
-              {CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              <option value="all">{t('billing.catalog.allCategories')}</option>
+              {CATEGORIES.map(([v, l]) => <option key={v} value={v}>{t('billing.categories.' + v, { defaultValue: l })}</option>)}
             </select>
             {(search || catFilter !== 'all') && (
               <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => { setSearch(''); setCatFilter('all'); }}>
-                <i className="bi bi-x-lg me-1"></i>Clear
+                <i className="bi bi-x-lg me-1"></i>{t('billing.catalog.clear')}
               </button>
             )}
             <div className="ms-auto d-flex align-items-center gap-2 small">
-              <span className="badge bg-light text-dark border">{sorted.length} shown</span>
+              <span className="badge bg-light text-dark border">{t('billing.catalog.shown', { count: sorted.length })}</span>
               {avgMargin != null && (
-                <span className={`badge rounded-pill ${marginBadge(avgMargin).cls}`} title="Average margin">
-                  avg margin {avgMargin.toFixed(0)}%
+                <span className={`badge rounded-pill ${marginBadge(avgMargin).cls}`} title={t('billing.catalog.avgMargin')}>
+                  {t('billing.catalog.avgMarginShort', { percent: avgMargin.toFixed(0) })}
                 </span>
               )}
             </div>
@@ -305,13 +307,13 @@ export default function ChargeCatalogPanel() {
             <div className="d-flex align-items-center gap-2 mb-2 px-3 py-2 rounded-3 border"
               style={{ backgroundColor: '#0d6efd0d', borderColor: '#0d6efd33' }}>
               <span className="small fw-semibold text-primary">
-                <i className="bi bi-check2-square me-1"></i>{selected.size} selected · {formatMoney(selectionTotal, currency, exchangeRate)} total fee
+                <i className="bi bi-check2-square me-1"></i>{t('billing.catalog.selectedTotal', { count: selected.size, amount: formatMoney(selectionTotal, currency, exchangeRate) })}
               </span>
               <div className="ms-auto d-flex gap-2">
                 {canEditCharges && (
                   <button className="btn btn-sm btn-outline-danger rounded-pill" disabled={bulkDeactivate.isPending}
                     onClick={() => bulkDeactivate.mutate([...selected])}>
-                    <i className="bi bi-trash me-1"></i>Deactivate selected
+                    <i className="bi bi-trash me-1"></i>{t('billing.catalog.deactivateSelected')}
                   </button>
                 )}
                 <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => setSelected(new Set())}>Clear</button>
@@ -324,16 +326,16 @@ export default function ChargeCatalogPanel() {
               <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                 <tr>
                   <th style={{ width: '36px' }} className="ps-3">
-                    <input type="checkbox" className="form-check-input" checked={allVisibleSelected} onChange={toggleAll} title="Select all" />
+                    <input type="checkbox" className="form-check-input" checked={allVisibleSelected} onChange={toggleAll} title={t('billing.catalog.selectAll')} />
                   </th>
-                  {th('Code', 'code')}
-                  {th('Type', 'code_type')}
-                  {th('Description', 'description')}
-                  {th('Category', 'category')}
-                  {th('Cost', 'cost', 'text-end')}
-                  {th('Margin', 'margin', 'text-center')}
-                  {th('Fee', 'fee', 'text-end')}
-                  <th className="text-end pe-3">Actions</th>
+                  {th(t('billing.catalog.code'), 'code')}
+                  {th(t('billing.catalog.type'), 'code_type')}
+                  {th(t('billing.catalog.description'), 'description')}
+                  {th(t('billing.catalog.category'), 'category')}
+                  {th(t('billing.catalog.cost'), 'cost', 'text-end')}
+                  {th(t('billing.catalog.margin'), 'margin', 'text-center')}
+                  {th(t('billing.catalog.fee'), 'fee', 'text-end')}
+                  <th className="text-end pe-3">{t('billing.catalog.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -370,16 +372,16 @@ export default function ChargeCatalogPanel() {
                       <td className="text-end text-nowrap pe-3" onClick={(ev) => ev.stopPropagation()}>
                         {e ? (
                           <>
-                            <button className="btn btn-sm btn-outline-success py-0 px-1" onClick={() => saveEdit(c.id)} title="Save"><i className="bi bi-check-lg"></i></button>
-                            <button className="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" onClick={() => { const n = { ...editing }; delete n[c.id]; setEditing(n); }} title="Cancel"><i className="bi bi-x-lg"></i></button>
+                            <button className="btn btn-sm btn-outline-success py-0 px-1" onClick={() => saveEdit(c.id)} title={t('billing.catalog.save')}><i className="bi bi-check-lg"></i></button>
+                            <button className="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" onClick={() => { const n = { ...editing }; delete n[c.id]; setEditing(n); }} title={t('billing.catalog.cancel')}><i className="bi bi-x-lg"></i></button>
                           </>
                         ) : canEditCharges ? (
                           <>
-                            <button className="btn btn-sm btn-outline-primary py-0 px-1" onClick={() => setEditing({ ...editing, [c.id]: { fee: String(c.fee), cost: String(c.cost) } })} title="Edit price"><i className="bi bi-pencil"></i></button>
-                            <button className="btn btn-sm btn-outline-danger py-0 px-1 ms-1" onClick={() => deleteMutation.mutate(c.id)} title="Deactivate"><i className="bi bi-trash"></i></button>
+                            <button className="btn btn-sm btn-outline-primary py-0 px-1" onClick={() => setEditing({ ...editing, [c.id]: { fee: String(c.fee), cost: String(c.cost) } })} title={t('billing.catalog.editPrice')}><i className="bi bi-pencil"></i></button>
+                            <button className="btn btn-sm btn-outline-danger py-0 px-1 ms-1" onClick={() => deleteMutation.mutate(c.id)} title={t('billing.catalog.deactivate')}><i className="bi bi-trash"></i></button>
                           </>
                         ) : (
-                          <span className="text-muted" title="Read-only"><i className="bi bi-lock"></i></span>
+                          <span className="text-muted" title={t('billing.catalog.readOnly')}><i className="bi bi-lock"></i></span>
                         )}
                       </td>
                     </tr>
@@ -387,7 +389,7 @@ export default function ChargeCatalogPanel() {
                 })}
                 {sorted.length === 0 && (
                   <tr><td colSpan={9} className="text-center text-muted py-4">
-                    <i className="bi bi-inbox me-1"></i>No charges match your search
+                    <i className="bi bi-inbox me-1"></i>{t('billing.catalog.noMatch')}
                   </td></tr>
                 )}
               </tbody>

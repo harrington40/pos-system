@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { patientChartPath } from '../../utils/patientChart';
@@ -31,6 +32,7 @@ function parseTitle(title?: string): { priority: string; kind: string; subject: 
 type Filter = 'all' | 'unread' | 'priority' | 'read';
 
 export default function MessagesPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -75,10 +77,10 @@ export default function MessagesPage() {
     onNewMessage: (event: MessagingEvent) => {
       qc.invalidateQueries({ queryKey: ['messages'] });
       setNewCount(c => c + 1);
-      addToast({ type: 'info', title: 'New Message', body: event.payload.title || 'You have a new message', priority: event.priority || 'NORMAL' });
+      addToast({ type: 'info', title: t('messages.toasts.newMessage'), body: event.payload.title || t('messages.toasts.youHaveNewMessage'), priority: event.priority || 'NORMAL' });
     },
     onNotification: (event: MessagingEvent) => {
-      addToast({ type: 'warning', title: 'Notification', body: event.payload.title || 'System notification', priority: event.priority || 'NORMAL' });
+      addToast({ type: 'warning', title: t('messages.toasts.notification'), body: event.payload.title || t('messages.toasts.systemNotification'), priority: event.priority || 'NORMAL' });
     },
   });
 
@@ -105,10 +107,10 @@ export default function MessagesPage() {
         const tone = m.priority === 'STAT' ? '#dc3545' : m.priority === 'URGENT' ? '#fd7e14' : '#0d6efd';
         return {
           id: m.id,
-          title: m.subject || '(no subject)',
+          title: m.subject || t('messages.feed.subjectFallback'),
           subtitle: m.patientName && String(m.patientName).trim()
             ? `${String(m.patientName).trim()} · PID ${m.pid}`
-            : m.groupname === 'events' ? 'Clinic broadcast' : 'Clinic message',
+            : m.groupname === 'events' ? t('messages.feed.clinicBroadcast') : t('messages.feed.clinicMessage'),
           summary: String(m.body || '').replace(/\s+/g, ' ').slice(0, 90),
           at: m.date,
           by: m.user,
@@ -117,24 +119,24 @@ export default function MessagesPage() {
           status: m.message_status,
           unread: isNew,
           link: patientChartPath(m.patientId) || undefined,
-          linkLabel: 'Open chart',
+          linkLabel: t('messages.feed.openChart'),
           metrics: [
-            { label: 'Priority', value: m.priority, color: tone },
-            { label: 'Channel', value: m.kind, color: '#6f42c1' },
-            { label: 'Status', value: m.message_status || 'Read', color: isNew ? '#dc3545' : '#198754' },
+            { label: t('messages.feed.metricPriority'), value: m.priority, color: tone },
+            { label: t('messages.feed.metricChannel'), value: m.kind, color: '#6f42c1' },
+            { label: t('messages.feed.metricStatus'), value: m.message_status || t('messages.read'), color: isNew ? '#dc3545' : '#198754' },
           ],
           fields: [
-            ['Subject', m.subject],
-            ['Patient', m.patientName && String(m.patientName).trim() ? `${String(m.patientName).trim()} (PID ${m.pid})` : 'No patient attached'],
-            ['Posted by', m.user],
-            ['Posted', formatDateTime(m.date)],
-            ['Assigned to', m.assigned_to],
-            ['Status', m.message_status || 'Read'],
+            [t('messages.feed.fieldSubject'), m.subject],
+            [t('messages.feed.fieldPatient'), m.patientName && String(m.patientName).trim() ? `${String(m.patientName).trim()} (PID ${m.pid})` : t('messages.feed.noPatientAttached')],
+            [t('messages.feed.fieldPostedBy'), m.user],
+            [t('messages.feed.fieldPosted'), formatDateTime(m.date)],
+            [t('messages.feed.fieldAssignedTo'), m.assigned_to],
+            [t('messages.feed.fieldStatus'), m.message_status || t('messages.read')],
           ],
-          lists: [{ title: 'Message body', lines: String(m.body || '').split(/\r?\n/).filter(Boolean) }],
+          lists: [{ title: t('messages.feed.messageBody'), lines: String(m.body || '').split(/\r?\n/).filter(Boolean) }],
         };
       }),
-    [enriched],
+    [enriched, t],
   );
 
   const filtered = useMemo(() => {
@@ -159,7 +161,7 @@ export default function MessagesPage() {
       qc.invalidateQueries({ queryKey: ['messages'] });
       setForm({ title: '', body: '', pid: '', recipientId: '', messageType: 'clinic', priority: 'NORMAL' });
       setShowCompose(false);
-      addToast({ type: 'success', title: 'Sent', body: 'Message routed via event bus', priority: 'NORMAL' });
+      addToast({ type: 'success', title: t('messages.toasts.sent'), body: t('messages.toasts.routed'), priority: 'NORMAL' });
     },
   });
 
@@ -236,8 +238,8 @@ export default function MessagesPage() {
       <div className="rounded-4 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #0dcaf0 0%, #0d6efd 50%, #6610f2 100%)' }}>
         <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
           <div>
-            <h2 className="mb-1 fw-bold"><i className="bi bi-chat-dots me-2"></i>Messages</h2>
-            <p className="mb-0 text-white text-opacity-75 small"><i className="bi bi-broadcast me-1"></i>Smart inbox · priority-sorted · real-time</p>
+            <h2 className="mb-1 fw-bold"><i className="bi bi-chat-dots me-2"></i>{t('messages.title')}</h2>
+            <p className="mb-0 text-white text-opacity-75 small"><i className="bi bi-broadcast me-1"></i>{t('messages.subtitle')}</p>
           </div>
           <div className="d-flex gap-2 align-items-center">
             {unreadCount > 0 && <span className="badge bg-danger rounded-pill fs-6">{unreadCount} unread</span>}
@@ -249,7 +251,7 @@ export default function MessagesPage() {
             {canWrite && (
               <button className="btn btn-light rounded-pill" onClick={() => setShowCompose(!showCompose)}>
                 <i className={`bi ${showCompose ? 'bi-x-lg' : 'bi-pencil-square'} me-1`}></i>
-                {showCompose ? 'Cancel' : 'Compose'}
+                {showCompose ? t('common.cancel') : t('messages.compose')}
               </button>
             )}
           </div>
@@ -258,11 +260,11 @@ export default function MessagesPage() {
 
       {/* Notification surface — same card + modal viewers used elsewhere */}
       <NotificationFeedCard
-        title="Message Notifications"
+        title={t('messages.feedTitle')}
         icon="bi-bell-fill"
         tone="#0d6efd"
         items={feedItems}
-        emptyText="No new messages"
+        emptyText={t('messages.feedEmpty')}
         onOpen={(item) => { setOpenFeed(item); if (item.unread) markRead.mutate(Number(item.id)); }}
         onSeeAll={() => setFilter('unread')}
       />
@@ -271,33 +273,33 @@ export default function MessagesPage() {
       {canWrite && showCompose && (
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '16px' }}>
           <div className="card-header bg-white py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-pencil-square me-2 text-primary"></i>New Message</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-pencil-square me-2 text-primary"></i>{t('messages.newMessage')}</h6>
           </div>
           <div className="card-body">
             <div className="row g-2">
-              <div className="col-md-2"><label className="form-label small">Type</label>
+              <div className="col-md-2"><label className="form-label small">{t('messages.type')}</label>
                 <select className="form-select form-select-sm rounded-pill" value={form.messageType} onChange={e => setForm({ ...form, messageType: e.target.value, pid: '', recipientId: '' })}>
-                  <option value="clinic">🏥 Clinic</option><option value="patient">👤 Patient</option><option value="direct">📨 Direct</option>
+                  <option value="clinic">{t('messages.clinic')}</option><option value="patient">{t('messages.patientOption')}</option><option value="direct">{t('messages.directOption')}</option>
                 </select>
               </div>
-              <div className="col-md-3"><label className="form-label small">Recipient</label>
+              <div className="col-md-3"><label className="form-label small">{t('messages.recipient')}</label>
                 {form.messageType === 'patient' ? (
                   <select className="form-select form-select-sm rounded-pill" value={form.pid} onChange={e => setForm({ ...form, pid: e.target.value })}>
-                    <option value="">— Select Patient —</option>
+                    <option value="">{t('messages.selectPatient')}</option>
                     {allPatients.map((p: any) => <option key={p.pid} value={p.pid}>{formatPatientName(p)} (PID {p.pid}){p.providerName ? ` — PCP: ${p.providerName}` : ''}</option>)}
                   </select>
                 ) : (
                   <select className="form-select form-select-sm rounded-pill" value={form.recipientId} onChange={e => setForm({ ...form, recipientId: e.target.value })}>
-                    <option value="">— Select Provider —</option>
-                    <option value="all">📢 All Providers (Broadcast)</option>
+                    <option value="">{t('messages.selectProvider')}</option>
+                    <option value="all">{t('messages.allProviders')}</option>
                     {patientProviderId && (
-                      <optgroup label="💡 Suggested — Patient's Provider">
+                      <optgroup label={t('messages.suggestedProvider')}>
                         {allUsers.filter((u: any) => String(u.id) === String(patientProviderId)).map((u: any) => (
                           <option key={u.id} value={u.id}>⭐ {u.title ? `${u.title} ` : ''}{u.fname} {u.lname} ({u.username})</option>
                         ))}
                       </optgroup>
                     )}
-                    <optgroup label="All Providers">
+                    <optgroup label={t('messages.allProvidersGroup')}>
                       {allUsers.filter((u: any) => u.active).map((u: any) => (
                         <option key={u.id} value={u.id}>{u.title ? `${u.title} ` : ''}{u.fname} {u.lname} ({u.username})</option>
                       ))}
@@ -305,11 +307,11 @@ export default function MessagesPage() {
                   </select>
                 )}
               </div>
-              <div className="col-md-3"><label className="form-label small">Subject</label><input className="form-control form-control-sm rounded-pill" placeholder="Subject" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
-              <div className="col-md-2"><label className="form-label small">Body</label><input className="form-control form-control-sm rounded-pill" placeholder="Message..." value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} /></div>
-              <div className="col-md-1"><label className="form-label small">Priority</label>
+              <div className="col-md-3"><label className="form-label small">{t('messages.subject')}</label><input className="form-control form-control-sm rounded-pill" placeholder={t('messages.subjectPlaceholder')} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
+              <div className="col-md-2"><label className="form-label small">{t('messages.body')}</label><input className="form-control form-control-sm rounded-pill" placeholder={t('messages.bodyPlaceholder')} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} /></div>
+              <div className="col-md-1"><label className="form-label small">{t('messages.priority')}</label>
                 <select className="form-select form-select-sm rounded-pill" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-                  <option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option><option value="STAT">STAT</option>
+                  <option value="NORMAL">{t('messages.normal')}</option><option value="HIGH">{t('messages.high')}</option><option value="URGENT">{t('messages.urgent')}</option><option value="STAT">{t('messages.stat')}</option>
                 </select>
               </div>
               <div className="col-md-1 d-flex align-items-end">
@@ -327,10 +329,10 @@ export default function MessagesPage() {
       {/* KPI cards */}
       <div className="row g-3 mb-3">
         {[
-          { v: enriched.length, l: 'Total', c: '#0d6efd', i: 'bi-inbox' },
-          { v: unreadCount, l: 'Unread', c: '#dc3545', i: 'bi-envelope-exclamation' },
-          { v: priorityCount, l: 'Priority', c: '#fd7e14', i: 'bi-exclamation-diamond' },
-          { v: enriched.length - unreadCount, l: 'Read', c: '#198754', i: 'bi-envelope-check' },
+          { v: enriched.length, l: t('messages.stats.total'), c: '#0d6efd', i: 'bi-inbox' },
+          { v: unreadCount, l: t('messages.stats.unread'), c: '#dc3545', i: 'bi-envelope-exclamation' },
+          { v: priorityCount, l: t('messages.stats.priority'), c: '#fd7e14', i: 'bi-exclamation-diamond' },
+          { v: enriched.length - unreadCount, l: t('messages.stats.read'), c: '#198754', i: 'bi-envelope-check' },
         ].map((s, i) => (
           <div className="col-md-3 col-sm-6" key={i}>
             <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
@@ -348,7 +350,7 @@ export default function MessagesPage() {
       {/* Toolbar: filters + search */}
       <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
         <div className="btn-group" role="group">
-          {([['all', 'All', 'bi-inbox'], ['unread', 'Unread', 'bi-envelope-exclamation'], ['priority', 'Priority', 'bi-exclamation-diamond'], ['read', 'Read', 'bi-envelope-check']] as [Filter, string, string][]).map(([f, label, icon]) => (
+          {([['all', t('messages.filter.all'), 'bi-inbox'], ['unread', t('messages.filter.unread'), 'bi-envelope-exclamation'], ['priority', t('messages.filter.priority'), 'bi-exclamation-diamond'], ['read', t('messages.filter.read'), 'bi-envelope-check']] as [Filter, string, string][]).map(([f, label, icon]) => (
             <button key={f} className={`btn btn-sm rounded-pill ${filter === f ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setFilter(f)}>
               <i className={`bi ${icon} me-1`}></i>{label}
             </button>
@@ -357,7 +359,7 @@ export default function MessagesPage() {
         <div className="ms-auto" style={{ minWidth: '240px' }}>
           <div className="input-group input-group-sm">
             <span className="input-group-text bg-white border-end-0 rounded-pill-start"><i className="bi bi-search text-muted"></i></span>
-            <input className="form-control border-start-0 rounded-pill-end" placeholder="Search messages..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input className="form-control border-start-0 rounded-pill-end" placeholder={t('messages.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
       </div>
@@ -365,7 +367,7 @@ export default function MessagesPage() {
       {/* Inbox */}
       <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
         <div className="card-header bg-white d-flex justify-content-between py-3" style={{ borderRadius: '16px 16px 0 0' }}>
-          <h6 className="mb-0 fw-bold"><i className="bi bi-inbox me-2 text-primary"></i>Inbox</h6>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-inbox me-2 text-primary"></i>{t('messages.inbox')}</h6>
           <span className="badge bg-primary rounded-pill">{filtered.length}</span>
         </div>
         <div className="card-body p-0">
@@ -385,10 +387,10 @@ export default function MessagesPage() {
                     <div className="d-flex justify-content-between align-items-center gap-2">
                       <div className="d-flex align-items-center gap-2 min-width-0">
                         {m.priority !== 'NORMAL' && <span className={`badge rounded-pill ${PRIORITY_BADGE[m.priority]}`} style={{ fontSize: '0.65rem' }}>{m.priority}</span>}
-                        <strong className={isNew ? 'text-primary text-truncate' : 'text-truncate'} style={{ fontSize: '0.9rem' }}>{m.subject || 'No Subject'}</strong>
+                        <strong className={isNew ? 'text-primary text-truncate' : 'text-truncate'} style={{ fontSize: '0.9rem' }}>{m.subject || t('messages.noSubject')}</strong>
                       </div>
                       <div className="d-flex gap-1 align-items-center flex-shrink-0">
-                        <span className={`badge rounded-pill ${isNew ? 'bg-primary' : 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>{isNew ? 'New' : 'Read'}</span>
+                        <span className={`badge rounded-pill ${isNew ? 'bg-primary' : 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>{isNew ? t('messages.new') : t('messages.read')}</span>
                       </div>
                     </div>
                     <p className="text-muted small mb-0 text-truncate">{m.body}</p>
@@ -409,8 +411,8 @@ export default function MessagesPage() {
                           </button>
                         );
                       })()}
-                      {isNew && <button className="btn btn-sm btn-outline-success rounded-pill" onClick={() => markRead.mutate(m.id)}><i className="bi bi-envelope-check me-1"></i>Mark read</button>}
-                      <button className="btn btn-sm btn-outline-danger rounded-pill" onClick={() => deleteMsg.mutate(m.id)}><i className="bi bi-trash me-1"></i>Delete</button>
+                      {isNew && <button className="btn btn-sm btn-outline-success rounded-pill" onClick={() => markRead.mutate(m.id)}><i className="bi bi-envelope-check me-1"></i>{t('messages.markRead')}</button>}
+                      <button className="btn btn-sm btn-outline-danger rounded-pill" onClick={() => deleteMsg.mutate(m.id)}><i className="bi bi-trash me-1"></i>{t('common.delete')}</button>
                     </div>
                   </div>
                 )}
@@ -420,10 +422,10 @@ export default function MessagesPage() {
           {filtered.length === 0 && (
             <div className="text-center text-muted py-5">
               <i className="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
-              <p>{search ? 'No messages match your search.' : 'No messages here.'}</p>
+              <p>{search ? t('messages.noMatchSearch') : t('messages.noMessages')}</p>
               {canWrite && (
                 <button className="btn btn-primary btn-sm rounded-pill" onClick={() => setShowCompose(true)}>
-                  <i className="bi bi-pencil-square me-1"></i>Compose Message
+                  <i className="bi bi-pencil-square me-1"></i>{t('messages.composeMessage')}
                 </button>
               )}
             </div>

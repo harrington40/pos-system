@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { Patient } from '../../../types/patient';
 import { updatePatient } from '../../../api/endpoints/patients';
 import nestClient from '../../../api/nest-client';
@@ -31,6 +32,7 @@ function formFromPatient(patient: Patient) {
 }
 
 export default function DemographicsTab({ patient }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -93,7 +95,7 @@ export default function DemographicsTab({ patient }: Props) {
   const saveError: string = (() => {
     const err: any = mutation.error;
     if (!err) return '';
-    return err?.response?.data?.message || err?.message || 'Save failed';
+    return err?.response?.data?.message || err?.message || t('patients.tabs.demographics.saveFailed');
   })();
 
   return (
@@ -101,11 +103,11 @@ export default function DemographicsTab({ patient }: Props) {
       <div className="card-header d-flex justify-content-between align-items-center">
         <h5 className="mb-0">
           <i className="bi bi-person-vcard me-2"></i>
-          Demographics
+          {t('patients.tabs.demographics.title')}
         </h5>
         {regDate && (
           <small className="text-muted">
-            Registered: {regDate.toLocaleDateString()} ({daysSinceReg} days ago)
+            {t('patients.tabs.demographics.registered', { date: regDate.toLocaleDateString(), days: daysSinceReg })}
           </small>
         )}
       </div>
@@ -115,22 +117,22 @@ export default function DemographicsTab({ patient }: Props) {
         <div className="rounded-3 border bg-light p-3 mb-3">
           <div className="d-flex justify-content-between align-items-center mb-2">
             <span className="fw-semibold small text-uppercase text-muted" style={{ letterSpacing: 0.5 }}>
-              <i className="bi bi-clipboard-check me-1"></i>On file
+              <i className="bi bi-clipboard-check me-1"></i>{t('patients.tabs.demographics.onFile')}
             </span>
             <button type="button" className="btn btn-outline-secondary btn-sm rounded-pill"
               onClick={() => setForm(formFromPatient(patient))}>
-              <i className="bi bi-arrow-counterclockwise me-1"></i>Reset to saved
+              <i className="bi bi-arrow-counterclockwise me-1"></i>{t('patients.tabs.demographics.resetToSaved')}
             </button>
           </div>
           <div className="row g-2 small">
             {[
-              ['Name', [patient.fname, patient.mname, patient.lname].filter(Boolean).join(' ') || '—'],
-              ['Date of birth', toDateInput(patient.dob || patient.DOB) || '—'],
-              ['Sex', patient.sex || '—'],
-              ['Phone', patient.phone || patient.phone_contact || '—'],
-              ['Email', patient.email || '—'],
-              ['Address', [patient.street, patient.city].filter(Boolean).join(', ') || '—'],
-              ['Provider', patient.providerName || patient.provider_name || '—'],
+              [t('patients.tabs.demographics.fName'), [patient.fname, patient.mname, patient.lname].filter(Boolean).join(' ') || '—'],
+              [t('patients.tabs.demographics.fDob'), toDateInput(patient.dob || patient.DOB) || '—'],
+              [t('patients.tabs.demographics.fSex'), patient.sex || '—'],
+              [t('patients.tabs.demographics.fPhone'), patient.phone || patient.phone_contact || '—'],
+              [t('patients.tabs.demographics.fEmail'), patient.email || '—'],
+              [t('patients.tabs.demographics.fAddress'), [patient.street, patient.city].filter(Boolean).join(', ') || '—'],
+              [t('patients.tabs.demographics.fProvider'), patient.providerName || patient.provider_name || '—'],
             ].map(([label, value]) => (
               <div className="col-md-4 col-sm-6" key={label}>
                 <div className="text-muted" style={{ fontSize: '0.7rem' }}>{label}</div>
@@ -146,20 +148,20 @@ export default function DemographicsTab({ patient }: Props) {
           <div className="alert alert-warning py-2 mb-3 d-flex align-items-start gap-2 border-warning">
             <i className="bi bi-exclamation-triangle-fill fs-5"></i>
             <div className="flex-grow-1">
-              <strong>Chart incomplete — not yet assigned to a provider</strong>
+              <strong>{t('patients.tabs.demographics.chartIncomplete')}</strong>
               {(patient.missing_fields?.length ?? 0) > 0 && (
                 <>
                   <br />
-                  <small>Still needed: {patient.missing_fields!.join(', ')}</small>
+                  <small>{t('patients.tabs.demographics.stillNeeded', { list: patient.missing_fields!.join(', ') })}</small>
                 </>
               )}
               <br />
               <small className="text-muted">
-                Finish these details and the registrar assigns the patient to a provider to complete the chart.
+                {t('patients.tabs.demographics.chartIncompleteHint')}
               </small>
             </div>
             <span className="badge bg-warning text-dark rounded-pill align-self-center">
-              {patient.missing_fields?.length ?? 0} missing
+              {t('patients.tabs.demographics.missingCount', { count: patient.missing_fields?.length ?? 0 })}
             </span>
           </div>
         )}
@@ -167,11 +169,11 @@ export default function DemographicsTab({ patient }: Props) {
           <div className="alert alert-warning py-2 mb-3 d-flex align-items-center gap-2">
             <i className="bi bi-lock-fill fs-5"></i>
             <div>
-              <strong>{isNurse ? 'Demographics read-only' : 'Name, date of birth and sex are locked'}</strong><br/>
+              <strong>{isNurse ? t('patients.tabs.demographics.lockedReadOnly') : t('patients.tabs.demographics.lockedIdentity')}</strong><br/>
               <small>
                 {isNurse
-                  ? 'Registered nurses have read-only access to patient demographics.'
-                  : `They cannot be changed ${daysSinceReg} days after registration. Address, phone, email and provider can still be updated.`}
+                  ? t('patients.tabs.demographics.lockedNurse')
+                  : t('patients.tabs.demographics.lockedIdentityHint', { days: daysSinceReg })}
               </small>
             </div>
           </div>
@@ -179,7 +181,7 @@ export default function DemographicsTab({ patient }: Props) {
         <form onSubmit={handleSubmit}>
           <div className="row">
             <div className="col-md-4 mb-3">
-              <label className="form-label">First Name</label>
+              <label className="form-label">{t('patients.tabs.demographics.lFirstName')}</label>
               <input
                 type="text"
                 className="form-control"
@@ -190,7 +192,7 @@ export default function DemographicsTab({ patient }: Props) {
               />
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">Last Name</label>
+              <label className="form-label">{t('patients.tabs.demographics.lLastName')}</label>
               <input
                 type="text"
                 className="form-control"
@@ -201,7 +203,7 @@ export default function DemographicsTab({ patient }: Props) {
               />
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">Middle Name</label>
+              <label className="form-label">{t('patients.tabs.demographics.lMiddleName')}</label>
               <input
                 type="text"
                 className="form-control"
@@ -211,7 +213,7 @@ export default function DemographicsTab({ patient }: Props) {
               />
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">Date of Birth</label>
+              <label className="form-label">{t('patients.tabs.demographics.lDob')}</label>
               <input
                 type="date"
                 className="form-control"
@@ -221,21 +223,21 @@ export default function DemographicsTab({ patient }: Props) {
               />
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">Sex</label>
+              <label className="form-label">{t('patients.tabs.demographics.lSex')}</label>
               <select
                 className="form-select"
                 value={form.sex}
                 onChange={(e) => handleChange('sex', e.target.value)}
                 disabled={identityLocked}
               >
-                <option value="">— Select —</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
+                <option value="">{t('patients.tabs.demographics.sexSelect')}</option>
+                <option value="Male">{t('patients.tabs.demographics.sexMale')}</option>
+                <option value="Female">{t('patients.tabs.demographics.sexFemale')}</option>
+                <option value="Other">{t('patients.tabs.demographics.sexOther')}</option>
               </select>
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">Email</label>
+              <label className="form-label">{t('patients.tabs.demographics.lEmail')}</label>
               <input
                 type="email"
                 className="form-control"
@@ -245,11 +247,11 @@ export default function DemographicsTab({ patient }: Props) {
               />
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">Phone</label>
+              <label className="form-label">{t('patients.tabs.demographics.lPhone')}</label>
               <PhoneInput value={form.phone} onChange={(v) => handleChange('phone', v)} disabled={contactLocked} />
             </div>
             <div className="col-md-8 mb-3">
-              <label className="form-label">Street</label>
+              <label className="form-label">{t('patients.tabs.demographics.lStreet')}</label>
               <input
                 type="text"
                 className="form-control"
@@ -259,18 +261,18 @@ export default function DemographicsTab({ patient }: Props) {
               />
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">City</label>
+              <label className="form-label">{t('patients.tabs.demographics.lCity')}</label>
               <CitySelect value={form.city} onChange={(v) => handleChange('city', v)} disabled={contactLocked} />
             </div>
             <div className="col-md-4 mb-3">
-              <label className="form-label">Primary Care Provider</label>
+              <label className="form-label">{t('patients.tabs.demographics.lProvider')}</label>
               <select
                 className="form-select"
                 value={form.providerID}
                 onChange={(e) => handleChange('providerID', e.target.value)}
                 disabled={contactLocked}
               >
-                <option value="">— Select Provider —</option>
+                <option value="">{t('patients.tabs.demographics.selectProvider')}</option>
                 {providers.filter((p: any) => p.active).map((p: any) => (
                   <option key={p.id} value={p.id}>
                     {p.title ? `${p.title} ` : ''}{p.fname} {p.lname}{p.specialty ? ` (${p.specialty})` : ''}
@@ -285,12 +287,12 @@ export default function DemographicsTab({ patient }: Props) {
                 {mutation.isPending ? (
                   <>
                     <span className="spinner-border spinner-border-sm me-1" role="status"></span>
-                    Saving...
+                    {t('patients.common.saving')}
                   </>
                 ) : (
                   <>
                     <i className="bi bi-floppy me-1"></i>
-                    Save Changes
+                    {t('patients.tabs.demographics.saveChanges')}
                   </>
                 )}
               </button>
@@ -298,7 +300,7 @@ export default function DemographicsTab({ patient }: Props) {
             {mutation.isSuccess && (
               <span className="text-success align-self-center">
                 <i className="bi bi-check-circle me-1"></i>
-                Saved — the chart above now shows the updated details.
+                {t('patients.tabs.demographics.savedHint')}
               </span>
             )}
             {mutation.isError && (

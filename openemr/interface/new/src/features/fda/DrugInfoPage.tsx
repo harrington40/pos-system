@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import DrugInformationPanel from './DrugInformationPanel';
 
 export default function DrugInfoPage() {
+  const { t } = useTranslation();
   return (
     <div className="glass-page position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh', padding: '16px' }}>
       <div className="position-absolute rounded-circle" style={{ width: '340px', height: '340px', top: '-80px', right: '-60px', background: 'radial-gradient(circle, rgba(13,110,253,0.30), transparent 70%)', filter: 'blur(20px)', zIndex: 0 }}></div>
@@ -31,10 +33,9 @@ export default function DrugInfoPage() {
       <div className="rounded-4 p-4 mb-4 text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dc3545 0%, #0d6efd 60%, #00c9a7 100%)', zIndex: 1 }}>
         <div className="position-absolute end-0 top-0 opacity-10" style={{ fontSize: '6rem', transform: 'rotate(10deg) translate(20px,-10px)' }}><i className="bi bi-capsule"></i></div>
         <div className="position-relative">
-          <h3 className="mb-1 fw-bold"><i className="bi bi-capsule me-2"></i>Drug Information</h3>
+          <h3 className="mb-1 fw-bold"><i className="bi bi-capsule me-2"></i>{t('fda.drugInfoPage.title')}</h3>
           <p className="mb-0 text-white text-opacity-75 small">
-            Powered by <strong>openFDA</strong> + <strong>RxNorm (NIH)</strong> — Search FDA drug labels, adverse events,
-            and cross-reference with patient records for interactions and allergies.
+            {t('fda.drugInfoPage.poweredBy')} <strong>openFDA</strong> + <strong>RxNorm (NIH)</strong> {t('fda.drugInfoPage.poweredByDetail')}
           </p>
         </div>
       </div>

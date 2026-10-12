@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { criticalFlags } from '../../utils/nursingSafety';
 import { getPatient } from '../../api/endpoints/patients';
@@ -30,22 +31,23 @@ import { emergencyBanner } from '../../utils/triage';
 
 type TabId = 'summary' | 'observations' | 'notes' | 'vitals' | 'allergies' | 'medications' | 'conditions' | 'immunizations' | 'demographics' | 'insurance' | 'maternity' | 'triage';
 
-const tabs: { id: TabId; label: string; icon: string; color: string }[] = [
-  { id: 'summary', label: 'Overview', icon: 'bi-person-vcard', color: '#0d6efd' },
-  { id: 'observations', label: 'Observations', icon: 'bi-journal-check', color: '#198754' },
-  { id: 'notes', label: 'Notes', icon: 'bi-pencil-square', color: '#e83e8c' },
-  { id: 'vitals', label: 'Vitals', icon: 'bi-heart-pulse', color: '#dc3545' },
-  { id: 'maternity', label: 'Maternity', icon: 'bi-clipboard-heart', color: '#d63384' },
-  { id: 'triage', label: 'Emergency', icon: 'bi-clipboard2-pulse', color: '#fd7e14' },
-  { id: 'allergies', label: 'Allergies', icon: 'bi-exclamation-triangle', color: '#fd7e14' },
-  { id: 'medications', label: 'Medications', icon: 'bi-capsule', color: '#6f42c1' },
-  { id: 'conditions', label: 'Diagnoses', icon: 'bi-clipboard2-pulse', color: '#0dcaf0' },
-  { id: 'immunizations', label: 'Immunizations', icon: 'bi-syringe', color: '#198754' },
-  { id: 'demographics', label: 'Demographics', icon: 'bi-person-lines-fill', color: '#6c757d' },
-  { id: 'insurance', label: 'Insurance', icon: 'bi-shield-check', color: '#20c997' },
+const tabs: { id: TabId; labelKey: string; icon: string; color: string }[] = [
+  { id: 'summary', labelKey: 'tabOverview', icon: 'bi-person-vcard', color: '#0d6efd' },
+  { id: 'observations', labelKey: 'tabObservations', icon: 'bi-journal-check', color: '#198754' },
+  { id: 'notes', labelKey: 'tabNotes', icon: 'bi-pencil-square', color: '#e83e8c' },
+  { id: 'vitals', labelKey: 'tabVitals', icon: 'bi-heart-pulse', color: '#dc3545' },
+  { id: 'maternity', labelKey: 'tabMaternity', icon: 'bi-clipboard-heart', color: '#d63384' },
+  { id: 'triage', labelKey: 'tabEmergency', icon: 'bi-clipboard2-pulse', color: '#fd7e14' },
+  { id: 'allergies', labelKey: 'tabAllergies', icon: 'bi-exclamation-triangle', color: '#fd7e14' },
+  { id: 'medications', labelKey: 'tabMedications', icon: 'bi-capsule', color: '#6f42c1' },
+  { id: 'conditions', labelKey: 'tabDiagnoses', icon: 'bi-clipboard2-pulse', color: '#0dcaf0' },
+  { id: 'immunizations', labelKey: 'tabImmunizations', icon: 'bi-syringe', color: '#198754' },
+  { id: 'demographics', labelKey: 'tabDemographics', icon: 'bi-person-lines-fill', color: '#6c757d' },
+  { id: 'insurance', labelKey: 'tabInsurance', icon: 'bi-shield-check', color: '#20c997' },
 ];
 
 export default function PatientDetailPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -67,26 +69,14 @@ export default function PatientDetailPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['patient', id] }),
   });
 
-  if (!canViewChart) {
-    return (
-      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
-        <div className="text-center">
-          <i className="bi bi-shield-lock fs-1 d-block mb-3 text-danger opacity-50"></i>
-          <h5 className="fw-bold">Access Restricted</h5>
-          <p className="text-muted">
-            {user?.role === 'front_desk'
-              ? 'Registrars do not have access to patient charts.'
-              : 'You do not have permission to view patient charts. Please contact an administrator.'}
-          </p>
-          <button className="btn btn-primary rounded-pill" onClick={() => navigate(-1)}>
-            <i className="bi bi-arrow-left me-1"></i>Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // NOTE: the access guard below MUST stay after every hook in this component.
+  // `user` is loaded asynchronously, so an early return placed before the
+  // useQuery hooks below changes the number of hooks between the first render
+  // (user = null) and the next, which trips React's rules-of-hooks (error #310)
+  // and blanks the whole app for every role. The queries are gated so that a
+  // user without chart access never issues a request.
 
-  const { data: patient, isLoading, error } = useQuery({ queryKey: ['patient', id], queryFn: () => getPatient(id!), enabled: !!id });
+  const { data: patient, isLoading, error } = useQuery({ queryKey: ['patient', id], queryFn: () => getPatient(id!), enabled: canViewChart && !!id });
   const { data: allergies } = useQuery({ queryKey: ['patient', id, 'allergies'], queryFn: () => getPatientAllergies(String(patient?.pid ?? id)), enabled: !!patient?.pid });
   const { data: enrichedAllergies } = useQuery({
     queryKey: ['patient', id, 'allergies-enriched'],
@@ -111,7 +101,26 @@ export default function PatientDetailPage() {
     enabled: !!patient?.pid,
   });
 
-  if (isLoading) return <div className="text-center py-5"><div className="spinner-grow text-primary" style={{ width: '3rem', height: '3rem' }} /><p className="text-muted mt-2">Loading chart...</p></div>;
+  if (!canViewChart) {
+    return (
+      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
+        <div className="text-center">
+          <i className="bi bi-shield-lock fs-1 d-block mb-3 text-danger opacity-50"></i>
+          <h5 className="fw-bold">{t('patients.detail.accessRestricted')}</h5>
+          <p className="text-muted">
+            {user?.role === 'front_desk'
+              ? t('patients.detail.accessRegistrar')
+              : t('patients.detail.accessOther')}
+          </p>
+          <button className="btn btn-primary rounded-pill" onClick={() => navigate(-1)}>
+            <i className="bi bi-arrow-left me-1"></i>{t('patients.detail.goBack')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) return <div className="text-center py-5"><div className="spinner-grow text-primary" style={{ width: '3rem', height: '3rem' }} /><p className="text-muted mt-2">{t('patients.detail.loadingChart')}</p></div>;
   if (error || !patient) {
     // Distinguish "no patient reference at all" from "that patient is gone" so a
     // broken link (e.g. /patients/0) reads clearly instead of a bare failure.
@@ -120,14 +129,14 @@ export default function PatientDetailPage() {
     return (
       <div className="text-center py-5">
         <i className="bi bi-exclamation-triangle fs-1 text-danger"></i>
-        <h5>{invalidId ? 'No patient selected' : 'Patient not found'}</h5>
+        <h5>{invalidId ? t('patients.detail.noPatientSelected') : t('patients.detail.patientNotFound')}</h5>
         <p className="text-muted small mb-0">
           {invalidId
-            ? 'This link did not contain a valid patient reference.'
-            : `The chart for patient #${id} could not be loaded.`}
+            ? t('patients.detail.invalidLink')
+            : t('patients.detail.couldNotLoad', { id })}
         </p>
         <button className="btn btn-outline-primary rounded-pill mt-3" onClick={() => navigate('/patients')}>
-          <i className="bi bi-arrow-left me-1"></i>Back to patients
+          <i className="bi bi-arrow-left me-1"></i>{t('patients.detail.backToPatients')}
         </button>
       </div>
     );
@@ -141,7 +150,7 @@ export default function PatientDetailPage() {
   const emergency = (patient as any)?.emergency as { total?: number } | undefined;
   const hasEmergency = (emergency?.total || 0) > 0;
   const banner = emergencyBanner(emergency);
-  const visibleTabs = tabs.filter((t) => (t.id === 'triage' ? hasEmergency : true));
+  const visibleTabs = tabs.filter((tab) => (tab.id === 'triage' ? hasEmergency : true));
 
   // ── Clinical safety algorithm (error prevention) ─────────────────────────
   const latestVital = (vitals || [])[0];
@@ -164,14 +173,14 @@ export default function PatientDetailPage() {
   });
   const polypharmacy = (medications || []).length >= 5;
   const safetyAlerts = [
-    ...(allergyList as any[]).map((a: any) => ({ severity: 'danger', icon: 'bi-exclamation-triangle', text: `Allergy: ${a.allergen || a.title}` })),
-    ...drugAllergyWarnings.map((m: any) => ({ severity: 'danger', icon: 'bi-capsule', text: `Drug-allergy interaction: ${m.drug}` })),
+    ...(allergyList as any[]).map((a: any) => ({ severity: 'danger', icon: 'bi-exclamation-triangle', text: t('patients.detail.alertAllergy', { name: a.allergen || a.title }) })),
+    ...drugAllergyWarnings.map((m: any) => ({ severity: 'danger', icon: 'bi-capsule', text: t('patients.tabs.summary.flagDrugAllergy', { drug: m.drug }) })),
     ...vitalFlags.map((f: any) => ({ severity: f.severity === 'critical' ? 'danger' : 'warning', icon: 'bi-heart-pulse', text: `${f.label} — ${f.action}` })),
-    ...(polypharmacy ? [{ severity: 'warning', icon: 'bi-capsule-pill', text: `Polypharmacy: ${(medications || []).length} active medications` }] : []),
+    ...(polypharmacy ? [{ severity: 'warning', icon: 'bi-capsule-pill', text: t('patients.tabs.summary.flagPolypharmacy', { count: (medications || []).length }) }] : []),
   ];
 
   // Theme color of the currently-selected chart tab.
-  const activeColor = (tabs.find((t) => t.id === activeTab) || tabs[0]).color;
+  const activeColor = (tabs.find((tab) => tab.id === activeTab) || tabs[0]).color;
 
   return (
     <div className="glass-page position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #f5faff 45%, #d1fae5 100%)', borderRadius: '20px', minHeight: '100vh', padding: '16px' }}>
@@ -220,23 +229,23 @@ export default function PatientDetailPage() {
                 <div>
                   <h3 className="mb-1 fw-bold">{formatPatientNameLastFirst(patient)}</h3>
                   <div className="d-flex flex-wrap gap-2 align-items-center">
-                    <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-cake2 me-1"></i>{formatDateOnly((patient as any).DOB || patient.dob)} {age != null && `(${age}y)`}</span>
+                    <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-cake2 me-1"></i>{formatDateOnly((patient as any).DOB || patient.dob)} {age != null && t('patients.detail.ageYears', { count: age })}</span>
                     <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-gender-ambiguous me-1"></i>{patient.sex || '—'}</span>
-                    <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-upc me-1"></i>PID: {patient.pid ?? patient.uuid?.substring(0, 8)}</span>
-                    {patient.public_id && <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-person-badge me-1"></i>Chart #: {patient.public_id}</span>}
+                    <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-upc me-1"></i>{t('patients.detail.pid', { pid: patient.pid ?? patient.uuid?.substring(0, 8) })}</span>
+                    {patient.public_id && <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-person-badge me-1"></i>{t('patients.detail.chartNumber', { chart: patient.public_id })}</span>}
                     {((patient as any).providerName || patient.provider_name) && <span className="badge bg-white bg-opacity-25 rounded-pill"><i className="bi bi-person-check me-1"></i>{(patient as any).providerName || patient.provider_name}</span>}
                   </div>
                 </div>
                 <div className="d-flex gap-2 flex-wrap">
-                  <button className="btn btn-light btn-sm rounded-pill" onClick={() => navigate(`/patients/${id}/screening`)}><i className="bi bi-clipboard2-pulse me-1"></i>Screening</button>
-                  <button className="btn btn-light btn-sm rounded-pill" onClick={() => navigate(`/patients/${id}/encounters`)}><i className="bi bi-file-medical me-1"></i>Encounters</button>
+                  <button className="btn btn-light btn-sm rounded-pill" onClick={() => navigate(`/patients/${id}/screening`)}><i className="bi bi-clipboard2-pulse me-1"></i>{t('patients.detail.screening')}</button>
+                  <button className="btn btn-light btn-sm rounded-pill" onClick={() => navigate(`/patients/${id}/encounters`)}><i className="bi bi-file-medical me-1"></i>{t('patients.detail.encounters')}</button>
                   {(user?.role === 'physician' || user?.role === 'admin' || user?.role === 'nurse') && (
                     <button className={`btn btn-sm rounded-pill ${patient.chart_shared ? 'btn-warning' : 'btn-outline-warning'}`}
                       onClick={() => shareChart.mutate(!patient.chart_shared)}>
-                      <i className="bi bi-share me-1"></i>{patient.chart_shared ? 'Unshare Chart' : 'Share with Nursing'}
+                      <i className="bi bi-share me-1"></i>{patient.chart_shared ? t('patients.detail.unshareChart') : t('patients.detail.shareWithNursing')}
                     </button>
                   )}
-                  <button className="btn btn-warning btn-sm rounded-pill fw-semibold" onClick={() => navigate(user?.role === 'nurse' ? '/nurse-dashboard' : '/provider-dashboard')}><i className="bi bi-check-lg me-1"></i>Done</button>
+                  <button className="btn btn-warning btn-sm rounded-pill fw-semibold" onClick={() => navigate(user?.role === 'nurse' ? '/nurse-dashboard' : '/provider-dashboard')}><i className="bi bi-check-lg me-1"></i>{t('patients.detail.done')}</button>
                 </div>
               </div>
             </div>
@@ -257,28 +266,28 @@ export default function PatientDetailPage() {
           <div className="card-body py-2 px-3">
             <div className="d-flex flex-wrap align-items-center gap-2">
               <i className="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
-              <strong className="small">Chart incomplete</strong>
+              <strong className="small">{t('patients.detail.chartIncomplete')}</strong>
               {(() => {
                 // Distinguish "not approved yet" from "approved but a registration
                 // detail is still blank" — reporting the latter as "No provider
                 // assigned" would be wrong once a provider is on the chart.
                 const missingProvider = (patient.missing_fields || []).includes('Assigned provider');
                 if (patient.status === 'pending') {
-                  return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>Awaiting registrar approval</span>;
+                  return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>{t('patients.detail.awaitingApproval')}</span>;
                 }
                 if (missingProvider) {
-                  return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>No provider assigned</span>;
+                  return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>{t('patients.detail.noProviderAssigned')}</span>;
                 }
-                return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>Registration details outstanding</span>;
+                return <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.7rem' }}>{t('patients.detail.detailsOutstanding')}</span>;
               })()}
               {(patient.missing_fields?.length ?? 0) > 0 && (
                 <span className="small text-dark">
-                  Still needed: <strong>{patient.missing_fields!.join(', ')}</strong>
+                  {t('patients.detail.stillNeeded')} <strong>{patient.missing_fields!.join(', ')}</strong>
                 </span>
               )}
               <button className="btn btn-warning btn-sm rounded-pill ms-auto"
                 onClick={() => setActiveTab('demographics')}>
-                <i className="bi bi-pencil-square me-1"></i>Complete Chart
+                <i className="bi bi-pencil-square me-1"></i>{t('patients.detail.completeChart')}
               </button>
             </div>
           </div>
@@ -291,7 +300,7 @@ export default function PatientDetailPage() {
           <div className="card-body py-2 px-3">
             <div className="d-flex align-items-center gap-2 mb-1">
               <i className="bi bi-shield-exclamation text-danger"></i>
-              <strong className="small">Clinical Safety Alerts</strong>
+              <strong className="small">{t('patients.detail.safetyAlerts')}</strong>
               <span className="badge bg-danger rounded-pill">{safetyAlerts.length}</span>
             </div>
             <div className="d-flex flex-wrap gap-2">
@@ -320,10 +329,10 @@ export default function PatientDetailPage() {
             <div className="small fw-semibold mt-1">{banner.action}</div>
           </div>
           <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={() => setActiveTab('triage')}>
-            <i className="bi bi-clock-history me-1"></i>Triage history
+            <i className="bi bi-clock-history me-1"></i>{t('patients.detail.triageHistory')}
           </button>
           <button className="btn btn-sm btn-outline-danger rounded-pill" onClick={() => navigate('/emergency')}>
-            <i className="bi bi-box-arrow-up-right me-1"></i>Open the board
+            <i className="bi bi-box-arrow-up-right me-1"></i>{t('patients.detail.openBoard')}
           </button>
         </div>
       )}
@@ -332,7 +341,7 @@ export default function PatientDetailPage() {
         <div className="col-lg-3">
           <div className="card border-0 shadow-sm" style={{ borderRadius: '20px', overflow: 'hidden' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '20px 20px 0 0', borderBottom: `2px solid ${activeColor}40` }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-journal-medical me-2" style={{ color: activeColor }}></i>Medical Chart</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-journal-medical me-2" style={{ color: activeColor }}></i>{t('patients.detail.medicalChart')}</h6>
             </div>
             <div className="list-group list-group-flush" style={{ boxShadow: `inset 0 0 0 2px ${activeColor}26` }}>
               {visibleTabs.map((tab) => (
@@ -348,7 +357,7 @@ export default function PatientDetailPage() {
                     style={{ width: '36px', height: '36px', backgroundColor: activeTab === tab.id ? tab.color : `${tab.color}18` }}>
                     <i className={`bi ${tab.icon}`} style={{ color: activeTab === tab.id ? '#fff' : tab.color, fontSize: '0.9rem' }}></i>
                   </div>
-                  <span className="small" style={{ color: activeTab === tab.id ? tab.color : '#212529', fontWeight: activeTab === tab.id ? 700 : 600 }}>{tab.label}</span>
+                  <span className="small" style={{ color: activeTab === tab.id ? tab.color : '#212529', fontWeight: activeTab === tab.id ? 700 : 600 }}>{t(`patients.detail.${tab.labelKey}`)}</span>
                   {activeTab === tab.id && <i className="bi bi-chevron-right ms-auto" style={{ color: tab.color }}></i>}
                 </button>
               ))}

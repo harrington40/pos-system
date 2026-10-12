@@ -11,6 +11,8 @@
  * caught rather than silently rendering the wrong colour.
  */
 
+import i18n from '../i18n';
+
 export type TriageLevel = 1 | 2 | 3 | 4 | 5;
 
 export interface TriageLevelMeta {
@@ -39,6 +41,27 @@ export function levelMeta(level: number | null | undefined): TriageLevelMeta {
   if (!Number.isFinite(n) || n <= 1) return TRIAGE_LEVELS[1];
   if (n >= 5) return TRIAGE_LEVELS[5];
   return TRIAGE_LEVELS[n as TriageLevel];
+}
+
+/**
+ * Translate a catalogue key when the app has booted i18n, and fall back to the
+ * English literal otherwise. The literals above mirror the backend and are
+ * asserted by tests that never initialise i18n, so the literal stays the
+ * contract and the catalogue is only ever a translation of it.
+ */
+const tr = (key: string, english: string, options?: Record<string, unknown>): string =>
+  i18n.isInitialized ? (i18n.t(key, { ...options, defaultValue: english }) as string) : english;
+
+/** The name of a level ("Red"), in the reader's language. */
+export function levelLabel(level: number | null | undefined): string {
+  const meta = levelMeta(level);
+  return tr(`emergency.levels.${meta.level}.label`, meta.label);
+}
+
+/** What a level means clinically, in the reader's language. */
+export function levelMeaning(level: number | null | undefined): string {
+  const meta = levelMeta(level);
+  return tr(`emergency.levels.${meta.level}.meaning`, meta.meaning);
 }
 
 /** Severity ordering weight — higher is sicker. Used for sorting and display. */
@@ -154,29 +177,42 @@ export function emergencyBanner(emergency: any, now: Date = new Date()): Emergen
   const clock = waitClock({ level: visit.level, waitMinutes, targetMinutes: visit.targetMinutes, reassessDueInMinutes: visit.reassessDueInMinutes });
 
   const tone: EmergencyBanner['tone'] = visit.level <= 2 ? 'danger' : visit.level === 3 ? 'warning' : 'info';
-  const target = visit.targetMinutes === 0 ? 'immediate' : `${visit.targetMinutes} min`;
+  const target = visit.targetMinutes === 0
+    ? tr('emergency.target.immediate', 'immediate')
+    : tr('emergency.target.minutes', `${visit.targetMinutes} min`, { count: visit.targetMinutes });
   const elapsed = clock.text;
+  const arrivedTime = arrivedAt && !Number.isNaN(arrivedAt.getTime())
+    ? arrivedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
 
   let action: string;
   if (clock.breached) {
-    action = `Escalate — ${clock.overByMinutes} min past the ${target} target.`;
+    action = tr('emergency.banner.actionBreach', `Escalate — ${clock.overByMinutes} min past the ${target} target.`, { over: clock.overByMinutes, target });
   } else if (visit.needsVitals) {
-    action = 'Complete the observations — the level is floored until they are recorded.';
+    action = tr('emergency.banner.actionVitals', 'Complete the observations — the level is floored until they are recorded.');
   } else if (clock.reassessOverdue) {
-    action = 'Reassessment is due.';
+    action = tr('emergency.banner.actionReassess', 'Reassessment is due.');
   } else if (!visit.awaitingFirstReview) {
-    action = 'Under treatment.';
+    action = tr('emergency.banner.actionTreating', 'Under treatment.');
   } else {
-    action = `Must be seen within ${clock.minutesToTarget} min.`;
+    action = tr('emergency.banner.actionWithin', `Must be seen within ${clock.minutesToTarget} min.`, { minutes: clock.minutesToTarget });
   }
 
   return {
     tone,
-    headline: `In the emergency department — level ${meta.level} ${meta.label} (${meta.meaning})`,
+    headline: tr(
+      'emergency.banner.headline',
+      `In the emergency department — level ${meta.level} ${meta.label} (${meta.meaning})`,
+      { level: meta.level, label: levelLabel(meta.level), meaning: levelMeaning(meta.level) },
+    ),
     detail: [
-      `arrived ${arrivedAt && !Number.isNaN(arrivedAt.getTime()) ? arrivedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'unknown'}`,
-      `waiting ${elapsed} of a ${target} target`,
-      visit.escalatedLevel !== null && visit.escalatedLevel !== undefined ? 'escalated for delay' : null,
+      arrivedTime
+        ? tr('emergency.banner.arrived', `arrived ${arrivedTime}`, { time: arrivedTime })
+        : tr('emergency.banner.arrivedUnknown', 'arrived unknown'),
+      tr('emergency.banner.waiting', `waiting ${elapsed} of a ${target} target`, { elapsed, target }),
+      visit.escalatedLevel !== null && visit.escalatedLevel !== undefined
+        ? tr('emergency.banner.escalated', 'escalated for delay')
+        : null,
       visit.chiefComplaint || null,
     ]
       .filter(Boolean)

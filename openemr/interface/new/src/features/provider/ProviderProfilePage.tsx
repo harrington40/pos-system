@@ -1,9 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../api/nest-client';
 import AvatarUpload from '../../components/common/AvatarUpload';
 
 export default function ProviderProfilePage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -49,7 +51,7 @@ export default function ProviderProfilePage() {
     return (
       <div className="text-center py-5">
         <div className="spinner-border text-primary" />
-        <p className="text-muted mt-2">Loading profile...</p>
+        <p className="text-muted mt-2">{t('provider.loadingProfile')}</p>
       </div>
     );
   }
@@ -58,9 +60,9 @@ export default function ProviderProfilePage() {
     return (
       <div className="text-center py-5">
         <i className="bi bi-person-x fs-1 text-muted"></i>
-        <h5 className="mt-2">Provider not found</h5>
+        <h5 className="mt-2">{t('provider.notFound')}</h5>
         <button className="btn btn-outline-primary mt-2 rounded-pill" onClick={() => navigate('/providers')}>
-          <i className="bi bi-arrow-left me-1"></i>Back to Providers
+          <i className="bi bi-arrow-left me-1"></i>{t('provider.backToProviders')}
         </button>
       </div>
     );
@@ -75,7 +77,7 @@ export default function ProviderProfilePage() {
       {/* Breadcrumb */}
       <nav className="mb-3 small">
         <a href="#" className="text-decoration-none text-muted" onClick={e => { e.preventDefault(); navigate('/providers'); }}>
-          <i className="bi bi-people me-1"></i>Providers
+          <i className="bi bi-people me-1"></i>{t('provider.providers')}
         </a>
         <span className="text-muted mx-1">/</span>
         <span className="fw-semibold">{provider.title ? `${provider.title} ` : ''}{provider.fname} {provider.lname}</span>
@@ -102,7 +104,7 @@ export default function ProviderProfilePage() {
                   />
                   {!isMyProfile && (
                     <div className="text-center text-white-50 mt-1" style={{ fontSize: '0.65rem' }}>
-                      Editing another user's photo
+                      {t('provider.editingOtherPhoto')}
                     </div>
                   )}
                 </div>
@@ -135,7 +137,7 @@ export default function ProviderProfilePage() {
                 )}
                 <span className={`badge ${provider.active ? 'bg-success' : 'bg-danger'} bg-opacity-90`}>
                   <i className={`bi ${provider.active ? 'bi-check-circle' : 'bi-x-circle'} me-1`}></i>
-                  {provider.active ? 'Active' : 'Inactive'}
+                  {provider.active ? t('common.active') : t('common.inactive')}
                 </span>
               </div>
 
@@ -143,7 +145,7 @@ export default function ProviderProfilePage() {
               <div className="d-flex flex-wrap gap-2">
                 {provider.npi && (
                   <span className="badge bg-white bg-opacity-15 rounded-pill px-3 py-2">
-                    <i className="bi bi-upc me-1 opacity-75"></i>NPI: {provider.npi}
+                    <i className="bi bi-upc me-1 opacity-75"></i>{t('provider.npiPrefix', { npi: provider.npi })}
                   </span>
                 )}
                 {provider.taxonomy && (
@@ -153,12 +155,12 @@ export default function ProviderProfilePage() {
                 )}
                 {provider.state_license_number && (
                   <span className="badge bg-white bg-opacity-15 rounded-pill px-3 py-2">
-                    <i className="bi bi-shield-check me-1 opacity-75"></i>License: {provider.state_license_number}
+                    <i className="bi bi-shield-check me-1 opacity-75"></i>{t('provider.licensePrefix', { number: provider.state_license_number })}
                   </span>
                 )}
                 {provider.upin && (
                   <span className="badge bg-white bg-opacity-15 rounded-pill px-3 py-2">
-                    <i className="bi bi-hash me-1 opacity-75"></i>UPIN: {provider.upin}
+                    <i className="bi bi-hash me-1 opacity-75"></i>{t('provider.upinPrefix', { upin: provider.upin })}
                   </span>
                 )}
               </div>
@@ -166,7 +168,7 @@ export default function ProviderProfilePage() {
 
             <div className="ms-auto d-flex gap-2">
               <button className="btn btn-light rounded-pill" onClick={() => navigate(`/providers`)}>
-                <i className="bi bi-pencil me-1"></i>Edit
+                <i className="bi bi-pencil me-1"></i>{t('common.edit')}
               </button>
             </div>
           </div>
@@ -183,11 +185,11 @@ export default function ProviderProfilePage() {
                 <i className={`bi bi-clock fs-5 ${hasSchedule ? 'text-success' : 'text-muted'}`}></i>
               </div>
               <div>
-                <div className="fw-bold">{hasSchedule ? 'In Office Today' : 'Not Scheduled Today'}</div>
+                <div className="fw-bold">{hasSchedule ? t('provider.inOfficeToday') : t('provider.notScheduledToday')}</div>
                 <small className="text-muted">
                   {hasSchedule
                     ? provider.todayAvailability.map((s: any) => `${s.pc_startTime?.substring(0, 5)}–${s.pc_endTime?.substring(0, 5)}`).join(', ')
-                    : 'No in-office hours set'}
+                    : t('provider.noOfficeHours')}
                 </small>
               </div>
             </div>
@@ -201,10 +203,10 @@ export default function ProviderProfilePage() {
                 <i className="bi bi-envelope fs-5 text-primary"></i>
               </div>
               <div>
-                <div className="fw-bold">{provider.email || 'No email on file'}</div>
+                <div className="fw-bold">{provider.email || t('provider.noEmailOnFile')}</div>
                 <small className="text-muted">
-                  {provider.email_direct && <span>Direct: {provider.email_direct}</span>}
-                  {!provider.email_direct && 'Direct messaging not configured'}
+                  {provider.email_direct && <span>{t('provider.directPrefix', { email: provider.email_direct })}</span>}
+                  {!provider.email_direct && t('provider.directNotConfigured')}
                 </small>
               </div>
             </div>
@@ -218,9 +220,9 @@ export default function ProviderProfilePage() {
                 <i className="bi bi-building fs-5" style={{ color: '#6f42c1' }}></i>
               </div>
               <div>
-                <div className="fw-bold">{provider.organization || 'No Organization'}</div>
+                <div className="fw-bold">{provider.organization || t('provider.noOrganization')}</div>
                 <small className="text-muted">
-                  {provider.street ? provider.city || '' : 'No address on file'}
+                  {provider.street ? provider.city || '' : t('provider.noAddressOnFile')}
                 </small>
               </div>
             </div>
@@ -234,7 +236,7 @@ export default function ProviderProfilePage() {
         <div className="col-lg-6">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-telephone me-2 text-primary"></i>Contact Information</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-telephone me-2 text-primary"></i>{t('provider.contactInformation')}</h6>
             </div>
             <div className="card-body">
               {provider.email || provider.phone || provider.phonecell || provider.fax ? (
@@ -242,7 +244,7 @@ export default function ProviderProfilePage() {
                   {provider.email && (
                     <div className="col-sm-6">
                       <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase">Email</small>
+                        <small className="text-muted d-block text-uppercase">{t('provider.email')}</small>
                         <a href={`mailto:${provider.email}`} className="fw-semibold text-decoration-none small">{provider.email}</a>
                       </div>
                     </div>
@@ -250,7 +252,7 @@ export default function ProviderProfilePage() {
                   {provider.email_direct && (
                     <div className="col-sm-6">
                       <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase">Direct (HISP)</small>
+                        <small className="text-muted d-block text-uppercase">{t('provider.directHisp')}</small>
                         <code className="small">{provider.email_direct}</code>
                       </div>
                     </div>
@@ -258,7 +260,7 @@ export default function ProviderProfilePage() {
                   {provider.phone && (
                     <div className="col-sm-6">
                       <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase">Phone</small>
+                        <small className="text-muted d-block text-uppercase">{t('provider.phone')}</small>
                         <a href={`tel:${provider.phone}`} className="fw-bold text-decoration-none">{provider.phone}</a>
                       </div>
                     </div>
@@ -266,7 +268,7 @@ export default function ProviderProfilePage() {
                   {provider.phonecell && (
                     <div className="col-sm-6">
                       <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase">Cell</small>
+                        <small className="text-muted d-block text-uppercase">{t('provider.cell')}</small>
                         <a href={`tel:${provider.phonecell}`} className="fw-bold text-decoration-none">{provider.phonecell}</a>
                       </div>
                     </div>
@@ -274,7 +276,7 @@ export default function ProviderProfilePage() {
                   {provider.phonew1 && (
                     <div className="col-sm-6">
                       <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase">Work</small>
+                        <small className="text-muted d-block text-uppercase">{t('provider.work')}</small>
                         <span className="fw-semibold small">{provider.phonew1}</span>
                       </div>
                     </div>
@@ -282,14 +284,14 @@ export default function ProviderProfilePage() {
                   {provider.fax && (
                     <div className="col-sm-6">
                       <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase">Fax</small>
+                        <small className="text-muted d-block text-uppercase">{t('provider.fax')}</small>
                         <span className="fw-semibold small">{provider.fax}</span>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-muted text-center py-2 mb-0">No contact information on file</p>
+                <p className="text-muted text-center py-2 mb-0">{t('provider.noContactInfo')}</p>
               )}
             </div>
           </div>
@@ -299,7 +301,7 @@ export default function ProviderProfilePage() {
         <div className="col-lg-6">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '20px' }}>
             <div className="card-header bg-white py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-              <h6 className="mb-0 fw-bold"><i className="bi bi-geo-alt me-2 text-success"></i>Address & Organization</h6>
+              <h6 className="mb-0 fw-bold"><i className="bi bi-geo-alt me-2 text-success"></i>{t('provider.addressOrganization')}</h6>
             </div>
             <div className="card-body">
               {provider.street ? (
@@ -311,23 +313,23 @@ export default function ProviderProfilePage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-muted small mb-3">No address on file</p>
+                <p className="text-muted small mb-3">{t('provider.noAddressOnFile')}</p>
               )}
               {provider.organization && (
                 <div className="p-3 bg-light rounded-3 mb-2">
-                  <small className="text-muted d-block text-uppercase">Organization</small>
+                  <small className="text-muted d-block text-uppercase">{t('provider.organization')}</small>
                   <span className="fw-semibold small">{provider.organization}</span>
                 </div>
               )}
               {provider.federaldrugid && (
                 <div className="p-3 bg-light rounded-3 mb-2">
-                  <small className="text-muted d-block text-uppercase">Federal Drug ID</small>
+                  <small className="text-muted d-block text-uppercase">{t('provider.federalDrugId')}</small>
                   <code className="small">{provider.federaldrugid}</code>
                 </div>
               )}
               {provider.assistant && (
                 <div className="p-3 bg-light rounded-3">
-                  <small className="text-muted d-block text-uppercase">Assistant</small>
+                  <small className="text-muted d-block text-uppercase">{t('provider.assistant')}</small>
                   <span className="fw-semibold small">{provider.assistant}</span>
                 </div>
               )}

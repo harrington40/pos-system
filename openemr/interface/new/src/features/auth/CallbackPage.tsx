@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 export default function CallbackPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,9 +15,9 @@ export default function CallbackPage() {
     <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
       <div className="text-center">
         <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
-          <span className="visually-hidden">Redirecting...</span>
+          <span className="visually-hidden">{t('auth.redirecting')}</span>
         </div>
-        <p className="text-muted">Redirecting to login...</p>
+        <p className="text-muted">{t('auth.redirectingToLogin')}</p>
       </div>
     </div>
   );

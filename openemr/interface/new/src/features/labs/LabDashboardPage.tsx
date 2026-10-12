@@ -1,6 +1,7 @@
 import { useState, useMemo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import nestClient from '../../api/nest-client';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useAuth } from '../../hooks/useAuth';
@@ -69,6 +70,7 @@ const EMPTY_RESULT: any = {
 };
 
 export default function LabDashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isLabStaff = user?.role === 'lab_tech' || user?.role === 'admin';
   const qc = useQueryClient();
@@ -120,15 +122,15 @@ export default function LabDashboardPage() {
       qc.invalidateQueries({ queryKey: ['lab-group-preview'] });
       setGroupToast(
         d.validated
-          ? `Validated ${d.validated} order(s) · ${d.resultCount} result(s). ` +
+          ? t('labs.toast.validated', { orders: t('labs.orderCount', { count: d.validated }), results: t('labtech.resultsCount', { count: d.resultCount }) }) + ' ' +
             (d.notified
-              ? `Notification sent to provider #${d.provider}.`
-              : 'No provider on file to notify.')
-          : d.reason || 'Nothing to validate.',
+              ? t('labs.toast.notified', { id: d.provider })
+              : t('labs.notice.noProvider'))
+          : d.reason || t('labs.toast.nothingToValidate'),
       );
       setPreviewPid(null);
     },
-    onError: (e: any) => setGroupToast(e?.response?.data?.message || 'Group validation failed'),
+    onError: (e: any) => setGroupToast(e?.response?.data?.message || t('labs.toast.groupFailed')),
   });
 
   // Database-driven catalog — the same fields used by the Patient Lab Result Form.
@@ -156,7 +158,7 @@ export default function LabDashboardPage() {
       setSelectedPanel('');
       setSampleLabel('');
       if (data?.duplicate) {
-        setDuplicateNotice('Duplicate lab order blocked — this test was already ordered for the patient within the last hour.');
+        setDuplicateNotice(t('labs.notice.duplicateOrder'));
         setShowOrderForm(true);
       } else {
         setDuplicateNotice('');
@@ -184,7 +186,7 @@ export default function LabDashboardPage() {
     mutationFn: (d: any) => nestClient.patch(`/lab/orders/${d.orderId}/status`, { status: d.status, sample_label: d.label }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['all-lab-orders'] }); qc.invalidateQueries({ queryKey: ['provider-lab-orders'] }); },
     onError: (e: any) => {
-      const msg = e?.response?.data?.message || e?.message || 'Unable to update order status';
+      const msg = e?.response?.data?.message || e?.message || t('labs.notice.statusFailed');
       alert(Array.isArray(msg) ? msg.join('\n') : msg);
     },
   });
@@ -287,16 +289,16 @@ export default function LabDashboardPage() {
         <div className="position-relative">
           <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
-              <h2 className="mb-1 fw-bold"><i className="bi bi-flask me-2"></i>Laboratory Management</h2>
-              <p className="mb-0 text-white text-opacity-75 small">Order tests · Collect samples · Enter results · Validate & refer</p>
+              <h2 className="mb-1 fw-bold"><i className="bi bi-flask me-2"></i>{t('labs.title')}</h2>
+              <p className="mb-0 text-white text-opacity-75 small">{t('labs.subtitleAdmin')}</p>
             </div>
             <div className="d-flex gap-2">
               {[
-                { v: orders.length, l: 'Total', c: '#fff' },
-                { v: pending, l: 'Pending', c: '#fd7e14' },
-                { v: processing, l: 'Processing', c: '#0dcaf0' },
-                { v: completed, l: 'Completed', c: '#198754' },
-                { v: referred, l: 'Referred', c: '#ffc107' },
+                { v: orders.length, l: t('labs.total'), c: '#fff' },
+                { v: pending, l: t('labs.status.pending'), c: '#fd7e14' },
+                { v: processing, l: t('labs.status.processing'), c: '#0dcaf0' },
+                { v: completed, l: t('labs.status.completed'), c: '#198754' },
+                { v: referred, l: t('labs.status.referred'), c: '#ffc107' },
               ].map(s => (
                 <div key={s.l} className="text-center bg-white bg-opacity-15 rounded-3 px-3 py-2" style={{ minWidth: '60px' }}>
                   <div className="fw-bold fs-5 lh-1">{s.v}</div>
@@ -310,19 +312,19 @@ export default function LabDashboardPage() {
 
       {/* Tab Navigation */}
       <div className="d-flex gap-2 mb-3">
-        {tabs.map(t => (
-          <button key={t.id} className={`btn rounded-pill ${activeTab === t.id ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setActiveTab(t.id)}>
-            <i className={`bi ${t.icon} me-1`}></i>{t.label}
+        {tabs.map(tabItem => (
+          <button key={tabItem.id} className={`btn rounded-pill ${activeTab === tabItem.id ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setActiveTab(tabItem.id)}>
+            <i className={`bi ${tabItem.icon} me-1`}></i>{t(`labs.tab.${tabItem.id}`)}
           </button>
         ))}
         <div className="ms-auto d-flex gap-2">
-          <input className="form-control form-control-sm rounded-pill" style={{ width: '200px' }} placeholder="Search by Patient ID..."
+          <input className="form-control form-control-sm rounded-pill" style={{ width: '200px' }} placeholder={t('labs.searchPidPlaceholder')}
             value={searchPid} onChange={e => setSearchPid(e.target.value)} />
           <select className="form-select form-select-sm rounded-pill" style={{ width: '150px' }}
             value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s}</option>)}
+            <option value="all">{t('labs.allStatus')}</option>
+            {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{t(`labs.status.${s}`)}</option>)}
           </select>
         </div>
       </div>
@@ -352,23 +354,23 @@ export default function LabDashboardPage() {
       {showOrderForm && (
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '20px', border: '2px solid #fd7e14' }}>
           <div className="card-header text-white py-3 d-flex justify-content-between" style={{ background: 'linear-gradient(135deg, #fd7e14, #dc3545)', borderRadius: '18px 18px 0 0' }}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-plus-circle me-2"></i>New Lab Order</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-plus-circle me-2"></i>{t('labs.newOrder')}</h6>
             <button className="btn btn-sm btn-outline-light rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => setShowOrderForm(false)}><i className="bi bi-x-lg"></i></button>
           </div>
           <div className="card-body">
             <div className="row g-2 mb-3">
               <div className="col-md-12">
-                <label className="form-label small fw-semibold">Patient *</label>
+                <label className="form-label small fw-semibold">{t('labs.patientLabel')}</label>
                 {selectedPatient ? (
                   <div className="d-flex align-items-center gap-2 p-2 rounded-3" style={{ background: '#f0fdfa', border: '1px solid #c6f6e5' }}>
                     <span className="fw-semibold small">{formatPatientName(selectedPatient)} (PID {selectedPatient.pid})</span>
-                    <button className="btn btn-sm btn-outline-secondary rounded-pill ms-auto" onClick={() => { setSelectedPatient(null); setPatientSearch(''); }}>Change</button>
+                    <button className="btn btn-sm btn-outline-secondary rounded-pill ms-auto" onClick={() => { setSelectedPatient(null); setPatientSearch(''); }}>{t('labs.change')}</button>
                   </div>
                 ) : (
                   <div className="position-relative">
                     <div className="input-group input-group-sm">
                       <span className="input-group-text"><i className="bi bi-search"></i></span>
-                      <input className="form-control" placeholder="Search patient by name or ID…" value={patientSearch}
+                      <input className="form-control" placeholder={t('labs.searchPatientPlaceholder')} value={patientSearch}
                         onChange={(e) => { setPatientSearch(e.target.value); setShowPatientDropdown(true); }}
                         onFocus={() => setShowPatientDropdown(true)} />
                     </div>
@@ -381,17 +383,17 @@ export default function LabDashboardPage() {
                             <small className="text-muted">{p.DOB?.split('T')[0]}</small>
                           </button>
                         ))}
-                        {!patientHits.length && <div className="list-group-item text-muted small">No patients found</div>}
+                        {!patientHits.length && <div className="list-group-item text-muted small">{t('labs.noPatientsFound')}</div>}
                       </div>
                     )}
                   </div>
                 )}
               </div>
-              <div className="col-md-3"><label className="form-label small fw-semibold">Priority</label><select className="form-select form-select-sm rounded-pill" value={orderForm.priority} onChange={e => setOrderForm({ ...orderForm, priority: e.target.value })}><option value="routine">Routine</option><option value="stat">STAT</option><option value="urgent">Urgent</option></select></div>
-              <div className="col-md-6"><label className="form-label small fw-semibold">Instructions</label><input className="form-control form-control-sm rounded-pill" value={orderForm.instructions} onChange={e => setOrderForm({ ...orderForm, instructions: e.target.value })} placeholder="e.g. Fasting 12 hours, collect in EDTA tube..." /></div>
-              <div className="col-md-12"><label className="form-label small fw-semibold">Clinical History</label><input className="form-control form-control-sm rounded-pill" value={orderForm.clinical_hx} onChange={e => setOrderForm({ ...orderForm, clinical_hx: e.target.value })} placeholder="Relevant clinical context..." /></div>
+              <div className="col-md-3"><label className="form-label small fw-semibold">{t('labs.priorityLabel')}</label><select className="form-select form-select-sm rounded-pill" value={orderForm.priority} onChange={e => setOrderForm({ ...orderForm, priority: e.target.value })}><option value="routine">{t('nurse.aide.priorityRoutine')}</option><option value="stat">{t('nurse.aide.priorityStat')}</option><option value="urgent">{t('nurse.aide.priorityUrgent')}</option></select></div>
+              <div className="col-md-6"><label className="form-label small fw-semibold">{t('labs.instructionsLabel')}</label><input className="form-control form-control-sm rounded-pill" value={orderForm.instructions} onChange={e => setOrderForm({ ...orderForm, instructions: e.target.value })} placeholder={t('labs.instructionsPlaceholder')} /></div>
+              <div className="col-md-12"><label className="form-label small fw-semibold">{t('labs.clinicalHxLabel')}</label><input className="form-control form-control-sm rounded-pill" value={orderForm.clinical_hx} onChange={e => setOrderForm({ ...orderForm, clinical_hx: e.target.value })} placeholder={t('labs.clinicalHxPlaceholder')} /></div>
             </div>
-            <h6 className="small fw-bold text-uppercase text-muted mb-2">Select Test Panel</h6>
+            <h6 className="small fw-bold text-uppercase text-muted mb-2">{t('labs.selectPanel')}</h6>
             <div className="d-flex flex-wrap gap-1 mb-3">
               {Object.keys(groupedCatalog).map(cat => (
                 <button key={cat} className={`btn btn-sm rounded-pill ${selectedPanel === cat ? 'btn-warning' : 'btn-outline-warning'}`}
@@ -399,21 +401,21 @@ export default function LabDashboardPage() {
                   <i className={`bi ${CATEGORY_ICONS[cat] || 'bi-flask'} me-1`}></i>{cat}
                 </button>
               ))}
-              {Object.keys(groupedCatalog).length === 0 && <span className="text-muted small">Loading catalog…</span>}
+              {Object.keys(groupedCatalog).length === 0 && <span className="text-muted small">{t('labs.loadingCatalog')}</span>}
             </div>
             {selectedPanel && (
               <div className="alert alert-warning py-2 mb-2 small rounded-3">
                 <strong>{selectedPanel}</strong>: {(groupedCatalog[selectedPanel] || []).map((t: any) => t.name).join(', ')}
               </div>
             )}
-            {sampleLabel && <div className="alert alert-info py-2 small rounded-3"><i className="bi bi-tag me-1"></i>Sample Label: <code>{sampleLabel}</code></div>}
+            {sampleLabel && <div className="alert alert-info py-2 small rounded-3"><i className="bi bi-tag me-1"></i>{t('labs.sampleLabel')} <code>{sampleLabel}</code></div>}
             {duplicateNotice && (
               <div className="alert alert-warning py-1 px-2 small rounded-3">
                 <i className="bi bi-exclamation-triangle me-1"></i>{duplicateNotice}
               </div>
             )}
             <button className="btn btn-warning rounded-pill" onClick={handleOrderSubmit} disabled={!selectedPatient?.pid || createOrder.isPending}>
-              {createOrder.isPending ? <><span className="spinner-border spinner-border-sm me-1"></span>Ordering...</> : <><i className="bi bi-flask me-1"></i>Order Lab Tests</>}
+              {createOrder.isPending ? <><span className="spinner-border spinner-border-sm me-1"></span>{t('labs.ordering')}</> : <><i className="bi bi-flask me-1"></i>{t('labs.orderLabTests')}</>}
             </button>
           </div>
         </div>
@@ -423,20 +425,20 @@ export default function LabDashboardPage() {
       {showResultForm && selectedOrder && (
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '20px', border: '2px solid #198754' }}>
           <div className="card-header text-white py-3 d-flex justify-content-between" style={{ background: 'linear-gradient(135deg, #198754, #0d6efd)', borderRadius: '18px 18px 0 0' }}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-pencil me-2"></i>Enter Results — Order #{selectedOrder.id}</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-pencil me-2"></i>{t('labs.enterResultsOrder', { id: selectedOrder.id })}</h6>
             <button className="btn btn-sm btn-outline-light rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => { setShowResultForm(false); setSelectedOrder(null); setResultForm({ ...EMPTY_RESULT }); }}><i className="bi bi-x-lg"></i></button>
           </div>
           <div className="card-body">
-            <div className="small text-muted mb-2">Panel: <strong>{selectedOrder.instructions || 'Custom'}</strong></div>
+            <div className="small text-muted mb-2">{t('labs.panelLabel')} <strong>{selectedOrder.instructions || t('labs.custom')}</strong></div>
             <div className="row g-2">
               <div className="col-md-5">
-                <label className="form-label small mb-0">Test Request *</label>
+                <label className="form-label small mb-0">{t('labs.testRequest')}</label>
                 <select className="form-select form-select-sm" value={resultForm.result_code}
                   onChange={(e) => {
                     const t = (catalog as any[]).find((c) => c.code === e.target.value);
                     setResultForm({ result_code: t?.code || '', result_text: t?.name || '', result: '', units: t?.unit || '', range: t ? refText(t) : '', flag: '', comments: '', result_type: t?.result_type || 'TEXT', ref_min: t?.ref_min ?? null, ref_max: t?.ref_max ?? null });
                   }}>
-                  <option value="">— Select Test —</option>
+                  <option value="">{t('labs.selectTest')}</option>
                   {sectionOptions.map((sec) => (
                     <Fragment key={sec.title}>
                       {sec.groups.map((g, gi) => (
@@ -451,17 +453,20 @@ export default function LabDashboardPage() {
                 </select>
               </div>
               <div className="col-md-4">
-                <label className="form-label small mb-0">Results *</label>
+                <label className="form-label small mb-0">{t('labs.resultsLabel')}</label>
                 {resultForm.result_type === 'POSITIVE_NEGATIVE' ? (
                   <select className="form-select form-select-sm" value={resultForm.result}
                     onChange={(e) => setResultForm({ ...resultForm, result: e.target.value, flag: computeFlag(resultForm.result_type, e.target.value, resultForm.ref_min, resultForm.ref_max) })}>
-                    <option value="">— Select —</option>
-                    <option>Negative</option><option>Positive</option><option>Non-Reactive</option><option>Reactive</option>
+                    <option value="">{t('labs.selectOption')}</option>
+                    <option value="Negative">{t('labs.value.negative')}</option>
+                    <option value="Positive">{t('labs.value.positive')}</option>
+                    <option value="Non-Reactive">{t('labs.value.nonReactive')}</option>
+                    <option value="Reactive">{t('labs.value.reactive')}</option>
                   </select>
                 ) : resultForm.result_type === 'BLOOD_GROUP' ? (
                   <select className="form-select form-select-sm" value={resultForm.result}
                     onChange={(e) => setResultForm({ ...resultForm, result: e.target.value, flag: computeFlag(resultForm.result_type, e.target.value, resultForm.ref_min, resultForm.ref_max) })}>
-                    <option value="">— Select —</option>
+                    <option value="">{t('labs.selectOption')}</option>
                     {BLOOD_GROUPS.map((g) => <option key={g}>{g}</option>)}
                   </select>
                 ) : (
@@ -471,24 +476,24 @@ export default function LabDashboardPage() {
                 )}
               </div>
               <div className="col-md-3">
-                <label className="form-label small mb-0">Flag</label>
+                <label className="form-label small mb-0">{t('labs.flagLabel')}</label>
                 <div className="form-control form-control-sm bg-light"><span className={`badge ${flagBadge(resultForm.flag)}`}>{resultForm.flag || '—'}</span></div>
               </div>
               <div className="col-md-4">
-                <label className="form-label small mb-0">Unit</label>
+                <label className="form-label small mb-0">{t('labs.unitLabel')}</label>
                 <div className="form-control form-control-sm bg-light small">{resultForm.units || '—'}</div>
               </div>
               <div className="col-md-4">
-                <label className="form-label small mb-0">Normal Value</label>
+                <label className="form-label small mb-0">{t('labs.normalValueLabel')}</label>
                 <div className="form-control form-control-sm bg-light small">{resultForm.range || '—'}</div>
               </div>
               <div className="col-md-4">
-                <label className="form-label small mb-0">Comments</label>
+                <label className="form-label small mb-0">{t('labs.commentsLabel')}</label>
                 <input className="form-control form-control-sm" value={resultForm.comments || ''} onChange={(e) => setResultForm({ ...resultForm, comments: e.target.value })} />
               </div>
               <div className="col-12 mt-2 d-flex align-items-center">
                 <button className="btn btn-success btn-sm rounded-pill ms-auto" onClick={handleResultSubmit} disabled={addResult.isPending || !resultForm.result_text || !resultForm.result}>
-                  {addResult.isPending ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</> : <><i className="bi bi-check-lg me-1"></i>Add Result</>}
+                  {addResult.isPending ? <><span className="spinner-border spinner-border-sm me-1"></span>{t('labs.saving')}</> : <><i className="bi bi-check-lg me-1"></i>{t('labs.addResult')}</>}
                 </button>
               </div>
             </div>
@@ -499,20 +504,20 @@ export default function LabDashboardPage() {
       {/* Lab Analytics Dashboard */}
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '20px' }}>
         <div className="card-header text-white py-3" style={{ background: 'linear-gradient(135deg, #6f42c1, #0d6efd)', borderRadius: '18px 18px 0 0' }}>
-          <h6 className="mb-0 fw-bold"><i className="bi bi-graph-up me-2"></i>Lab Analytics</h6>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-graph-up me-2"></i>{t('labtech.analytics')}</h6>
         </div>
         <div className="card-body">
           <div className="row g-3">
             {/* Turnaround Summary */}
             <div className="col-12">
-              <small className="fw-bold text-muted text-uppercase">Status Overview</small>
+              <small className="fw-bold text-muted text-uppercase">{t('labs.statusOverview')}</small>
               <div className="row g-1 mt-1">
                 {[
-                  { l: 'Pending', c: '#fd7e14', v: orders.filter((o:any) => o.orderStatus === 'pending').length },
-                  { l: 'Collected', c: '#0dcaf0', v: orders.filter((o:any) => o.orderStatus === 'collected').length },
-                  { l: 'Processing', c: '#6f42c1', v: orders.filter((o:any) => o.orderStatus === 'processing').length },
-                  { l: 'Completed', c: '#198754', v: orders.filter((o:any) => o.orderStatus === 'completed').length },
-                  { l: 'Validated', c: '#0d6efd', v: 0 },
+                  { l: t('labs.status.pending'), c: '#fd7e14', v: orders.filter((o:any) => o.orderStatus === 'pending').length },
+                  { l: t('labs.status.collected'), c: '#0dcaf0', v: orders.filter((o:any) => o.orderStatus === 'collected').length },
+                  { l: t('labs.status.processing'), c: '#6f42c1', v: orders.filter((o:any) => o.orderStatus === 'processing').length },
+                  { l: t('labs.status.completed'), c: '#198754', v: orders.filter((o:any) => o.orderStatus === 'completed').length },
+                  { l: t('labs.status.validated'), c: '#0d6efd', v: 0 },
                 ].map(s => {
                   const pct = orders.length > 0 ? Math.round((s.v / orders.length) * 100) : 0;
                   return (
@@ -532,10 +537,10 @@ export default function LabDashboardPage() {
             <div className="col-12">
               <div className="row g-2">
                 {[
-                  { v: orders.length, l: 'Total Orders', c: '#0d6efd', i: 'bi-clipboard-check' },
-                  { v: orders.filter((o:any) => o.orderPriority === 'stat').length, l: 'STAT', c: '#dc3545', i: 'bi-exclamation-triangle' },
-                  { v: orders.filter((o:any) => o.orderStatus === 'referred').length, l: 'Referred Out', c: '#ffc107', i: 'bi-send' },
-                  { v: 0, l: 'External Results', c: '#20c997', i: 'bi-cloud-download' },
+                  { v: orders.length, l: t('labs.statTotal'), c: '#0d6efd', i: 'bi-clipboard-check' },
+                  { v: orders.filter((o:any) => o.orderPriority === 'stat').length, l: t('labtech.statBadge'), c: '#dc3545', i: 'bi-exclamation-triangle' },
+                  { v: orders.filter((o:any) => o.orderStatus === 'referred').length, l: t('labs.referredOut'), c: '#ffc107', i: 'bi-send' },
+                  { v: 0, l: t('labs.externalResults'), c: '#20c997', i: 'bi-cloud-download' },
                 ].map(s => (
                   <div className="col-3" key={s.l}>
                     <div className="p-2 rounded-3 text-center" style={{backgroundColor:`${s.c}10`}}>
@@ -555,25 +560,25 @@ export default function LabDashboardPage() {
       {showReferForm && selectedOrder && (
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '20px', border: '2px solid #ffc107' }}>
           <div className="card-header text-dark py-3 d-flex justify-content-between" style={{ background: 'linear-gradient(135deg, #ffc107, #fd7e14)', borderRadius: '18px 18px 0 0' }}>
-            <h6 className="mb-0 fw-bold"><i className="bi bi-send me-2"></i>Refer Order #{selectedOrder.id} to Outside Lab</h6>
+            <h6 className="mb-0 fw-bold"><i className="bi bi-send me-2"></i>{t('labs.referOrderTitle', { id: selectedOrder.id })}</h6>
             <button className="btn btn-sm btn-outline-dark rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => setShowReferForm(false)}><i className="bi bi-x-lg"></i></button>
           </div>
           <div className="card-body">
             <div className="row g-2">
               <div className="col-md-6">
-                <label className="form-label small fw-semibold">Outside Lab</label>
+                <label className="form-label small fw-semibold">{t('labs.outsideLab')}</label>
                 <select className="form-select form-select-sm rounded-pill" value={referForm.lab} onChange={e => setReferForm({ ...referForm, lab: e.target.value })}>
-                  <option value="">— Select Lab —</option>
+                  <option value="">{t('labs.selectLab')}</option>
                   {OUTSIDE_LABS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
               <div className="col-md-6">
-                <label className="form-label small fw-semibold">Notes</label>
-                <input className="form-control form-control-sm rounded-pill" value={referForm.notes} onChange={e => setReferForm({ ...referForm, notes: e.target.value })} placeholder="Referral notes..." />
+                <label className="form-label small fw-semibold">{t('labs.notesLabel')}</label>
+                <input className="form-control form-control-sm rounded-pill" value={referForm.notes} onChange={e => setReferForm({ ...referForm, notes: e.target.value })} placeholder={t('labs.referralNotesPlaceholder')} />
               </div>
             </div>
             <button className="btn btn-warning rounded-pill mt-2" onClick={() => referOrder.mutate({ orderId: selectedOrder.id, lab: referForm.lab, notes: referForm.notes })} disabled={!referForm.lab || referOrder.isPending}>
-              <i className="bi bi-send me-1"></i>Refer to Outside Lab
+              <i className="bi bi-send me-1"></i>{t('labs.referToOutside')}
             </button>
           </div>
         </div>
@@ -582,13 +587,13 @@ export default function LabDashboardPage() {
       {/* Orders Table */}
       <div className="card border-0 shadow-sm" style={{ borderRadius: '20px' }}>
         <div className="card-header bg-white d-flex justify-content-between py-3" style={{ borderRadius: '20px 20px 0 0' }}>
-          <h6 className="mb-0 fw-bold"><i className="bi bi-list-ul me-2 text-primary"></i>Lab Orders ({filtered.length})</h6>
-          <button className="btn btn-warning btn-sm rounded-pill" onClick={() => setShowOrderForm(true)}><i className="bi bi-plus-lg me-1"></i>New Lab Order</button>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-list-ul me-2 text-primary"></i>{t('labs.labOrdersCount', { count: filtered.length })}</h6>
+          <button className="btn btn-warning btn-sm rounded-pill" onClick={() => setShowOrderForm(true)}><i className="bi bi-plus-lg me-1"></i>{t('labs.newOrder')}</button>
         </div>
         <div className="card-body p-0">
           <div className="table-responsive">
             <table className="table table-hover mb-0 small">
-              <thead className="table-light"><tr><th>Order #</th><th>Patient</th><th>Panel</th><th>Tests</th><th>Label</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead className="table-light"><tr><th>{t('labs.thOrderNo')}</th><th>{t('labs.thPatient')}</th><th>{t('labs.thPanel')}</th><th>{t('labs.thTests')}</th><th>{t('labs.thLabel')}</th><th>{t('labs.thStatus')}</th><th>{t('labs.thActions')}</th></tr></thead>
               <tbody>
                 {groupedOrders.map((g: any) => {
                   const color = g.hasStat ? '#dc3545' : g.pendingCount > 0 ? '#fd7e14' : g.completedCount === g.count ? '#198754' : '#0d6efd';
@@ -605,22 +610,22 @@ export default function LabDashboardPage() {
                             </div>
                             <div className="flex-grow-1 min-w-0">
                               <div className="fw-bold small text-truncate" style={{ color }}>{g.patientName}</div>
-                              <small className="text-muted">PID {g.patientPid ?? g.patientId} · {g.count} test{g.count !== 1 ? 's' : ''}</small>
+                              <small className="text-muted">{t('labtech.pidLine', { pid: g.patientPid ?? g.patientId, count: t('labtech.testsCount', { count: g.count }) })}</small>
                             </div>
-                            {g.hasStat && <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>STAT</span>}
-                            {g.pendingCount > 0 && <span className="badge rounded-pill" style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.6rem' }}>{g.pendingCount} pending</span>}
+                            {g.hasStat && <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>{t('labtech.statBadge')}</span>}
+                            {g.pendingCount > 0 && <span className="badge rounded-pill" style={{ backgroundColor: '#fd7e14', color: '#fff', fontSize: '0.6rem' }}>{t('labtech.pendingCount', { count: g.pendingCount })}</span>}
                             {isLabStaff && readyToValidate(g).length > 0 && (
                               <button
                                 className="btn btn-primary btn-sm rounded-pill"
-                                title="Preview this patient's whole lab group and validate it in one shot"
+                                title={t('labs.validateGroupTitle')}
                                 onClick={() => { setGroupToast(''); setPreviewPid(String(g.patientPid ?? g.patientId)); }}>
                                 <i className="bi bi-check2-square me-1"></i>
-                                Validate group ({readyToValidate(g).length})
+                                {t('labs.validateGroup', { count: readyToValidate(g).length })}
                               </button>
                             )}
                             {readyToValidate(g).length > 0 && !isLabStaff && (
                               <span className="badge bg-primary rounded-pill" style={{ fontSize: '0.6rem' }}>
-                                {readyToValidate(g).length} ready to validate
+                                {t('labs.readyToValidate', { count: readyToValidate(g).length })}
                               </span>
                             )}
                           </div>
@@ -632,8 +637,8 @@ export default function LabDashboardPage() {
                         <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => { const cid = chartPatientId(o.chartId, o.patientPid, o.patientId); if (cid) navigate(`/patients/${cid}`); }}>
                           <td className="ps-4"><code>#{o.id}</code></td>
                           <td></td>
-                          <td><span className="badge bg-light text-dark">{o.instructions || 'Custom'}</span></td>
-                          <td><small>{tests.slice(0, 3).join(', ')}{tests.length > 3 ? ` +${tests.length - 3} more` : ''}</small></td>
+                          <td><span className="badge bg-light text-dark">{o.instructions || t('labs.custom')}</span></td>
+                          <td><small>{tests.slice(0, 3).join(', ')}{tests.length > 3 ? ` ${t('labs.moreTests', { count: tests.length - 3 })}` : ''}</small></td>
                           <td>
                             <code className="small">{o.specimenId || `LAB-${o.id}`}</code>
                             <div className="mt-1"><Barcode seed={o.specimenId || `LAB-${o.id}`} width={92} height={26} /></div>
@@ -641,8 +646,8 @@ export default function LabDashboardPage() {
                           <td>
                             <span className="badge rounded-pill" style={{ backgroundColor: STATUS_COLORS[o.orderStatus] || '#6c757d', color: o.orderStatus === 'pending' || o.orderStatus === 'referred' ? '#000' : '#fff' }}>{o.orderStatus}</span>
                             {o.billingHeld && (
-                              <span className="badge rounded-pill bg-danger ms-1" title={`Billing hold — $${o.billingHoldFee || 0} unpaid`}>
-                                <i className="bi bi-lock-fill me-1"></i>Hold
+                              <span className="badge rounded-pill bg-danger ms-1" title={t('labs.billingHoldUnpaid', { fee: o.billingHoldFee || 0 })}>
+                                <i className="bi bi-lock-fill me-1"></i>{t('labtech.hold')}
                               </span>
                             )}
                           </td>
@@ -650,30 +655,30 @@ export default function LabDashboardPage() {
                             {isLabStaff ? (
                               o.billingHeld ? (
                                 <span className="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2 py-2"
-                                  title={`Billing hold — $${o.billingHoldFee || 0} must be cleared by billing before processing`}>
-                                  <i className="bi bi-lock-fill me-1"></i>Billing hold — awaiting clearance
+                                  title={t('labs.billingHoldProcessing', { fee: o.billingHoldFee || 0 })}>
+                                  <i className="bi bi-lock-fill me-1"></i>{t('labs.billingHoldCleared')}
                                 </span>
                               ) : (
                               <div className="d-flex gap-1">
                                 {o.orderStatus === 'pending' && (
-                                  <button className="btn btn-info btn-sm rounded-pill" title="Mark sample as collected" onClick={() => handleCollectSample(o)}><i className="bi bi-droplet me-1"></i>Collect</button>
+                                  <button className="btn btn-info btn-sm rounded-pill" title={t('labs.collectTitle')} onClick={() => handleCollectSample(o)}><i className="bi bi-droplet me-1"></i>{t('labs.collect')}</button>
                                 )}
                                 {o.orderStatus === 'collected' && (
-                                  <button className="btn btn-secondary btn-sm rounded-pill" title="Move to processing" onClick={() => updateStatus.mutate({ orderId: o.id, status: 'processing' })}><i className="bi bi-cpu me-1"></i>Process</button>
+                                  <button className="btn btn-secondary btn-sm rounded-pill" title={t('labs.processTitle')} onClick={() => updateStatus.mutate({ orderId: o.id, status: 'processing' })}><i className="bi bi-cpu me-1"></i>{t('labs.process')}</button>
                                 )}
                                 {(o.orderStatus === 'collected' || o.orderStatus === 'processing') && (
-                                  <button className="btn btn-success btn-sm rounded-pill" title="Saving results completes this order" onClick={() => { setSelectedOrder(o); setShowResultForm(true); }}>
-                                    <i className="bi bi-pencil me-1"></i>{o.orderStatus === 'processing' ? 'Enter Results' : 'Results'}
+                                  <button className="btn btn-success btn-sm rounded-pill" title={t('labs.savingCompletesTitle')} onClick={() => { setSelectedOrder(o); setShowResultForm(true); }}>
+                                    <i className="bi bi-pencil me-1"></i>{o.orderStatus === 'processing' ? t('labs.enterResults') : t('labs.resultsBtn')}
                                   </button>
                                 )}
                                 {o.orderStatus === 'completed' && (
                                   <>
-                                    <button className="btn btn-primary btn-sm rounded-pill" onClick={() => validateOrder.mutate({ orderId: o.id, action: 'accept' })}><i className="bi bi-check-lg me-1"></i>Validate</button>
-                                    <button className="btn btn-danger btn-sm rounded-pill" onClick={() => validateOrder.mutate({ orderId: o.id, action: 'reject' })}><i className="bi bi-x-lg me-1"></i>Reject</button>
+                                    <button className="btn btn-primary btn-sm rounded-pill" onClick={() => validateOrder.mutate({ orderId: o.id, action: 'accept' })}><i className="bi bi-check-lg me-1"></i>{t('labs.validate')}</button>
+                                    <button className="btn btn-danger btn-sm rounded-pill" onClick={() => validateOrder.mutate({ orderId: o.id, action: 'reject' })}><i className="bi bi-x-lg me-1"></i>{t('labtech.reject')}</button>
                                   </>
                                 )}
                                 {(o.orderStatus === 'pending' || o.orderStatus === 'collected') && (
-                                  <button className="btn btn-warning btn-sm rounded-pill" onClick={() => { setSelectedOrder(o); setShowReferForm(true); }}><i className="bi bi-send me-1"></i>Refer</button>
+                                  <button className="btn btn-warning btn-sm rounded-pill" onClick={() => { setSelectedOrder(o); setShowReferForm(true); }}><i className="bi bi-send me-1"></i>{t('labs.refer')}</button>
                                 )}
                               </div>
                               )
@@ -687,7 +692,7 @@ export default function LabDashboardPage() {
                     </Fragment>
                   );
                 })}
-                {filtered.length === 0 && <tr><td colSpan={7} className="text-center text-muted py-4">No lab orders found</td></tr>}
+                {filtered.length === 0 && <tr><td colSpan={7} className="text-center text-muted py-4">{t('labs.noOrdersAdmin')}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -713,6 +718,7 @@ function GroupValidateModal({
   onValidate: () => void;
   catalog: any[];
 }) {
+  const { t } = useTranslation();
   // Flag and print each stored result exactly like the Patient Lab Result Form.
   const byCode = useMemo(() => new Map((catalog || []).map((t: any) => [t.code, t])), [catalog]);
   const byName = useMemo(
@@ -727,9 +733,9 @@ function GroupValidateModal({
       <div className="card-header text-white py-3 d-flex justify-content-between align-items-center"
         style={{ background: 'linear-gradient(135deg, #0d6efd, #6f42c1)', borderRadius: '18px 18px 0 0' }}>
         <div>
-          <h6 className="mb-0 fw-bold"><i className="bi bi-check2-square me-2"></i>Validate Lab Group</h6>
+          <h6 className="mb-0 fw-bold"><i className="bi bi-check2-square me-2"></i>{t('labs.validateGroupHeading')}</h6>
           <small className="text-white text-opacity-75">
-            {preview?.patient?.patientName || 'Loading…'} · PID {pid}
+            {preview?.patient?.patientName || t('labs.loading')} · {t('labs.pidLabel', { pid })}
           </small>
         </div>
         <button className="btn btn-sm btn-outline-light rounded-circle" style={{ width: '32px', height: '32px' }}
@@ -738,19 +744,19 @@ function GroupValidateModal({
       <div className="card-body">
         {loading ? (
           <div className="text-center py-4">
-            <span className="spinner-border spinner-border-sm me-2"></span>Building group preview…
+            <span className="spinner-border spinner-border-sm me-2"></span>{t('labs.buildingPreview')}
           </div>
         ) : !preview ? (
-          <div className="alert alert-danger mb-0">Could not load the group preview.</div>
+          <div className="alert alert-danger mb-0">{t('labs.previewFailed')}</div>
         ) : (
           <>
             {/* Summary */}
             <div className="row g-2 mb-3">
               {[
-                { l: 'Orders to validate', v: preview.readyOrders, c: '#0d6efd', i: 'bi-clipboard-check' },
-                { l: 'Results', v: preview.resultCount, c: '#198754', i: 'bi-list-check' },
-                { l: 'Critical / abnormal', v: preview.criticalCount, c: preview.criticalCount ? '#dc3545' : '#6c757d', i: 'bi-exclamation-triangle' },
-                { l: 'Awaiting results', v: (preview.withoutResults || []).length, c: '#fd7e14', i: 'bi-hourglass-split' },
+                { l: t('labs.sumOrdersToValidate'), v: preview.readyOrders, c: '#0d6efd', i: 'bi-clipboard-check' },
+                { l: t('labs.sumResults'), v: preview.resultCount, c: '#198754', i: 'bi-list-check' },
+                { l: t('labs.sumCritical'), v: preview.criticalCount, c: preview.criticalCount ? '#dc3545' : '#6c757d', i: 'bi-exclamation-triangle' },
+                { l: t('labs.sumAwaiting'), v: (preview.withoutResults || []).length, c: '#fd7e14', i: 'bi-hourglass-split' },
               ].map((s) => (
                 <div className="col-6 col-md-3" key={s.l}>
                   <div className="p-2 rounded-3 text-center" style={{ backgroundColor: `${s.c}10` }}>
@@ -766,10 +772,10 @@ function GroupValidateModal({
             <div className={`alert ${preview.provider ? 'alert-info' : 'alert-warning'} py-2 small`}>
               <i className="bi bi-send me-1"></i>
               {preview.provider ? (
-                <>Notification will be sent to <strong>provider #{preview.provider}</strong>{' '}
-                  ({preview.providerSource === 'assigned' ? "the patient's assigned provider" : 'the ordering provider'}).</>
+                <>{t('labs.notifySentPrefix')}<strong>{t('labs.notifyProvider', { id: preview.provider })}</strong>{' '}
+                  ({preview.providerSource === 'assigned' ? t('labs.notifySourceAssigned') : t('labs.notifySourceOrdering')}).</>
               ) : (
-                <>No provider is set on the patient or their orders — results will be validated but no notification will be sent.</>
+                <>{t('labs.notifyNone')}</>
               )}
             </div>
 
@@ -779,15 +785,15 @@ function GroupValidateModal({
               <div key={o.id} className="border rounded-3 mb-2">
                 <div className="d-flex align-items-center gap-2 px-3 py-2" style={{ background: '#f8f9fa' }}>
                   <code className="small">#{o.id}</code>
-                  <span className="fw-semibold small">{o.instructions || 'Lab order'}</span>
+                  <span className="fw-semibold small">{o.instructions || t('labtech.labOrder')}</span>
                   {o.criticalCount > 0 && (
-                    <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>{o.criticalCount} critical</span>
+                    <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.6rem' }}>{t('labs.criticalCount', { count: o.criticalCount })}</span>
                   )}
                   <span className="badge bg-light text-dark border ms-auto" style={{ fontSize: '0.6rem' }}>{o.orderStatus}</span>
                 </div>
                 <table className="table table-sm small mb-0">
                   <thead className="table-light">
-                    <tr><th>Test Request</th><th>Result</th><th>Unit</th><th>Normal Value</th><th>Flag</th><th>Comments</th></tr>
+                    <tr><th>{t('labs.testRequest')}</th><th>{t('labs.thResult')}</th><th>{t('labs.unitLabel')}</th><th>{t('labs.normalValueLabel')}</th><th>{t('labs.flagLabel')}</th><th>{t('labs.commentsLabel')}</th></tr>
                   </thead>
                   <tbody>
                     {(o.results || []).map((r: any, i: number) => {
@@ -807,7 +813,7 @@ function GroupValidateModal({
                       );
                     })}
                     {!(o.results || []).length && (
-                      <tr><td colSpan={6} className="text-muted text-center">No results</td></tr>
+                      <tr><td colSpan={6} className="text-muted text-center">{t('labs.noResultsRow')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -816,25 +822,24 @@ function GroupValidateModal({
 
             {(preview.withoutResults || []).length > 0 && (
               <div className="alert alert-warning py-2 small">
-                <strong>Awaiting results:</strong>{' '}
+                <strong>{t('labs.awaitingResults')}</strong>{' '}
                 {(preview.withoutResults || []).map((o: any) => `#${o.id} ${o.instructions || ''}`).join(', ')}
-                {' '}— these orders stay open.
+                {' '}{t('labs.ordersStayOpen')}
               </div>
             )}
 
             {/* Actions */}
             <div className="d-flex align-items-center gap-2 mt-3 flex-wrap">
               <span className="text-muted small">
-                Validating marks all {preview.readyOrders} order(s) as <strong>validated</strong>,
-                files the results into the patient chart, and notifies the provider — in one shot.
+                {t('labs.validateExplainer', { count: preview.readyOrders })}
               </span>
-              <button className="btn btn-outline-secondary btn-sm rounded-pill ms-auto" onClick={onClose}>Cancel</button>
+              <button className="btn btn-outline-secondary btn-sm rounded-pill ms-auto" onClick={onClose}>{t('common.cancel')}</button>
               <button className="btn btn-primary btn-sm rounded-pill"
                 disabled={pending || !preview.readyOrders}
                 onClick={onValidate}>
                 {pending
-                  ? <><span className="spinner-border spinner-border-sm me-1"></span>Validating…</>
-                  : <><i className="bi bi-check2-all me-1"></i>Validate all &amp; notify provider</>}
+                  ? <><span className="spinner-border spinner-border-sm me-1"></span>{t('labs.validating')}</>
+                  : <><i className="bi bi-check2-all me-1"></i>{t('labs.validateAllNotify')}</>}
               </button>
             </div>
           </>
