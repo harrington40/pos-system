@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 import { useLicenseStatus } from '../../hooks/useLicenseStatus';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import LicenseRequired from './LicenseRequired';
 
 export default function AppLayout() {
   const { data: licenseStatus } = useLicenseStatus();
@@ -31,7 +32,8 @@ export default function AppLayout() {
 
   return (
     <div className="d-flex vh-100">
-      <Sidebar />
+      {/* No licence, no navigation: the app is reduced to the notice below. */}
+      {!isExpired && <Sidebar />}
       <div className="d-flex flex-column flex-grow-1 overflow-hidden">
         <TopBar />
 
@@ -89,7 +91,10 @@ export default function AppLayout() {
         )}
 
         <main className="flex-grow-1 overflow-auto p-3 bg-light">
-          <Outlet />
+          {/* Unlicensed means limited to the notice: every route here renders
+              inside this layout, so nothing else is reachable, and the licence
+              page itself lives outside the layout and stays available. */}
+          {isExpired ? <LicenseRequired /> : <Outlet />}
         </main>
       </div>
     </div>
