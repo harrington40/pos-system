@@ -7,6 +7,7 @@ import { PatientsService } from './patients.service';
 import { Patient } from './patient.entity';
 import { PatientPortalModule } from '../patient-portal/patient-portal.module';
 import { EmergencyModule } from '../emergency/emergency.module';
+import { getJwtSecret } from '../auth/jwt-secret';
 
 @Module({
     imports: [
@@ -15,9 +16,13 @@ import { EmergencyModule } from '../emergency/emergency.module';
         // The chart payload carries the patient's emergency state (banner + triage
         // history). EmergencyModule does not import PatientsModule, so no cycle.
         EmergencyModule,
-        JwtModule.register({
-            secret: process.env.JWT_SECRET || 'openrx-secret-key-2024',
-            signOptions: { expiresIn: '8h' },
+        // See getJwtSecret(): resolved after .env is loaded, from one shared
+        // source, so the signer and verifier cannot drift apart.
+        JwtModule.registerAsync({
+            useFactory: () => ({
+                secret: getJwtSecret(),
+                signOptions: { expiresIn: '8h' },
+            }),
         }),
     ],
     controllers: [PatientsController, PortalController],
