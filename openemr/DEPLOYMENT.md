@@ -153,6 +153,55 @@ The term runs from activation, not from when the key was minted, and the tier
 sets the seat count (`basic` 5, `professional` 25, `enterprise` 100), which
 `createUser`, `approveUser` and reactivating a user all enforce.
 
+### Generating a key locally
+
+`backend/scripts/license-key.ts` runs the same code as the server, so a key
+minted with it is exactly the key the server expects:
+
+```bash
+cd backend
+npm run license -- generate --tier professional --months 12 --count 3
+npm run license -- inspect OPENRX-...      # decode, and check it against a secret
+```
+
+A deployment only accepts keys signed with **its** `LICENSE_SECRET_CURRENT`, and
+the tool prints a fingerprint of the secret it used. If a key is rejected as
+invalid, the two secrets differ rather than the key being wrong. Compare with:
+
+```bash
+ssh dev@94.250.201.58 'grep ^LICENSE_SECRET_CURRENT= /home/dev/openrx/backend/.env | cut -d= -f2- \
+  | sha256sum | cut -c1-8'
+```
+
+### Deactivating a key
+
+Keys have no shelf life, so a key minted last year still activates today. A key
+can therefore be deactivated **whether or not it was ever activated**:
+
+- an activated licence becomes `revoked`, which takes it out of
+  `getActiveLicense()` on the next request, and the seat cap it imposed goes
+  with it
+- a key that was never activated has no row to flag, so a revocation placeholder
+  is recorded instead and `activateKey` refuses it
+
+```bash
+# through the API (admin JWT required)
+curl -X POST -H "Authorization: Bearer <jwt>" -H 'Content-Type: application/json' \
+  -d '{"key":"OPENRX-...","reason":"refunded"}' \
+  https://openrx.transtechologies.com/api/license/revoke
+
+# or locally
+npm run license -- revoke OPENRX-... --reason "refunded" --token <jwt>
+npm run license -- list --token <jwt>
+npm run license -- unrevoke OPENRX-... --token <jwt>
+```
+
+`unrevoke` releases a key that never activated outright. One that really was
+activated is parked as `expired` instead, so the revoked period is not handed
+back silently and reactivating is a deliberate act. Endpoints:
+`POST /api/license/revoke`, `POST /api/license/unrevoke`,
+`GET /api/license/revoked`.
+
 ## Verifying a deploy
 
 ```bash

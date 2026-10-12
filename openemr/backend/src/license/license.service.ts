@@ -8,6 +8,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
 import * as crypto from 'crypto';
 import { License, LicenseTier } from './license.entity';
+// Seat counts live with the key format so the CLI, the tests and the server all
+// read the same table.
+import { TIER_MAX_USERS } from './license-key';
 
 /**
  * Local license generation and validation.
@@ -355,6 +358,12 @@ export class LicenseService implements OnModuleInit {
         if (existing && existing.status === 'active') {
             throw new BadRequestException('License key already activated');
         }
+        // Revocation is permanent, unlike expiry: a revoked key must never come
+        // back by being activated again. Without this check the existing-row
+        // path below would happily revive it.
+        if (existing && existing.status === 'revoked') {
+            throw new BadRequestException('This license key has been revoked');
+        }
 
         // Only one license is in force at a time, and activating is what makes
         // a key current — the UI promises a new key takes effect immediately.
@@ -475,14 +484,103 @@ export class LicenseService implements OnModuleInit {
 
     // ── Revocation ────────────────────────────────────────────
 
-    async revoke(licenseKey: string): Promise<void> {
-        const license = await this.licenseRepo.findOne({
-            where: { licenseKey },
+    /**
+     * Deactivate a key, whether or not it was ever activated.
+     *
+     * An activated licence simply becomes `revoked`, which takes it out of
+     * getActiveLicense() immediately — so an open term stops being honoured
+     * from the next request, and the seat cap that licence imposed goes with it.
+     *
+     * A key that was never activated has no row to flag. Keys have no shelf
+     * life, so without recording it here it would stay activatable forever, and
+     * "deactivate" would silently do nothing for exactly the keys most likely to
+     * have leaked in an email. A revoked placeholder row is written instead,
+     * with activatedAt left null so unrevoke can tell the two cases apart.
+     */
+    async revoke(key: string, reason = ''): Promise<void> {
+        const decoded = this.decodeKey(key);
+        if (!decoded) throw new BadRequestException('Invalid license key');
+
+        const existing = await this.licenseRepo.findOne({
+            where: { licenseKey: decoded.canonicalKey },
         });
-        if (!license) throw new BadRequestException('License not found');
-        license.status = 'revoked';
-        await this.licenseRepo.save(license);
-        this.logger.log(`License revoked: ${licenseKey}`);
+        if (existing) {
+            existing.status = 'revoked';
+            await this.licenseRepo.save(existing);
+            this.logger.log(
+                `License revoked: ${decoded.canonicalKey}${reason ? ' (' + reason + ')' : ''}`,
+            );
+            return;
+        }
+
+        const issuedAt = new Date(decoded.generatedAt);
+        const expiresAt = new Date(issuedAt);
+        expiresAt.setMonth(expiresAt.getMonth() + decoded.durationMonths);
+
+        await this.licenseRepo.save(
+            this.licenseRepo.create({
+                licenseKey: decoded.canonicalKey,
+                tier: decoded.tier,
+                activatedAt: null,
+                expiresAt,
+                status: 'revoked',
+                customerName: reason,
+                maxUsers: TIER_MAX_USERS[decoded.tier],
+            }),
+        );
+        this.logger.log(
+            `License revoked before activation: ${decoded.canonicalKey}` +
+                `${reason ? ' (' + reason + ')' : ''}`,
+        );
+    }
+
+    /**
+     * Lift a revocation.
+     *
+     * A key that never activated had only a placeholder, so the row goes away
+     * and the key can be activated again. One that had really been activated is
+     * parked as `expired` rather than restored to `active`: the revoked period
+     * should not be handed back silently, and reactivating is a deliberate act.
+     */
+    async unrevoke(key: string): Promise<void> {
+        const decoded = this.decodeKey(key);
+        if (!decoded) throw new BadRequestException('Invalid license key');
+
+        const existing = await this.licenseRepo.findOne({
+            where: { licenseKey: decoded.canonicalKey },
+        });
+        if (!existing || existing.status !== 'revoked') {
+            throw new BadRequestException('License is not revoked');
+        }
+
+        if (!existing.activatedAt) {
+            await this.licenseRepo.remove(existing);
+            this.logger.log(
+                `Revocation lifted (never activated): ${decoded.canonicalKey}`,
+            );
+            return;
+        }
+
+        existing.status = 'expired';
+        await this.licenseRepo.save(existing);
+        this.logger.log(
+            `Revocation lifted, reactivation required: ${decoded.canonicalKey}`,
+        );
+    }
+
+    /** Every key currently refused, for the vendor CLI and support. */
+    async listRevoked(): Promise<
+        { licenseKey: string; activatedAt: Date | null; customerName: string }[]
+    > {
+        const rows = await this.licenseRepo.find({
+            where: { status: 'revoked' },
+            order: { id: 'DESC' },
+        });
+        return rows.map((r) => ({
+            licenseKey: r.licenseKey,
+            activatedAt: r.activatedAt,
+            customerName: r.customerName,
+        }));
     }
 
     // ── Batch Generation ─────────────────────────────────────

@@ -74,13 +74,34 @@ export class LicenseController {
     }
 
     /**
-     * Revoke a license (admin only).
+     * Deactivate a licence key (admin only). Works whether or not the key was
+     * ever activated, so a key that leaked before use can be stopped too.
      */
     @Post('revoke')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('admin')
-    async revoke(@Body('key') key: string) {
-        await this.licenseService.revoke(key);
+    async revoke(@Body('key') key: string, @Body('reason') reason?: string) {
+        await this.licenseService.revoke(key, reason);
         return { message: 'License revoked' };
+    }
+
+    /**
+     * Lift a revocation (admin only). A key that never activated is released
+     * outright; one that did is left expired and must be reactivated.
+     */
+    @Post('unrevoke')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('admin')
+    async unrevoke(@Body('key') key: string) {
+        await this.licenseService.unrevoke(key);
+        return { message: 'Revocation lifted' };
+    }
+
+    /** Every key currently refused (admin only). */
+    @Get('revoked')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('admin')
+    async revoked() {
+        return { revoked: await this.licenseService.listRevoked() };
     }
 }

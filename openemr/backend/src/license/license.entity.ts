@@ -5,8 +5,14 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { LicenseTier } from './license-key';
 
-export type LicenseTier = 'basic' | 'professional' | 'enterprise';
+/**
+ * Tiers are defined beside the key format in license-key.ts, so the server and
+ * the offline generator cannot disagree about what a tier is.
+ */
+export type { LicenseTier };
+
 export type LicenseStatus =
     | 'active'
     | 'expired'
