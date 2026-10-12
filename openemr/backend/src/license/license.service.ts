@@ -94,6 +94,24 @@ export class LicenseService implements OnModuleInit {
     // ── Key Generation (server-side) ─────────────────────────
 
     /**
+     * Key layout — every field is fixed width and covered by the checksum, so
+     * decoding is a set of offsets rather than a guess:
+     *
+     *   OPENRX     magic                                    6 chars
+     *   T          tier code, B | P | E                     1 char
+     *   tttttttt   issued-at, seconds since the epoch, hex  8 chars  (until 2106)
+     *   DD         duration in months, hex, zero padded     2 chars
+     *   NNNNNNNN   random nonce, hex                        8 chars
+     *   CCCCCCCC   HMAC-SHA256 of "T-tttttttt-DD-NNNNNNNN"  8 chars
+     *
+     * Rendered as OPENRX-B6B0B-28C001-1A2B3C4D-9E8F7A6B.
+     */
+    private readonly KEY_MAGIC = 'OPENRX';
+    private readonly ISSUED_AT_HEX_LENGTH = 8;
+    private readonly DURATION_HEX_LENGTH = 2;
+    private readonly NONCE_HEX_LENGTH = 8;
+
+    /**
      * Checksum width in hex characters.
      *
      * 4 characters is 16 bits. A forger without the signing secret cannot
@@ -103,24 +121,87 @@ export class LicenseService implements OnModuleInit {
      */
     private readonly CHECKSUM_HEX_LENGTH = 8;
 
+    private readonly TIER_CODES: Record<LicenseTier, string> = {
+        basic: 'B',
+        professional: 'P',
+        enterprise: 'E',
+    };
+
+    private readonly TIER_BY_CODE: Record<string, LicenseTier> = {
+        B: 'basic',
+        P: 'professional',
+        E: 'enterprise',
+    };
+
+    /** Canonical payload for a key's fields. */
+    private canonicalPayload(
+        tierCode: string,
+        issuedAtHex: string,
+        durationHex: string,
+        nonce: string,
+    ): string {
+        return `${tierCode}-${issuedAtHex}-${durationHex}-${nonce}`;
+    }
+
+    /** HMAC-SHA256 of a canonical payload, truncated to the checksum field. */
+    private sign(payload: string, secret: string = this.currentSecret): string {
+        return crypto
+            .createHmac('sha256', secret)
+            .update(payload)
+            .digest('hex')
+            .slice(0, this.CHECKSUM_HEX_LENGTH)
+            .toLowerCase();
+    }
+
     /**
      * Generate a license key for a given tier and duration.
      * Signs with the current secret (LICENSE_SECRET_CURRENT).
      */
     generateKey(tier: LicenseTier, durationMonths: number): string {
-        const tierCode = tier[0].toUpperCase();
-        // Uppercase here, not just in the returned string: the payload signed
-        // below has to be byte-for-byte what decodeKeyWithSecret rebuilds, and
-        // that one rebuilds from the uppercased key. Signing the lowercase
-        // form produced keys that could never validate.
-        const ts = Date.now().toString(16).slice(-8).toUpperCase();
-        const payload = `${tierCode}-${ts}-${durationMonths}`;
-        const checksum = crypto
-            .createHmac('sha256', this.currentSecret)
-            .update(payload)
-            .digest('hex')
-            .slice(0, this.CHECKSUM_HEX_LENGTH);
-        return `OPENRX-${tierCode}${ts.slice(0, 4)}-${ts.slice(4)}${durationMonths.toString(16)}-${checksum}`.toUpperCase();
+        if (
+            !Number.isInteger(durationMonths) ||
+            durationMonths < 1 ||
+            durationMonths > 36
+        ) {
+            throw new BadRequestException(
+                'durationMonths must be a whole number between 1 and 36',
+            );
+        }
+
+        const tierCode = this.TIER_CODES[tier];
+        // Seconds, not milliseconds: 8 hex digits covers the epoch until 2106,
+        // whereas the low 32 bits of a millisecond clock moved every 49 days
+        // and put every derived expiry date in 1970.
+        // Uppercased like every other field: decodeKey upper-cases the key
+        // before rebuilding the payload, so a lower-case digit here would sign
+        // a different string than the one it is validated against — the exact
+        // drift that made the previous format's keys unusable.
+        const issuedAtHex = Math.floor(Date.now() / 1000)
+            .toString(16)
+            .toUpperCase()
+            .padStart(this.ISSUED_AT_HEX_LENGTH, '0');
+        const durationHex = durationMonths
+            .toString(16)
+            .toUpperCase()
+            .padStart(this.DURATION_HEX_LENGTH, '0');
+        // Random, so several keys minted in the same millisecond stay distinct.
+        // A batch used to collide on the shared timestamp and then hit the
+        // unique index on licenseKey.
+        const nonce = crypto
+            .randomBytes(this.NONCE_HEX_LENGTH / 2)
+            .toString('hex')
+            .toUpperCase();
+        const checksum = this.sign(
+            this.canonicalPayload(tierCode, issuedAtHex, durationHex, nonce),
+        );
+
+        return [
+            this.KEY_MAGIC,
+            `${tierCode}${issuedAtHex.slice(0, 4)}`,
+            `${issuedAtHex.slice(4)}${durationHex}`,
+            nonce,
+            checksum.toUpperCase(),
+        ].join('-');
     }
 
     /**
@@ -149,46 +230,65 @@ export class LicenseService implements OnModuleInit {
     } | null {
         try {
             const clean = key.replace(/-/g, '').toUpperCase();
-            if (!clean.startsWith('OPENRX')) return null;
+            const expectedLength =
+                this.KEY_MAGIC.length +
+                1 +
+                this.ISSUED_AT_HEX_LENGTH +
+                this.DURATION_HEX_LENGTH +
+                this.NONCE_HEX_LENGTH +
+                this.CHECKSUM_HEX_LENGTH;
+            if (clean.length !== expectedLength) return null;
+            if (!clean.startsWith(this.KEY_MAGIC)) return null;
 
-            const tierCode = clean[6];
-            const ts1 = clean.slice(7, 11);
-            const ts2AndDur = clean.slice(11);
-            const checksum = ts2AndDur.slice(-this.CHECKSUM_HEX_LENGTH);
-            const ts2 = ts2AndDur.slice(0, 4);
-            const durHex = ts2AndDur.slice(4, -this.CHECKSUM_HEX_LENGTH);
-            const durationMonths = parseInt(durHex, 16);
+            // Offsets follow the layout comment on the constants above.
+            let cursor = this.KEY_MAGIC.length;
+            const tierCode = clean.slice(cursor, (cursor += 1));
+            const issuedAtHex = clean.slice(
+                cursor,
+                (cursor += this.ISSUED_AT_HEX_LENGTH),
+            );
+            const durationHex = clean.slice(
+                cursor,
+                (cursor += this.DURATION_HEX_LENGTH),
+            );
+            const nonce = clean.slice(cursor, (cursor += this.NONCE_HEX_LENGTH));
+            const checksum = clean.slice(
+                cursor,
+                (cursor += this.CHECKSUM_HEX_LENGTH),
+            );
 
-            const tierMap: Record<string, LicenseTier> = {
-                B: 'basic',
-                P: 'professional',
-                E: 'enterprise',
-            };
-            const tier = tierMap[tierCode];
+            const tier = this.TIER_BY_CODE[tierCode];
+            const durationMonths = parseInt(durationHex, 16);
+            if (!tier) return null;
+            if (!/^[0-9A-F]+$/.test(issuedAtHex + durationHex + nonce)) {
+                return null;
+            }
             if (
-                !tier ||
                 isNaN(durationMonths) ||
                 durationMonths < 1 ||
                 durationMonths > 36
-            )
+            ) {
                 return null;
+            }
 
-            const ts = ts1 + ts2;
-            const payload = `${tierCode}-${ts}-${durationMonths}`;
-            const expected = crypto
-                .createHmac('sha256', secret)
-                .update(payload)
-                .digest('hex')
-                .slice(0, this.CHECKSUM_HEX_LENGTH);
-
-            // The key is upper-cased above while a hex digest comes back
-            // lower-case, so normalise before comparing. Comparing the two raw
-            // strings is what made every generated key fail validation.
+            // One shared helper signs both sides. Hand-rolling the payload here
+            // is what let generation and validation drift apart on case.
+            const expected = this.sign(
+                this.canonicalPayload(
+                    tierCode,
+                    issuedAtHex,
+                    durationHex,
+                    nonce,
+                ),
+                secret,
+            );
             if (expected !== checksum.toLowerCase()) return null;
 
             return {
                 tier,
-                generatedAt: parseInt(ts, 16),
+                // Only seconds are carried, and expiry counts from activation
+                // anyway — this is for diagnostics.
+                generatedAt: parseInt(issuedAtHex, 16) * 1000,
                 durationMonths,
             };
         } catch {
@@ -207,22 +307,40 @@ export class LicenseService implements OnModuleInit {
         const existing = await this.licenseRepo.findOne({
             where: { licenseKey: key },
         });
+        // Refuse a key already in force: re-activating it would reset the term
+        // from today, so repeating the call would extend it indefinitely.
+        if (existing && existing.status === 'active') {
+            throw new BadRequestException('License key already activated');
+        }
+
+        // Only one license is in force at a time, and activating is what makes
+        // a key current — the UI promises a new key takes effect immediately.
+        // This runs after the guard above so an already-active key still trips
+        // it, and it stops two active rows from racing to be returned by
+        // getActiveLicense(), which picks the latest expiry.
+        await this.licenseRepo.update(
+            { status: 'active' },
+            { status: 'superseded' },
+        );
+
         if (existing) {
-            if (existing.status === 'active') {
-                throw new BadRequestException('License key already activated');
-            }
             existing.status = 'active';
-            existing.activatedAt = new Date();
-            const expiry = new Date(decoded.generatedAt);
-            expiry.setMonth(expiry.getMonth() + decoded.durationMonths);
-            existing.expiresAt = expiry;
+            // Counted from activation, not from when the key was minted: a key
+            // that sat unopened for a month should still deliver its full term.
+            const reactivatedAt = new Date();
+            const reactivatedExpiry = new Date(reactivatedAt);
+            reactivatedExpiry.setMonth(
+                reactivatedExpiry.getMonth() + decoded.durationMonths,
+            );
+            existing.activatedAt = reactivatedAt;
+            existing.expiresAt = reactivatedExpiry;
             existing.customerName = customerName || existing.customerName;
             existing.tier = decoded.tier;
             return this.licenseRepo.save(existing);
         }
 
-        const generatedDate = new Date(decoded.generatedAt);
-        const expiresAt = new Date(generatedDate);
+        const activatedAt = new Date();
+        const expiresAt = new Date(activatedAt);
         expiresAt.setMonth(expiresAt.getMonth() + decoded.durationMonths);
 
         const maxUsersMap: Record<LicenseTier, number> = {
@@ -234,7 +352,7 @@ export class LicenseService implements OnModuleInit {
         const license = this.licenseRepo.create({
             licenseKey: key,
             tier: decoded.tier,
-            activatedAt: new Date(),
+            activatedAt,
             expiresAt,
             status: 'active',
             customerName: customerName || '',
@@ -292,6 +410,16 @@ export class LicenseService implements OnModuleInit {
             customerName: license.customerName,
             maxUsers: license.maxUsers,
         };
+    }
+
+    /**
+     * How many users the active license allows, or null when nothing is
+     * licensed — callers must then impose no cap. An unlicensed install is not
+     * a licensed install with zero seats, and enforcement is opt-in elsewhere.
+     */
+    async getUserLimit(): Promise<number | null> {
+        const license = await this.getActiveLicense();
+        return license ? license.maxUsers : null;
     }
 
     // ── Revocation ────────────────────────────────────────────

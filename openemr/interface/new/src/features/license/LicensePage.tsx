@@ -290,7 +290,7 @@ export default function LicensePage() {
               <label className="form-label small fw-semibold text-uppercase text-muted">License Key</label>
               <input className="form-control form-control-lg"
                 style={{ fontFamily: 'monospace', letterSpacing: '0.08em', borderRadius: '12px', fontSize: '0.95rem' }}
-                placeholder="OPENRX-XXXXX-XXXXX-XXXXXXXX"
+                placeholder="OPENRX-XXXXX-XXXXXX-XXXXXXXX-XXXXXXXX"
                 value={key}
                 onChange={(e) => { setKey(e.target.value.toUpperCase()); setError(''); setSuccess(''); }} />
             </div>

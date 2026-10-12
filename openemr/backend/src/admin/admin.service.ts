@@ -1,8 +1,14 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    OnModuleInit,
+    ForbiddenException,
+} from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { MENU_ITEMS, MENU_ROLES } from './menu-items';
+import { LicenseService } from '../license/license.service';
 
 /** `users` row (admin management view). */
 export interface AdminUserRow {
@@ -217,7 +223,10 @@ export interface MenuPermissionsPayload {
 export class AdminService implements OnModuleInit {
     private readonly logger = new Logger(AdminService.name);
 
-    constructor(@InjectDataSource() private dataSource: DataSource) {}
+    constructor(
+        @InjectDataSource() private dataSource: DataSource,
+        private readonly licenseService: LicenseService,
+    ) {}
 
     async onModuleInit(): Promise<void> {
         try {
@@ -276,7 +285,32 @@ export class AdminService implements OnModuleInit {
         return rows[0] || null;
     }
 
+    /**
+     * Refuse a seat beyond the active license's user limit.
+     *
+     * Only active users count, and approving a pending registration is the
+     * moment a seat is actually taken. Pending self-registrations do not count,
+     * which also stops the public registration endpoint from being used to
+     * exhaust the cap. An unlicensed install reports no limit at all — whether
+     * the API is usable in that state is LicenseGuard's decision, not this one.
+     */
+    private async assertUserCapacity(): Promise<void> {
+        const limit = await this.licenseService.getUserLimit();
+        if (limit === null) return;
+
+        const rows = await this.dataSource.query<{ total: number | string }[]>(
+            'SELECT COUNT(*) AS total FROM users WHERE active = 1',
+        );
+        const activeUsers = Number(rows[0]?.total ?? 0);
+        if (activeUsers >= limit) {
+            throw new ForbiddenException(
+                `License limit reached: this license covers ${limit} active users`,
+            );
+        }
+    }
+
     async createUser(dto: UserDto) {
+        await this.assertUserCapacity();
         const result = await this.dataSource.query<AffectedRowsResult>(
             `INSERT INTO users (
         username, fname, mname, lname, suffix, title,
@@ -583,6 +617,7 @@ export class AdminService implements OnModuleInit {
     }
 
     async approveUser(id: number) {
+        await this.assertUserCapacity();
         await this.dataSource.query(
             `UPDATE users SET registration_status = 'approved', active = 1 WHERE id = ?`,
             [id],

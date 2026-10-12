@@ -4,9 +4,14 @@ import { AdminService } from './admin.service';
 import { DbAdminController } from './db-admin.controller';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PatientPortalModule } from '../patient-portal/patient-portal.module';
+import { LicenseModule } from '../license/license.module';
 
 @Module({
-    imports: [forwardRef(() => MessagingModule), PatientPortalModule],
+    imports: [
+        forwardRef(() => MessagingModule),
+        PatientPortalModule,
+        LicenseModule,
+    ],
     controllers: [AdminController, DbAdminController],
     providers: [AdminService],
 })

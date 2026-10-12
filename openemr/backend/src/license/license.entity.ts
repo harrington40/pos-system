@@ -7,14 +7,18 @@ import {
 } from 'typeorm';
 
 export type LicenseTier = 'basic' | 'professional' | 'enterprise';
-export type LicenseStatus = 'active' | 'expired' | 'revoked';
+export type LicenseStatus =
+    | 'active'
+    | 'expired'
+    | 'revoked'
+    | 'superseded';
 
 @Entity('licenses')
 export class License {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    /** The license key (e.g. OPENRX-XXXX-XXXX-XXXX) */
+    /** The license key (e.g. OPENRX-B6B0B-28C001-1A2B3C4D-9E8F7A6B) */
     @Column({ length: 30, unique: true })
     licenseKey!: string;
 
