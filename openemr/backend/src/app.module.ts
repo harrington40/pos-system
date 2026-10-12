@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppConfigController } from './config/app-config.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -25,6 +26,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { AvatarsModule } from './avatars/avatars.module';
 import { ImagingModule } from './imaging/imaging.module';
 import { LicenseModule } from './license/license.module';
+import { LicenseGuard } from './license/license.guard';
 import { NursingModule } from './nursing/nursing.module';
 import { PatientChatModule } from './patient-chat/patient-chat.module';
 import { ReferralsModule } from './referrals/referrals.module';
@@ -42,6 +44,14 @@ import { SettingsModule } from './settings/settings.module';
 
 @Module({
     controllers: [AppConfigController],
+    providers: [
+        // Global licence enforcement. Registered here so the guard is genuinely
+        // active rather than an unused provider — but it only blocks when
+        // LICENSE_ENFORCEMENT=true (see LicenseGuard). Leaving it opt-in keeps
+        // an install that has no licence yet from being locked out of its own
+        // API by a variable that was simply never set.
+        { provide: APP_GUARD, useClass: LicenseGuard },
+    ],
     imports: [
         ConfigModule.forRoot({
             isGlobal: true,

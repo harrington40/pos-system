@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    BadRequestException,
+    OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
 import * as crypto from 'crypto';
@@ -7,30 +12,57 @@ import { License, LicenseTier } from './license.entity';
 /**
  * Local license generation and validation.
  *
- * Supports secret rotation via SECRET_VERSIONS.
- * Current version is always first in the array.
- * Keys are validated against all active secret versions.
+ * Signing secrets come from the environment, never from this file — a secret
+ * committed to source is a secret in every customer's hands, and anyone
+ * holding it can mint a key for any tier and duration.
+ *
+ * Rotation: set LICENSE_SECRET_CURRENT to the new secret and move the retired
+ * one into LICENSE_SECRET_LEGACY (comma-separated, oldest last) so keys
+ * already in the field keep validating. Keys are tried against each secret in
+ * order. With nothing configured the service fails closed: no key validates
+ * and no key can be generated.
  */
 @Injectable()
-export class LicenseService {
+export class LicenseService implements OnModuleInit {
     private readonly logger = new Logger(LicenseService.name);
 
-    // Secret rotation: add new secrets at the front.
-    // Old secrets remain for validating existing keys.
-    private readonly SECRET_VERSIONS = [
-        { version: 2, secret: 'openrx-license-secret-v2-2026' },
-        { version: 1, secret: 'openrx-license-secret-v1' },
-    ];
+    // Current secret first, then any retired ones (LICENSE_SECRET_LEGACY is a
+    // comma-separated list so more than one rotation can stay valid at once).
+    private readonly SIGNING_SECRETS: string[] = [
+        process.env.LICENSE_SECRET_CURRENT,
+        ...(process.env.LICENSE_SECRET_LEGACY || '').split(','),
+    ]
+        .map((secret) => (secret || '').trim())
+        .filter((secret) => secret.length > 0);
 
-    // Generator passphrase hash (SHA-256 of "openrx-sales-2024")
-    private readonly GENERATOR_PASSPHRASE_HASH =
-        'd5c7e8f9a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7';
+    // SHA-256 of the key-generator passphrase, supplied via the environment.
+    // Generate with: printf 'your-passphrase' | sha256sum
+    private readonly GENERATOR_PASSPHRASE_HASH = (
+        process.env.LICENSE_GENERATOR_PASSPHRASE_HASH || ''
+    )
+        .trim()
+        .toLowerCase();
+
+    onModuleInit(): void {
+        if (this.SIGNING_SECRETS.length === 0) {
+            this.logger.error(
+                'No license signing secret configured (LICENSE_SECRET_CURRENT). ' +
+                    'License keys cannot be validated or generated — every new ' +
+                    'activation will be rejected. Set it in the environment.',
+            );
+        }
+    }
 
     /**
      * Verify the generator passphrase server-side.
      * No secrets exposed in client-side code.
+     *
+     * Fails closed: with no hash configured, nothing verifies.
      */
     verifyGeneratorPassphrase(passphrase: string): boolean {
+        if (this.GENERATOR_PASSPHRASE_HASH.length === 0) {
+            return false;
+        }
         const hash = crypto
             .createHash('sha256')
             .update(passphrase)
@@ -43,25 +75,51 @@ export class LicenseService {
         private readonly licenseRepo: Repository<License>,
     ) {}
 
+    /**
+     * The secret used to sign newly generated keys.
+     * Generation has no fail-open path: with no secret there is nothing to
+     * sign with, so it is an error rather than a default.
+     */
     private get currentSecret(): string {
-        return this.SECRET_VERSIONS[0].secret;
+        const secret = this.SIGNING_SECRETS[0];
+        if (!secret) {
+            throw new Error(
+                'LICENSE_SECRET_CURRENT is not set, so license keys cannot be ' +
+                    'generated. Set the signing secret in the environment.',
+            );
+        }
+        return secret;
     }
 
     // ── Key Generation (server-side) ─────────────────────────
 
     /**
+     * Checksum width in hex characters.
+     *
+     * 4 characters is 16 bits. A forger without the signing secret cannot
+     * compute the MAC, so their only route is guessing a value the server
+     * accepts — 65,536 attempts, which is scriptable in an afternoon. 8
+     * characters is 32 bits and puts that out of reach.
+     */
+    private readonly CHECKSUM_HEX_LENGTH = 8;
+
+    /**
      * Generate a license key for a given tier and duration.
-     * Uses the current (latest) secret version.
+     * Signs with the current secret (LICENSE_SECRET_CURRENT).
      */
     generateKey(tier: LicenseTier, durationMonths: number): string {
         const tierCode = tier[0].toUpperCase();
-        const ts = Date.now().toString(16).slice(-8);
+        // Uppercase here, not just in the returned string: the payload signed
+        // below has to be byte-for-byte what decodeKeyWithSecret rebuilds, and
+        // that one rebuilds from the uppercased key. Signing the lowercase
+        // form produced keys that could never validate.
+        const ts = Date.now().toString(16).slice(-8).toUpperCase();
         const payload = `${tierCode}-${ts}-${durationMonths}`;
         const checksum = crypto
             .createHmac('sha256', this.currentSecret)
             .update(payload)
             .digest('hex')
-            .slice(0, 4);
+            .slice(0, this.CHECKSUM_HEX_LENGTH);
         return `OPENRX-${tierCode}${ts.slice(0, 4)}-${ts.slice(4)}${durationMonths.toString(16)}-${checksum}`.toUpperCase();
     }
 
@@ -74,8 +132,8 @@ export class LicenseService {
         generatedAt: number;
         durationMonths: number;
     } | null {
-        for (const sv of this.SECRET_VERSIONS) {
-            const result = this.decodeKeyWithSecret(key, sv.secret);
+        for (const secret of this.SIGNING_SECRETS) {
+            const result = this.decodeKeyWithSecret(key, secret);
             if (result) return result;
         }
         return null;
@@ -96,9 +154,9 @@ export class LicenseService {
             const tierCode = clean[6];
             const ts1 = clean.slice(7, 11);
             const ts2AndDur = clean.slice(11);
-            const checksum = ts2AndDur.slice(-4);
+            const checksum = ts2AndDur.slice(-this.CHECKSUM_HEX_LENGTH);
             const ts2 = ts2AndDur.slice(0, 4);
-            const durHex = ts2AndDur.slice(4, -4);
+            const durHex = ts2AndDur.slice(4, -this.CHECKSUM_HEX_LENGTH);
             const durationMonths = parseInt(durHex, 16);
 
             const tierMap: Record<string, LicenseTier> = {
@@ -121,9 +179,12 @@ export class LicenseService {
                 .createHmac('sha256', secret)
                 .update(payload)
                 .digest('hex')
-                .slice(0, 4);
+                .slice(0, this.CHECKSUM_HEX_LENGTH);
 
-            if (checksum !== expected) return null;
+            // The key is upper-cased above while a hex digest comes back
+            // lower-case, so normalise before comparing. Comparing the two raw
+            // strings is what made every generated key fail validation.
+            if (expected !== checksum.toLowerCase()) return null;
 
             return {
                 tier,
