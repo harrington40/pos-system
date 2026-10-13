@@ -353,6 +353,47 @@ export default function LicensePage() {
           </div>
         )}
 
+        {/* Purchase strip: how to pay and who to talk to. Flat, minimal chrome. */}
+        <div className="row g-3 mb-3">
+          <div className="col-lg-8">
+            <div className="h-100 p-3 bg-white border" style={{ borderRadius: '12px' }}>
+              <div className="small text-uppercase text-muted fw-semibold mb-2" style={{ letterSpacing: '1px' }}>
+                Payment options
+              </div>
+              <div className="d-flex align-items-center gap-2 flex-wrap">
+                <span className="badge bg-light text-dark border d-inline-flex align-items-center gap-2 px-3 py-2">
+                  <i className="bi bi-credit-card-2-front"></i>Visa
+                </span>
+                <span className="badge bg-light text-dark border d-inline-flex align-items-center gap-2 px-3 py-2">
+                  <i className="bi bi-paypal"></i>PayPal
+                </span>
+                <span className="badge bg-light text-dark border d-inline-flex align-items-center gap-2 px-3 py-2">
+                  <i className="bi bi-phone"></i>Cash App
+                </span>
+              </div>
+              <div className="small text-muted mt-2">
+                Invoiced and receipted. No card details are stored in OpenRx.
+              </div>
+            </div>
+          </div>
+          <div className="col-lg-4">
+            <div className="h-100 p-3 bg-white border" style={{ borderRadius: '12px' }}>
+              <div className="small text-uppercase text-muted fw-semibold mb-2" style={{ letterSpacing: '1px' }}>
+                Questions first?
+              </div>
+              <a className="fw-semibold text-decoration-none" href="mailto:support@transtechologies.com?subject=OpenRx licence enquiry">
+                support@transtechologies.com
+              </a>
+              <a
+                className="btn btn-outline-primary btn-sm d-block mt-3"
+                href="mailto:support@transtechologies.com?subject=OpenRx licence enquiry&body=Practice name:%0APlan of interest:%0APreferred payment (Visa / PayPal / Cash App):"
+              >
+                <i className="bi bi-envelope me-1"></i>Email support
+              </a>
+            </div>
+          </div>
+        </div>
+
         <div className="row g-3">
           {PLANS.map((plan) => {
             const price = billingCycle === 'yearly'
@@ -363,10 +404,10 @@ export default function LicensePage() {
             const promoPrice = discountedPrice(price);
             return (
               <div className="col-md-4" key={plan.tier}>
-                <div className="card h-100 shadow-sm" style={{
-                  borderRadius: '16px', border: isActive ? '2px solid #0d6efd' : '1px solid #e0e0e0',
-                  transform: plan.recommended ? 'scale(1.03)' : 'none',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
+                <div className="card h-100" style={{
+                  borderRadius: '14px',
+                  border: isActive ? '2px solid #0d6efd' : plan.recommended ? '1px solid #c7d2fe' : '1px solid #e5e7eb',
+                  boxShadow: plan.recommended ? '0 8px 24px rgba(13,110,253,0.10)' : '0 1px 2px rgba(16,24,40,0.04)',
                   position: 'relative', overflow: 'hidden',
                 }}>
                   {plan.recommended && (
