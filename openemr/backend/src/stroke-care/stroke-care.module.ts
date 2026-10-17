@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { StrokeCareController } from './stroke-care.controller';
 import { StrokeCareService } from './stroke-care.service';
 import { StrokeNotificationScheduler } from './stroke-notification.scheduler';
+import { StrokeFacilityGuard } from './stroke-facility.guard';
 
 /**
  * OpenRx Stroke Care.
@@ -12,7 +13,11 @@ import { StrokeNotificationScheduler } from './stroke-notification.scheduler';
  */
 @Module({
   controllers: [StrokeCareController],
-  providers: [StrokeCareService, StrokeNotificationScheduler],
+  providers: [
+    StrokeCareService,
+    StrokeNotificationScheduler,
+    StrokeFacilityGuard,
+  ],
   exports: [StrokeCareService],
 })
 export class StrokeCareModule {}

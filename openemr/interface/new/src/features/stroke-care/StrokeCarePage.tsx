@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import {
   getStrokeOverview,
@@ -10,8 +11,15 @@ import { formatMinutes, severityBadge, severityLabel } from './nihss';
 import ActivationForm from './components/ActivationForm';
 import StrokeDetail from './components/StrokeDetail';
 import EmergencyBoard from './components/EmergencyBoard';
+import FacilityConfigPanel from './components/FacilityConfigPanel';
 
-type PageTab = 'board' | 'emergency' | 'activate' | 'quality' | 'protocols';
+type PageTab =
+  | 'board'
+  | 'emergency'
+  | 'activate'
+  | 'quality'
+  | 'protocols'
+  | 'configuration';
 
 const CONTRIBUTOR_ROLES = [
   'admin',
@@ -30,6 +38,7 @@ const CONTRIBUTOR_ROLES = [
  */
 export default function StrokeCarePage() {
   const { user } = useAuth();
+  const { t } = useTranslation('stroke');
   const qc = useQueryClient();
   const [tab, setTab] = useState<PageTab>('board');
   const [facilityInput, setFacilityInput] = useState('');
@@ -98,11 +107,10 @@ export default function StrokeCarePage() {
           <div>
             <h3 className="fw-bold mb-1">
               <i className="bi bi-activity me-2"></i>
-              OpenRx Stroke Care
+              {t('title')}
             </h3>
             <p className="mb-0 small text-white text-opacity-75">
-              Outpatient stroke clinic · Acute stroke activation · Comprehensive
-              stroke centre
+              {t('subtitle')}
             </p>
             {protocols && (
               <div className="small mt-2 text-white text-opacity-75">
@@ -113,7 +121,7 @@ export default function StrokeCarePage() {
           </div>
           <div>
             <label className="form-label small mb-1" htmlFor="stroke-facility">
-              Facility id
+              {t('facility')}
             </label>
             <input
               id="stroke-facility"
@@ -173,19 +181,28 @@ export default function StrokeCarePage() {
 
       <ul className="nav nav-pills mb-3 small">
         {[
-          { key: 'board', label: 'Stroke board', icon: 'bi-kanban' },
+          { key: 'board', label: t('tabs.board'), icon: 'bi-kanban' },
           {
             key: 'emergency',
-            label: 'Emergency board',
+            label: t('tabs.emergency'),
             icon: 'bi-heart-pulse-fill',
           },
           {
             key: 'activate',
-            label: 'New activation',
+            label: t('tabs.activate'),
             icon: 'bi-lightning-charge',
           },
-          { key: 'quality', label: 'Quality', icon: 'bi-graph-up-arrow' },
-          { key: 'protocols', label: 'Protocols', icon: 'bi-journal-medical' },
+          { key: 'quality', label: t('tabs.quality'), icon: 'bi-graph-up-arrow' },
+          {
+            key: 'protocols',
+            label: t('tabs.protocols'),
+            icon: 'bi-journal-medical',
+          },
+          {
+            key: 'configuration',
+            label: t('tabs.configuration'),
+            icon: 'bi-sliders',
+          },
         ].map((entry) => (
           <li className="nav-item" key={entry.key}>
             <button
@@ -391,6 +408,13 @@ export default function StrokeCarePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {tab === 'configuration' && (
+        <FacilityConfigPanel
+          facilityId={facilityId}
+          isAdmin={user?.role === 'admin'}
+        />
       )}
 
       {tab === 'protocols' && protocols && (

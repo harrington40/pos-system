@@ -13,8 +13,10 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { parseNumericId } from '../common/id.util';
 import { StrokeCareService } from './stroke-care.service';
+import { StrokeFacilityGuard } from './stroke-facility.guard';
 import type {
   ActivationDto,
   ActivationUpdateDto,
@@ -95,8 +97,10 @@ function actor(req: StrokeRequest): StrokeActor {
  * patient, encounter, imaging and authentication modules; it does not create a
  * second patient index or a second image store.
  */
+@ApiTags('Stroke Care')
+@ApiBearerAuth()
 @Controller('stroke-care')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, StrokeFacilityGuard)
 export class StrokeCareController {
   constructor(private readonly stroke: StrokeCareService) {}
 
@@ -107,6 +111,13 @@ export class StrokeCareController {
   @Roles(...READ_ROLES)
   getProtocols() {
     return this.stroke.getProtocols();
+  }
+
+  /** Pinned FHIR version, supported resources and validation scope. */
+  @Get('fhir/metadata')
+  @Roles(...READ_ROLES)
+  getFhirMetadata() {
+    return this.stroke.getFhirCapability();
   }
 
   @Get('facilities/:facilityId/modules')
@@ -133,6 +144,57 @@ export class StrokeCareController {
       dto || {},
       actor(req),
     );
+  }
+
+  @Get('facilities/:facilityId/users')
+  @Roles('admin')
+  getFacilityUsers(@Param('facilityId') facilityId: string) {
+    return this.stroke.listFacilityUsers(
+      parseNumericId(facilityId, 'facilityId'),
+    );
+  }
+
+  @Put('facilities/:facilityId/users')
+  @Roles('admin')
+  setFacilityUser(
+    @Param('facilityId') facilityId: string,
+    @Body() dto: { userId?: number | string; enabled?: boolean },
+    @Req() req: StrokeRequest,
+  ) {
+    return this.stroke.setFacilityUser(
+      parseNumericId(facilityId, 'facilityId'),
+      parseNumericId(String(dto?.userId ?? ''), 'userId'),
+      dto?.enabled !== false,
+      actor(req),
+    );
+  }
+
+  // ── Encounters (pagination; aliases keep the existing activation API) ───
+
+  @Get('encounters')
+  @Roles(...READ_ROLES)
+  listEncounters(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('facilityId') facilityId?: string,
+    @Query('setting') setting?: string,
+    @Query('status') status?: string,
+    @Query('patientId') patientId?: string,
+  ) {
+    return this.stroke.listActivations({
+      page,
+      pageSize,
+      facilityId,
+      setting,
+      status,
+      patientId,
+    });
+  }
+
+  @Get('encounters/:id')
+  @Roles(...READ_ROLES)
+  getEncounter(@Param('id') id: string) {
+    return this.stroke.getActivation(parseNumericId(id, 'encounter id'));
   }
 
   // ── Board and quality ───────────────────────────────────────────────────
@@ -342,6 +404,16 @@ export class StrokeCareController {
     return this.stroke.toFhirBundle(parseNumericId(id, 'activation id'));
   }
 
+  /** Structural R4 profile/terminology/reference validation report. */
+  @Get('activations/:id/fhir/validation')
+  @Roles(...READ_ROLES)
+  validateFhir(@Param('id') id: string, @Req() req: StrokeRequest) {
+    return this.stroke.validateActivationFhir(
+      parseNumericId(id, 'activation id'),
+      actor(req),
+    );
+  }
+
   // ── NIHSS assessments ───────────────────────────────────────────────────
 
   @Get('activations/:id/assessments')
@@ -416,6 +488,15 @@ export class StrokeCareController {
   getAssessmentFhir(@Param('id') id: string) {
     return this.stroke.toAssessmentFhirBundle(
       parseNumericId(id, 'assessment id'),
+    );
+  }
+
+  @Get('assessments/:id/fhir/validation')
+  @Roles(...READ_ROLES)
+  validateAssessmentFhir(@Param('id') id: string, @Req() req: StrokeRequest) {
+    return this.stroke.validateAssessmentFhir(
+      parseNumericId(id, 'assessment id'),
+      actor(req),
     );
   }
 

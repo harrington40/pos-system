@@ -2,6 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import enCommon from './en/common.json';
+import enStroke from './en/stroke.json';
 import esCommon from './es/common.json';
 import nestClient from '../api/nest-client';
 
@@ -12,7 +13,9 @@ import nestClient from '../api/nest-client';
  */
 
 const resources = {
-  en: { common: enCommon },
+  en: { common: enCommon, stroke: enStroke },
+  // Spanish stroke keys intentionally fall back to English so existing
+  // Spanish localization work is never overwritten by a partial translation.
   es: { common: esCommon },
 };
 
@@ -35,7 +38,7 @@ export async function initI18n(): Promise<typeof i18n> {
       resources,
       lng: serverLang,
       fallbackLng: 'en',
-      ns: ['common'],
+      ns: ['common', 'stroke'],
       defaultNS: 'common',
       interpolation: { escapeValue: false },
       detection: {

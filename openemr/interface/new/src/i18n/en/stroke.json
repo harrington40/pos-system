@@ -1,0 +1,48 @@
+{
+  "title": "OpenRx Stroke Care",
+  "subtitle": "Outpatient stroke clinic · Acute stroke activation · Comprehensive stroke centre",
+  "facility": "Facility id",
+  "tabs": {
+    "board": "Stroke board",
+    "emergency": "Emergency board",
+    "activate": "New activation",
+    "quality": "Quality",
+    "protocols": "Protocols",
+    "configuration": "Facility configuration"
+  },
+  "board": {
+    "activations": "Activations",
+    "patient": "Patient",
+    "code": "Code",
+    "setting": "Setting",
+    "arrival": "Arrival",
+    "lkw": "Last known well",
+    "nihss": "NIHSS",
+    "type": "Type",
+    "status": "Status",
+    "doorToCt": "Door → CT",
+    "empty": "No stroke activation has been recorded for this facility.",
+    "loading": "Loading board…",
+    "error": "The stroke board could not be loaded."
+  },
+  "configuration": {
+    "heading": "Facility stroke configuration",
+    "description": "Enable the modules available at this facility. Configuration is not clinical accreditation or stroke-centre certification.",
+    "facilityRequired": "Enter a facility id to configure modules.",
+    "careSetting": "Care setting",
+    "outpatient": "Outpatient stroke clinic",
+    "acute": "Acute stroke centre",
+    "comprehensive": "Comprehensive stroke centre",
+    "save": "Save configuration",
+    "saved": "Configuration saved.",
+    "users": "Facility user assignments",
+    "userId": "User id",
+    "assign": "Assign",
+    "remove": "Remove"
+  },
+  "fhir": {
+    "validation": "FHIR validation",
+    "version": "FHIR R4 version",
+    "conformance": "Structure validated; HL7 conformance testing is still required."
+  }
+}

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -40,6 +41,14 @@ import type {
   TimeQuality,
   TreatmentCriteriaInput,
 } from './stroke-protocols';
+import {
+  STROKE_FHIR_PROFILES,
+  STROKE_FHIR_VERSION,
+  applyFhirProfiles,
+  validateFhirBundle,
+  type FhirBundle,
+  type FhirResource,
+} from './stroke-fhir';
 
 /** The authenticated clinician performing a change, supplied by the controller. */
 export interface StrokeActor {
@@ -921,6 +930,18 @@ export class StrokeCareService implements OnModuleInit {
     `);
 
     await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS stroke_facility_users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        facility_id INT NOT NULL,
+        user_id INT NOT NULL,
+        created_by INT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_stroke_facility_user (facility_id, user_id),
+        INDEX idx_stroke_facility_user (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS stroke_activations (
         id INT AUTO_INCREMENT PRIMARY KEY,
         pid INT NOT NULL,
@@ -1470,6 +1491,8 @@ export class StrokeCareService implements OnModuleInit {
 
     // Additive upgrades for installations that already ran v1 of this module.
     const assessmentColumns: Array<[string, string]> = [
+      ['encounter_id', 'INT NULL'],
+      ['facility_id', 'INT NULL'],
       ['untestable_json', 'MEDIUMTEXT NULL'],
       ['status', "VARCHAR(20) NOT NULL DEFAULT 'finalized'"],
       ['version', 'INT NOT NULL DEFAULT 1'],
@@ -1502,6 +1525,9 @@ export class StrokeCareService implements OnModuleInit {
       );
     }
     const imagingColumns: Array<[string, string]> = [
+      ['encounter_id', 'INT NULL'],
+      ['facility_id', 'INT NULL'],
+      ['version', 'INT NOT NULL DEFAULT 1'],
       ['ordered_at', 'DATETIME NULL'],
       ['interpreted_at', 'DATETIME NULL'],
       ['interpretation_by', 'VARCHAR(120) NULL'],
@@ -1516,6 +1542,18 @@ export class StrokeCareService implements OnModuleInit {
     for (const [column, definition] of imagingColumns) {
       await this.ensureColumn(
         'stroke_imaging_studies',
+        column,
+        `${column} ${definition}`,
+      );
+    }
+    const treatmentColumns: Array<[string, string]> = [
+      ['encounter_id', 'INT NULL'],
+      ['facility_id', 'INT NULL'],
+      ['version', 'INT NOT NULL DEFAULT 1'],
+    ];
+    for (const [column, definition] of treatmentColumns) {
+      await this.ensureColumn(
+        'stroke_treatment_events',
         column,
         `${column} ${definition}`,
       );
@@ -1540,6 +1578,27 @@ export class StrokeCareService implements OnModuleInit {
       );
     }
 
+    await this.dataSource.query(
+      `UPDATE stroke_assessments sa
+         JOIN stroke_activations a ON a.id = sa.activation_id
+          SET sa.encounter_id = COALESCE(sa.encounter_id, a.encounter_id),
+              sa.facility_id = COALESCE(sa.facility_id, a.facility_id)
+        WHERE sa.encounter_id IS NULL OR sa.facility_id IS NULL`,
+    );
+    await this.dataSource.query(
+      `UPDATE stroke_imaging_studies si
+         JOIN stroke_activations a ON a.id = si.activation_id
+          SET si.encounter_id = COALESCE(si.encounter_id, a.encounter_id),
+              si.facility_id = COALESCE(si.facility_id, a.facility_id)
+        WHERE si.encounter_id IS NULL OR si.facility_id IS NULL`,
+    );
+    await this.dataSource.query(
+      `UPDATE stroke_treatment_events te
+         JOIN stroke_activations a ON a.id = te.activation_id
+          SET te.encounter_id = COALESCE(te.encounter_id, a.encounter_id),
+              te.facility_id = COALESCE(te.facility_id, a.facility_id)
+        WHERE te.encounter_id IS NULL OR te.facility_id IS NULL`,
+    );
     await this.dataSource.query(
       `UPDATE stroke_assessments
           SET finalized_at = COALESCE(finalized_at, signed_at),
@@ -1738,6 +1797,95 @@ export class StrokeCareService implements OnModuleInit {
     return this.getFacilityModules(facilityId);
   }
 
+  /**
+   * Facility scope check. Administrators bypass; users with no explicit
+   * assignments retain access for backwards compatibility, while assigned
+   * users are restricted to their facilities. Assignments are managed by an
+   * administrator through the endpoints below.
+   */
+  async assertFacilityAccess(
+    actor: StrokeActor | undefined,
+    facilityId: number,
+  ): Promise<void> {
+    if (!actor?.id || actor.role === 'admin') return;
+    const rows = await this.dataSource.query<Array<{ facility_id: number }>>(
+      `SELECT facility_id FROM stroke_facility_users WHERE user_id = ?`,
+      [actor.id],
+    );
+    if (!rows.length) return;
+    if (!rows.some((row) => Number(row.facility_id) === facilityId)) {
+      throw new ForbiddenException(
+        'You are not authorized for this stroke-care facility.',
+      );
+    }
+  }
+
+  async listFacilityUsers(facilityId: number) {
+    return this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT f.id, f.facility_id, f.user_id, f.created_at,
+              u.username, u.fname, u.lname, u.role
+         FROM stroke_facility_users f
+         LEFT JOIN users u ON u.id = f.user_id
+        WHERE f.facility_id = ?
+        ORDER BY f.created_at DESC`,
+      [facilityId],
+    );
+  }
+
+  async setFacilityUser(
+    facilityId: number,
+    userId: number,
+    enabled: boolean,
+    actor?: StrokeActor,
+  ) {
+    if (!Number.isInteger(userId) || userId < 1) {
+      throw new BadRequestException('userId is required.');
+    }
+    if (enabled) {
+      const users = await this.dataSource.query<Array<{ id: number }>>(
+        `SELECT id FROM users WHERE id = ? LIMIT 1`,
+        [userId],
+      );
+      if (!users.length) {
+        throw new NotFoundException(`User ${userId} was not found.`);
+      }
+      await this.dataSource.query(
+        `INSERT INTO stroke_facility_users (facility_id, user_id, created_by)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE created_by = VALUES(created_by)`,
+        [facilityId, userId, actor?.id ?? null],
+      );
+    } else {
+      await this.dataSource.query(
+        `DELETE FROM stroke_facility_users
+          WHERE facility_id = ? AND user_id = ?`,
+        [facilityId, userId],
+      );
+    }
+    await this.audit(
+      'stroke_facility_user',
+      facilityId,
+      enabled ? 'assigned' : 'unassigned',
+      actor,
+      null,
+      { userId },
+    );
+    return this.listFacilityUsers(facilityId);
+  }
+
+  /** Capability statement for the FHIR export; no conformance claim. */
+  getFhirCapability() {
+    return {
+      fhirVersion: STROKE_FHIR_VERSION,
+      supportedResources: Object.keys(STROKE_FHIR_PROFILES),
+      profiles: STROKE_FHIR_PROFILES,
+      validation:
+        'Structural R4 base-profile and stroke terminology validation. ' +
+        'Official HL7 validator/terminology conformance testing remains required.',
+      nihssLoinc: NIHSS_LOINC,
+    };
+  }
+
   // ── Activations ──────────────────────────────────────────────────────────
 
   /** Register a stroke activation against the existing patient record. */
@@ -1870,6 +2018,8 @@ export class StrokeCareService implements OnModuleInit {
     status?: unknown;
     patientId?: unknown;
     limit?: unknown;
+    page?: unknown;
+    pageSize?: unknown;
   }) {
     const where: string[] = [];
     const params: unknown[] = [];
@@ -1899,9 +2049,19 @@ export class StrokeCareService implements OnModuleInit {
       where.push('a.pid = ?');
       params.push(patientId);
     }
-    const limit = Math.min(
-      optionalInteger(filters.limit, 'limit', 1, 500) ?? 50,
+    const page = optionalInteger(filters.page, 'page', 1) ?? 1;
+    const pageSize = Math.min(
+      optionalInteger(filters.pageSize, 'pageSize', 1, 200) ??
+        optionalInteger(filters.limit, 'limit', 1, 500) ??
+        50,
       500,
+    );
+    const limit = pageSize;
+    const offset = (page - 1) * limit;
+    const countRows = await this.dataSource.query<Array<{ total: number }>>(
+      `SELECT COUNT(*) AS total FROM stroke_activations a
+        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}`,
+      params,
     );
 
     const rows = await this.dataSource.query<ActivationRow[]>(
@@ -1924,10 +2084,16 @@ export class StrokeCareService implements OnModuleInit {
                JOIN patient_data pd ON pd.pid = a.pid
               ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
               ORDER BY a.arrival_at DESC, a.id DESC
-              LIMIT ${limit}`,
+              LIMIT ${limit} OFFSET ${offset}`,
       params,
     );
-    return { activations: rows, count: rows.length };
+    return {
+      activations: rows,
+      count: rows.length,
+      total: Number(countRows[0]?.total ?? 0),
+      page,
+      pageSize,
+    };
   }
 
   /** One activation with its full, unified stroke record. */
@@ -2173,15 +2339,18 @@ export class StrokeCareService implements OnModuleInit {
 
     const result = await this.dataSource.query<AffectedRowsResult>(
       `INSERT INTO stroke_assessments
-               (activation_id, pid, scale, items_json, untestable_json,
+               (activation_id, encounter_id, facility_id, pid, scale,
+                items_json, untestable_json,
                 total_score, severity, status, version, assessed_at,
                 assessed_by, assessed_by_name, signed_by_name, signed_at,
                 finalized_at, finalized_by, finalized_by_name, notes,
                 protocol_key, protocol_version)
-             VALUES (?, ?, 'nihss', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?,
+             VALUES (?, ?, ?, ?, 'nihss', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?,
                      CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)`,
       [
         activationId,
+        activation.encounter_id,
+        activation.facility_id,
         activation.pid,
         JSON.stringify(score.byItem),
         JSON.stringify(untestable),
@@ -2784,15 +2953,18 @@ export class StrokeCareService implements OnModuleInit {
 
     const result = await this.dataSource.query<AffectedRowsResult>(
       `INSERT INTO stroke_imaging_studies
-               (activation_id, pid, imaging_id, modality, dicom_study_uid,
+               (activation_id, encounter_id, facility_id, pid, imaging_id,
+                modality, dicom_study_uid,
                 orthanc_study_id, ordered_at, performed_at, interpreted_at,
                 findings, interpretation_status, study_description,
                 accession_number, series_count, instance_count, study_date,
-                dicom_patient_id, patient_match_status, linked_by,
+                dicom_patient_id, patient_match_status, version, linked_by,
                 linked_by_name)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       [
         activationId,
+        activation.encounter_id,
+        activation.facility_id,
         activation.pid,
         imagingId,
         modality,
@@ -4257,13 +4429,16 @@ export class StrokeCareService implements OnModuleInit {
 
     const result = await this.dataSource.query<AffectedRowsResult>(
       `INSERT INTO stroke_treatment_events
-         (activation_id, pid, event_type, status, medication, dose, route,
+         (activation_id, encounter_id, facility_id, pid, event_type, status,
+          medication, dose, route,
           contraindications, details, adverse_severity, specialist_name,
           occurred_at, time_quality, recorded_by, recorded_by_name,
           protocol_key, protocol_version)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         activationId,
+        activation.encounter_id,
+        activation.facility_id,
         activation.pid,
         eventType,
         status,
@@ -5844,7 +6019,7 @@ export class StrokeCareService implements OnModuleInit {
       display: encoded.display,
     };
 
-    const entries: unknown[] = [
+    const entries: NonNullable<FhirBundle['entry']> = [
       {
         fullUrl: `urn:uuid:patient-${a.pid}`,
         resource: {
@@ -5941,7 +6116,7 @@ export class StrokeCareService implements OnModuleInit {
       ],
     };
     const itemRefs: string[] = [];
-    const entries: unknown[] = [];
+    const entries: NonNullable<FhirBundle['entry']> = [];
 
     for (const item of NIHSS_ITEMS) {
       const loinc =
@@ -6096,7 +6271,49 @@ export class StrokeCareService implements OnModuleInit {
       },
     });
 
-    return {
+    const targetReferences = entries
+      .map((entry) => entry.fullUrl)
+      .filter((url): url is string => Boolean(url));
+    entries.push({
+      fullUrl: `urn:uuid:provenance-nihss-${assessment.id}`,
+      resource: {
+        resourceType: 'Provenance',
+        id: `provenance-nihss-${assessment.id}`,
+        meta,
+        target: targetReferences.map((reference) => ({ reference })),
+        recorded: assessment.finalized_at ?? assessment.assessed_at,
+        activity: {
+          coding: [
+            {
+              system: 'http://terminology.hl7.org/CodeSystem/v3-DataOperation',
+              code: 'CREATE',
+              display: 'create',
+            },
+          ],
+        },
+        agent: [
+          {
+            type: {
+              coding: [
+                {
+                  system:
+                    'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
+                  code: 'AUT',
+                  display: 'author',
+                },
+              ],
+            },
+            who: {
+              display:
+                assessment.finalized_by_name ??
+                assessment.assessed_by_name ??
+                'OpenRx Stroke Care',
+            },
+          },
+        ],
+      },
+    });
+    return applyFhirProfiles({
       resourceType: 'Bundle',
       type: 'collection',
       timestamp: new Date().toISOString(),
@@ -6111,14 +6328,88 @@ export class StrokeCareService implements OnModuleInit {
             code: assessment.protocol_version,
             display: assessment.protocol_key,
           },
+          {
+            system: 'urn:openrx:fhir-version',
+            code: STROKE_FHIR_VERSION,
+          },
         ],
       },
       entry: entries,
-    };
+    });
   }
 
-  private buildFhirBundle(record: ActivationRecord, entries: unknown[]) {
+  /** Validate the comprehensive R4 bundle without asserting HL7 conformance. */
+  async validateActivationFhir(activationId: number, actor?: StrokeActor) {
+    const bundle = await this.toFhirBundle(activationId);
+    const result = validateFhirBundle(bundle);
+    await this.audit(
+      'stroke_activation',
+      activationId,
+      'fhir_validated',
+      actor,
+      (await this.findActivation(activationId)).pid,
+      {
+        fhirVersion: result.fhirVersion,
+        valid: result.valid,
+        errors: result.errors.length,
+        warnings: result.warnings.length,
+      },
+    );
+    return result;
+  }
+
+  /** Validate one NIHSS assessment export. */
+  async validateAssessmentFhir(assessmentId: number, actor?: StrokeActor) {
+    const bundle = await this.toAssessmentFhirBundle(assessmentId);
+    const result = validateFhirBundle(bundle);
+    const assessment = await this.getAssessment(assessmentId);
+    await this.audit(
+      'stroke_assessment',
+      assessmentId,
+      'fhir_validated',
+      actor,
+      assessment.pid,
+      {
+        fhirVersion: result.fhirVersion,
+        valid: result.valid,
+        errors: result.errors.length,
+        warnings: result.warnings.length,
+      },
+    );
+    return result;
+  }
+
+  private async buildFhirBundle(
+    record: ActivationRecord,
+    entries: NonNullable<FhirBundle['entry']>,
+  ) {
     const a = record.activation;
+    const patientRef = `Patient/${a.pid}`;
+    const encounterRef = `Encounter/stroke-encounter-${a.id}`;
+    const meta = {
+      tag: [
+        {
+          system: 'urn:openrx:stroke-protocol',
+          code: ACUTE_ISCHEMIC_STROKE_PROTOCOL.version,
+          display: ACUTE_ISCHEMIC_STROKE_PROTOCOL.key,
+        },
+      ],
+    };
+    const push = (
+      type: string,
+      id: string,
+      resource: Omit<FhirResource, 'resourceType' | 'id'>,
+    ) => {
+      entries.push({
+        fullUrl: `urn:uuid:${type.toLowerCase()}-${id}`,
+        resource: {
+          resourceType: type,
+          id: `${type.toLowerCase()}-${id}`,
+          ...resource,
+          meta,
+        },
+      });
+    };
     const latest = record.assessments?.find(
       (item) => item.status === 'finalized',
     );
@@ -6173,7 +6464,301 @@ export class StrokeCareService implements OnModuleInit {
         },
       });
     }
-    return {
+    const [treatmentEvents, carePlans, reports] = await Promise.all([
+      this.listTreatmentEvents(a.id),
+      this.listCarePlans(a.id),
+      this.dataSource.query<
+        Array<{
+          id: number;
+          stroke_imaging_id: number | null;
+          report_text: string | null;
+          impression: string | null;
+          status: string;
+          reported_by_name: string | null;
+          reported_at: string;
+        }>
+      >(
+        `SELECT id, stroke_imaging_id, report_text, impression, status,
+                reported_by_name,
+                DATE_FORMAT(reported_at, '%Y-%m-%dT%H:%i:%s') AS reported_at
+           FROM stroke_radiology_reports WHERE activation_id = ?
+          ORDER BY reported_at DESC, id DESC`,
+        [a.id],
+      ),
+    ]);
+
+    for (const study of record.imaging) {
+      push('ImagingStudy', String(study.id), {
+        status:
+          study.interpretation_status === 'ordered'
+            ? 'registered'
+            : 'available',
+        subject: { reference: patientRef },
+        encounter: { reference: encounterRef },
+        identifier: [
+          study.dicom_study_uid
+            ? {
+                system: 'urn:dicom:uid',
+                value: `urn:oid:${study.dicom_study_uid.replace(/^urn:oid:/, '')}`,
+              }
+            : { system: 'urn:openrx:stroke-imaging', value: String(study.id) },
+          ...(study.accession_number
+            ? [
+                {
+                  system: 'urn:openrx:accession',
+                  value: study.accession_number,
+                },
+              ]
+            : []),
+        ],
+        modality: [
+          {
+            system: 'http://dicom.nema.org/resources/ontology/DCM',
+            code: fhirDicomModality(study.modality),
+            display: study.modality.toUpperCase(),
+          },
+        ],
+        numberOfSeries: study.series_count ?? undefined,
+        numberOfInstances: study.instance_count ?? undefined,
+        started: study.performed_at ?? study.study_date ?? undefined,
+        description: study.study_description ?? undefined,
+        note: study.findings ? [{ text: study.findings }] : undefined,
+      });
+    }
+
+    for (const report of reports) {
+      const reportStatus =
+        report.status === 'preliminary'
+          ? 'preliminary'
+          : report.status === 'amended'
+            ? 'amended'
+            : report.status === 'addendum'
+              ? 'appended'
+              : 'final';
+      const imagingStudy = record.imaging.find(
+        (study) => study.id === report.stroke_imaging_id,
+      );
+      push('DiagnosticReport', String(report.id), {
+        status: reportStatus,
+        subject: { reference: patientRef },
+        encounter: { reference: encounterRef },
+        code: {
+          coding: [
+            {
+              system: 'http://loinc.org',
+              code: '18748-4',
+              display: 'Diagnostic imaging report',
+            },
+          ],
+        },
+        effectiveDateTime: report.reported_at,
+        issued: report.reported_at,
+        conclusion: report.impression ?? undefined,
+        performer: report.reported_by_name
+          ? [{ display: report.reported_by_name }]
+          : undefined,
+        imagingStudy: imagingStudy
+          ? [{ reference: `ImagingStudy/imagingstudy-${imagingStudy.id}` }]
+          : undefined,
+      });
+      if (report.report_text) {
+        push('DocumentReference', `radiology-${report.id}`, {
+          status: 'current',
+          type: {
+            coding: [
+              {
+                system: 'http://loinc.org',
+                code: '18748-4',
+                display: 'Diagnostic imaging report',
+              },
+            ],
+          },
+          subject: { reference: patientRef },
+          date: report.reported_at,
+          context: { encounter: [{ reference: encounterRef }] },
+          description: report.impression ?? 'Radiology report',
+          author: report.reported_by_name
+            ? [{ display: report.reported_by_name }]
+            : undefined,
+          content: [
+            {
+              attachment: {
+                contentType: 'text/plain',
+                data: Buffer.from(report.report_text, 'utf8').toString(
+                  'base64',
+                ),
+                title: `Radiology report ${report.id}`,
+              },
+            },
+          ],
+        });
+      }
+    }
+
+    for (const event of treatmentEvents) {
+      const eventStatus =
+        event.status === 'given'
+          ? 'completed'
+          : event.status === 'pending'
+            ? 'in-progress'
+            : 'not-done';
+      push('Procedure', String(event.id), {
+        status: eventStatus,
+        subject: { reference: patientRef },
+        encounter: { reference: encounterRef },
+        code: {
+          text: `Stroke treatment: ${event.event_type.replace(/_/g, ' ')}`,
+        },
+        performedDateTime: event.occurred_at ?? undefined,
+        performer: event.specialist_name
+          ? [{ display: event.specialist_name }]
+          : undefined,
+        note: event.details ? [{ text: event.details }] : undefined,
+      });
+      if (event.medication) {
+        push('MedicationRequest', String(event.id), {
+          status:
+            event.status === 'given'
+              ? 'completed'
+              : event.status === 'pending'
+                ? 'active'
+                : 'cancelled',
+          intent: 'order',
+          subject: { reference: patientRef },
+          encounter: { reference: encounterRef },
+          authoredOn: event.occurred_at ?? event.created_at,
+          medicationCodeableConcept: { text: event.medication },
+          dosageInstruction: [
+            {
+              text:
+                [event.dose, event.route].filter(Boolean).join(' · ') ||
+                undefined,
+              timing: { code: { text: event.time_quality ?? undefined } },
+            },
+          ],
+          statusReasonCodeableConcept:
+            event.status === 'given'
+              ? undefined
+              : { text: `Documented as ${event.status.replace(/_/g, ' ')}` },
+          requester: event.recorded_by_name
+            ? { display: event.recorded_by_name }
+            : undefined,
+        });
+      }
+    }
+
+    for (const order of record.orders) {
+      push('ServiceRequest', String(order.id), {
+        status: order.status === 'completed' ? 'completed' : 'active',
+        intent: 'order',
+        subject: { reference: patientRef },
+        encounter: { reference: encounterRef },
+        code: { text: order.order_set_label },
+        authoredOn: order.acknowledged_at,
+        requester: order.ordered_by_name
+          ? { display: order.ordered_by_name }
+          : undefined,
+        note: order.notes ? [{ text: order.notes }] : undefined,
+      });
+    }
+
+    for (const [index, plan] of carePlans.entries()) {
+      const planStatus = ['active', 'completed', 'cancelled'].includes(
+        String(plan.status),
+      )
+        ? String(plan.status)
+        : 'active';
+      const goals = Array.isArray(plan.goals) ? plan.goals : [];
+      push('CarePlan', `${String(plan.id)}-${index}`, {
+        status: planStatus,
+        intent: 'plan',
+        title:
+          typeof plan.plan_type === 'string'
+            ? plan.plan_type
+            : 'Stroke care plan',
+        description:
+          typeof plan.summary === 'string' ? plan.summary : undefined,
+        subject: { reference: patientRef },
+        encounter: { reference: encounterRef },
+        created:
+          typeof plan.created_at === 'string' ? plan.created_at : undefined,
+        goal: goals.map((goal) => ({
+          description: { text: String(goal) },
+          status: planStatus === 'completed' ? 'completed' : 'in-progress',
+        })),
+      });
+    }
+
+    for (const transfer of record.transfers) {
+      push('ServiceRequest', `transfer-${transfer.id}`, {
+        status:
+          transfer.status === 'cancelled'
+            ? 'revoked'
+            : transfer.status === 'arrived'
+              ? 'completed'
+              : 'active',
+        intent: 'order',
+        priority:
+          transfer.priority === 'emergent'
+            ? 'stat'
+            : transfer.priority === 'urgent'
+              ? 'urgent'
+              : 'routine',
+        subject: { reference: patientRef },
+        encounter: { reference: encounterRef },
+        code: { text: 'Inter-facility stroke transfer' },
+        authoredOn: transfer.created_at,
+        reasonCode: transfer.reason ? [{ text: transfer.reason }] : undefined,
+        note: transfer.clinical_summary
+          ? [{ text: transfer.clinical_summary }]
+          : undefined,
+      });
+    }
+
+    const targetReferences = entries
+      .map((entry) => entry.fullUrl)
+      .filter((url): url is string => Boolean(url));
+    entries.push({
+      fullUrl: `urn:uuid:provenance-stroke-${a.id}`,
+      resource: {
+        resourceType: 'Provenance',
+        id: `provenance-stroke-${a.id}`,
+        meta,
+        target: targetReferences.map((reference) => ({ reference })),
+        recorded: new Date().toISOString(),
+        activity: {
+          coding: [
+            {
+              system: 'http://terminology.hl7.org/CodeSystem/v3-DataOperation',
+              code: 'CREATE',
+              display: 'create',
+            },
+          ],
+        },
+        agent: [
+          {
+            type: {
+              coding: [
+                {
+                  system:
+                    'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
+                  code: 'AUT',
+                  display: 'author',
+                },
+              ],
+            },
+            who: { display: 'OpenRx Stroke Care' },
+          },
+        ],
+        reason: [
+          {
+            text: `Generated from stroke activation ${a.activation_code} for interoperability export.`,
+          },
+        ],
+      },
+    });
+
+    const bundle: FhirBundle = {
       resourceType: 'Bundle',
       type: 'collection',
       timestamp: new Date().toISOString(),
@@ -6184,10 +6769,16 @@ export class StrokeCareService implements OnModuleInit {
             code: ACUTE_ISCHEMIC_STROKE_PROTOCOL.version,
             display: ACUTE_ISCHEMIC_STROKE_PROTOCOL.key,
           },
+          {
+            system: 'urn:openrx:fhir-version',
+            code: STROKE_FHIR_VERSION,
+            display: `FHIR R4 ${STROKE_FHIR_VERSION}`,
+          },
         ],
       },
       entry: entries,
     };
+    return applyFhirProfiles(bundle);
   }
 }
 
@@ -6221,6 +6812,23 @@ function fhirGender(sex: unknown): string | undefined {
   if (value.startsWith('f')) return 'female';
   if (value === '' || value === 'unknown') return 'unknown';
   return 'other';
+}
+
+/** Map the stroke module's modality labels to DICOM modality codes. */
+function fhirDicomModality(modality: string): string {
+  switch (modality.toLowerCase()) {
+    case 'cta':
+    case 'ctp':
+      return 'CT';
+    case 'mri':
+    case 'mra':
+      return 'MR';
+    case 'angiography':
+      return 'XA';
+    case 'ct':
+    default:
+      return modality.toUpperCase();
+  }
 }
 
 /** Parse a JSON column that may already have been decoded by the driver. */

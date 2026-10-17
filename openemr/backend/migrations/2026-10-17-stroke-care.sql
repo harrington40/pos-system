@@ -19,6 +19,16 @@ CREATE TABLE IF NOT EXISTS stroke_facility_modules (
   INDEX idx_stroke_facility (facility_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS stroke_facility_users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  facility_id INT NOT NULL,
+  user_id INT NOT NULL,
+  created_by INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_stroke_facility_user (facility_id, user_id),
+  INDEX idx_stroke_facility_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS stroke_activations (
   id INT AUTO_INCREMENT PRIMARY KEY,
   pid INT NOT NULL,
@@ -313,7 +323,14 @@ ALTER TABLE stroke_activations
   ADD COLUMN IF NOT EXISTS outcome VARCHAR(80) NULL,
   ADD COLUMN IF NOT EXISTS outcome_notes TEXT NULL;
 
+ALTER TABLE stroke_assessments
+  ADD COLUMN IF NOT EXISTS encounter_id INT NULL,
+  ADD COLUMN IF NOT EXISTS facility_id INT NULL;
+
 ALTER TABLE stroke_imaging_studies
+  ADD COLUMN IF NOT EXISTS encounter_id INT NULL,
+  ADD COLUMN IF NOT EXISTS facility_id INT NULL,
+  ADD COLUMN IF NOT EXISTS version INT NOT NULL DEFAULT 1,
   ADD COLUMN IF NOT EXISTS ordered_at DATETIME NULL,
   ADD COLUMN IF NOT EXISTS interpreted_at DATETIME NULL,
   ADD COLUMN IF NOT EXISTS interpretation_by VARCHAR(120) NULL;
@@ -557,6 +574,11 @@ ALTER TABLE stroke_imaging_studies
   ADD COLUMN IF NOT EXISTS dicom_patient_id VARCHAR(120) NULL,
   ADD COLUMN IF NOT EXISTS patient_match_status VARCHAR(20) NOT NULL DEFAULT 'unverified';
 
+ALTER TABLE stroke_treatment_events
+  ADD COLUMN IF NOT EXISTS encounter_id INT NULL,
+  ADD COLUMN IF NOT EXISTS facility_id INT NULL,
+  ADD COLUMN IF NOT EXISTS version INT NOT NULL DEFAULT 1;
+
 ALTER TABLE stroke_transfers
   ADD COLUMN IF NOT EXISTS transfer_type VARCHAR(30) NULL,
   ADD COLUMN IF NOT EXISTS priority VARCHAR(20) NULL,
@@ -565,3 +587,22 @@ ALTER TABLE stroke_transfers
   ADD COLUMN IF NOT EXISTS accepting_clinician_name VARCHAR(120) NULL,
   ADD COLUMN IF NOT EXISTS transport_status VARCHAR(30) NULL,
   ADD COLUMN IF NOT EXISTS arrival_confirmed_at DATETIME NULL;
+
+-- Backfill interoperability context from the encounter of record.
+UPDATE stroke_assessments sa
+  JOIN stroke_activations a ON a.id = sa.activation_id
+   SET sa.encounter_id = COALESCE(sa.encounter_id, a.encounter_id),
+       sa.facility_id = COALESCE(sa.facility_id, a.facility_id)
+ WHERE sa.encounter_id IS NULL OR sa.facility_id IS NULL;
+
+UPDATE stroke_imaging_studies si
+  JOIN stroke_activations a ON a.id = si.activation_id
+   SET si.encounter_id = COALESCE(si.encounter_id, a.encounter_id),
+       si.facility_id = COALESCE(si.facility_id, a.facility_id)
+ WHERE si.encounter_id IS NULL OR si.facility_id IS NULL;
+
+UPDATE stroke_treatment_events te
+  JOIN stroke_activations a ON a.id = te.activation_id
+   SET te.encounter_id = COALESCE(te.encounter_id, a.encounter_id),
+       te.facility_id = COALESCE(te.facility_id, a.facility_id)
+ WHERE te.encounter_id IS NULL OR te.facility_id IS NULL;

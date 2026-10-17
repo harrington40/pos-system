@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { StrokeCareService } from './stroke-care.service';
+import { validateFhirBundle } from './stroke-fhir';
 
 /**
  * The service is where clinical safety lives: totals are recomputed, signatures
@@ -84,7 +85,7 @@ describe('StrokeCareService', () => {
     const creates = queries.filter((q) =>
       q.sql.includes('CREATE TABLE IF NOT EXISTS stroke_'),
     );
-    expect(creates).toHaveLength(27);
+    expect(creates).toHaveLength(28);
     expect(queries.some((q) => q.sql.includes('ALTER TABLE'))).toBe(false);
   });
 
@@ -215,10 +216,10 @@ describe('StrokeCareService', () => {
         q.sql.includes('INSERT INTO stroke_assessments'),
       );
       expect(insert).toBeDefined();
-      expect(insert?.params[1]).toBe(17);
-      expect(insert?.params[4]).toBe(5);
-      expect(insert?.params[5]).toBe('moderate');
-      expect(insert?.params[10]).toBe('Dr Test');
+      expect(insert?.params[3]).toBe(17);
+      expect(insert?.params[6]).toBe(5);
+      expect(insert?.params[7]).toBe('moderate');
+      expect(insert?.params[12]).toBe('Dr Test');
       const update = queries.find(
         (q) =>
           q.sql.includes('UPDATE stroke_activations') &&
@@ -473,7 +474,7 @@ describe('StrokeCareService', () => {
       const insert = queries.find((q) =>
         q.sql.includes('INSERT INTO stroke_assessments'),
       );
-      expect(insert?.params[6]).toBe('draft');
+      expect(insert?.params[8]).toBe('draft');
       expect(
         queries.some(
           (q) =>
@@ -504,8 +505,8 @@ describe('StrokeCareService', () => {
       const insert = queries.find((q) =>
         q.sql.includes('INSERT INTO stroke_assessments'),
       );
-      expect(String(insert?.params[3])).toContain('Left arm amputated');
-      expect(insert?.params[4]).toBe(1);
+      expect(String(insert?.params[5])).toContain('Left arm amputated');
+      expect(insert?.params[6]).toBe(1);
     });
 
     it('refuses to edit a finalized assessment', async () => {
@@ -593,7 +594,7 @@ describe('StrokeCareService', () => {
       const bundle = await (
         await service(dataSource)
       ).toAssessmentFhirBundle(7);
-      expect(bundle.entry).toHaveLength(17); // panel + 15 items + total
+      expect(bundle.entry).toHaveLength(18); // panel + 15 items + total + provenance
       interface FhirObservation {
         code?: { coding?: Array<{ code?: string }> };
         hasMember?: unknown[];
@@ -620,6 +621,143 @@ describe('StrokeCareService', () => {
         'not-performed',
       );
       expect(leftArm?.valueQuantity).toBeUndefined();
+    });
+  });
+
+  describe('comprehensive FHIR R4 export', () => {
+    it('emits all supported clinical resource types with valid references', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        if (sql.includes('FROM patient_data WHERE pid')) return [{ pid: 17 }];
+        if (sql.includes('FROM stroke_assessments'))
+          return [
+            {
+              id: 7,
+              activation_id: 5,
+              pid: 17,
+              status: 'finalized',
+              version: 1,
+              items_json: JSON.stringify({}),
+              untestable_json: JSON.stringify({}),
+              total_score: 5,
+              severity: 'moderate',
+              assessed_at: '2026-05-01T10:00:00',
+              finalized_at: '2026-05-01T10:01:00',
+              finalized_by_name: 'Dr Test',
+              protocol_key: 'openrx.nihss',
+              protocol_version: '1.0.0',
+            },
+          ];
+        if (sql.includes('FROM stroke_orders'))
+          return [
+            {
+              id: 9,
+              order_set_label: 'Acute ischemic stroke',
+              status: 'acknowledged',
+              acknowledged_at: '2026-05-01T10:00:00',
+              ordered_by_name: 'Dr Test',
+              notes: null,
+            },
+          ];
+        if (sql.includes('FROM stroke_treatment_decisions')) return [];
+        if (sql.includes('FROM stroke_imaging_studies'))
+          return [
+            {
+              id: 3,
+              imaging_id: 12,
+              modality: 'ct',
+              dicom_study_uid: '1.2.3.4',
+              orthanc_study_id: null,
+              performed_at: '2026-05-01T10:05:00',
+              findings: 'No haemorrhage',
+              interpretation_status: 'reviewed',
+              study_description: 'Noncontrast head CT',
+              accession_number: 'ACC-1',
+              series_count: 1,
+              instance_count: 20,
+              study_date: '2026-05-01T10:05:00',
+            },
+          ];
+        if (sql.includes('FROM stroke_transfers'))
+          return [
+            {
+              id: 4,
+              reason: 'Thrombectomy centre',
+              status: 'requested',
+              priority: 'emergent',
+              clinical_summary: 'NIHSS 5',
+              created_at: '2026-05-01T10:10:00',
+            },
+          ];
+        if (sql.includes('FROM stroke_care_tasks')) return [];
+        if (sql.includes('FROM stroke_encounter_profiles')) return [];
+        if (sql.includes('FROM stroke_treatment_events'))
+          return [
+            {
+              id: 6,
+              activation_id: 5,
+              pid: 17,
+              event_type: 'thrombolysis',
+              status: 'given',
+              medication: 'Alteplase',
+              dose: '0.9 mg/kg',
+              route: 'IV',
+              occurred_at: '2026-05-01T10:20:00',
+              time_quality: 'exact',
+              recorded_by_name: 'Dr Test',
+              created_at: '2026-05-01T10:21:00',
+            },
+          ];
+        if (sql.includes('FROM stroke_care_plans'))
+          return [
+            {
+              id: 2,
+              plan_type: 'multidisciplinary',
+              summary: 'Stroke unit plan',
+              goals_json: '["Mobilise with assistance"]',
+              status: 'active',
+              created_at: '2026-05-01T10:00:00',
+            },
+          ];
+        if (sql.includes('FROM stroke_radiology_reports'))
+          return [
+            {
+              id: 8,
+              stroke_imaging_id: 3,
+              report_text: 'No acute haemorrhage.',
+              impression: 'No haemorrhage',
+              status: 'final',
+              reported_by_name: 'Dr Radiologist',
+              reported_at: '2026-05-01T10:30:00',
+            },
+          ];
+        if (sql.includes('INSERT INTO stroke_audit_events'))
+          return { affectedRows: 1 };
+        return [];
+      });
+      const bundle = await (await service(dataSource)).toFhirBundle(5);
+      const types = new Set(
+        (bundle.entry ?? []).map((entry) => entry.resource?.resourceType),
+      );
+      for (const expected of [
+        'Patient',
+        'Encounter',
+        'Observation',
+        'Condition',
+        'DiagnosticReport',
+        'ImagingStudy',
+        'ServiceRequest',
+        'MedicationRequest',
+        'CarePlan',
+        'Procedure',
+        'DocumentReference',
+        'Provenance',
+      ]) {
+        expect(types.has(expected)).toBe(true);
+      }
+      const validation = validateFhirBundle(bundle);
+      expect(validation.valid).toBe(true);
+      expect(validation.checkedReferences).toBeGreaterThan(5);
     });
   });
 

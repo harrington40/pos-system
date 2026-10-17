@@ -272,7 +272,7 @@ treat local testing accordingly. Credentials live only in the git-ignored
 
 ## 5b. Modules D–H
 
-All five modules extend the same stroke module and 27 `stroke_*` tables. They
+All five modules extend the same stroke module and 28 `stroke_*` tables. They
 reuse existing OpenRx data rather than duplicating it: `patient_care_assignment`
 for beds, `form_vitals` for vital signs, `medication_administration_orders` for
 MAR due counts, `procedure_order`/`procedure_report` for laboratory review, and
@@ -317,10 +317,58 @@ shape and writes a `fhir_exported` audit event.
 
 ---
 
+## 5c. FHIR, persistence and interoperability hardening
+
+**FHIR R4.** The existing OpenRx interoperability layer is R4, so exports pin
+`4.0.1`. `GET /stroke-care/activations/:id/fhir` now emits a comprehensive
+collection Bundle covering Patient, Encounter, Observation, Condition,
+DiagnosticReport, ImagingStudy, ServiceRequest, MedicationRequest, CarePlan,
+Procedure, DocumentReference and Provenance. The latest finalized NIHSS remains
+in the Bundle as LOINC `72089-6`, and the per-assessment export
+(`GET /stroke-care/assessments/:id/fhir`) emits panel `70182-1`, all 15 item
+LOINC codes and the total. Untestable items use `dataAbsentReason` and are never
+exported as zero.
+
+`GET /stroke-care/fhir/metadata` reports the version, profiles and validation
+scope. `GET /stroke-care/activations/:id/fhir/validation` and
+`GET /stroke-care/assessments/:id/fhir/validation` run structural validation:
+required R4 elements, profile declaration, internal reference resolution, status
+values, NIHSS LOINC terminology and UCUM `{score}` units. This is **not** a claim
+of HL7 conformance; the official HL7 validator and terminology server must be
+run against the deployed endpoint before conformance is asserted.
+
+**Persistence.** The module keeps the existing patient, encounter, facility,
+medication, appointment and audit architecture. Signed NIHSS assessments retain
+immutable versions with `amends_id`, `version` and amendment reason; all writes
+carry a patient/activation context and an author, clinical timestamp, created
+timestamp, status and audit event. `stroke_assessments`,
+`stroke_imaging_studies` and `stroke_treatment_events` now also carry
+`encounter_id`/`facility_id` (backfilled from the activation) and imaging/
+treatment records carry a version. `migrations/2026-10-17-stroke-care.sql` is
+additive and idempotent. `migrations/2026-10-18-stroke-care-modules-d-h-down.sql`
+is the reversible down path for the D–H additions and explicitly preserves
+Modules A–C.
+
+**Backend surface.** The existing `/api/stroke-care` prefix is retained. The
+activation APIs remain the encounter APIs, with paginated
+`GET /stroke-care/encounters?page=&pageSize=` and `GET /encounters/:id` aliases.
+Swagger/OpenAPI is generated at `/api/docs` (JSON `/api/docs-json`). DTOs are
+validated at the boundary, role guards protect writes, and `StrokeFacilityGuard`
+enforces explicit facility scope. Administrators can configure modules and
+facility user assignments through `/facilities/:id/modules` and
+`/facilities/:id/users`.
+
+**Frontend and i18n.** Existing React pages remain in one responsive stroke
+workspace with dedicated tabs for the stroke board, emergency board, activation,
+quality, protocols and facility configuration, plus the Module D–H detail tabs.
+English stroke keys live in `interface/new/src/i18n/en/stroke.json` and are
+registered as the `stroke` namespace. No Spanish files are overwritten; Spanish
+falls back to the English stroke namespace until reviewed translations exist.
+
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (65 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (74 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
 # Frontend — NIHSS preview, untestable handling, formatting (7 tests)
@@ -334,7 +382,37 @@ facility module validation, audit writes, and null quality denominators.
 
 ---
 
-## 7. Known limitations / follow-ups
+## 7. Security, downtime and clinical validation
+
+- Access is JWT-authenticated with role guards. Tokens carry an expiry (`exp`)
+  and are rejected after expiry; the SPA must discard the token and return to
+  sign-in on `401`. Facility-scoped endpoints accept only facilities assigned to
+  the user when assignments exist; administrators retain cross-facility access.
+- All writes are audited with the actor, patient context, action and timestamp.
+  Signed NIHSS versions are immutable and amendments create a new version.
+- Deploy behind TLS (the hosted site terminates HTTPS). Do not put PHI in logs,
+  URLs, test fixtures or development databases without authorization and a data
+  processing agreement.
+- Backups and recovery are operational requirements: take encrypted database
+  backups before migrations, test restore procedures, and keep the documented
+  down migration with the backup. The down migration is destructive by design.
+- Downtime/contingency: the module is not a standalone emergency record. Each
+  facility must document a paper/offline stroke pathway, how activations and
+  NIHSS scores are captured during downtime, and how records are reconciled and
+  audited after recovery.
+- U.S. deployments must apply applicable HIPAA requirements; other deployments
+  must apply local healthcare privacy law. Network, host and database hardening
+  remain part of the deployment's security programme.
+
+**Clinical validation is not complete until qualified stroke clinicians review
+the workflows, NIHSS scoring is checked against authoritative reference cases,
+treatment documentation and alert behaviour are verified, failure/downtime
+scenarios are tested, interoperability is validated with target systems, and
+applicable medical-device software regulatory requirements are reviewed. The
+software must not be described as clinically validated or certified before those
+activities finish.**
+
+## 8. Known limitations / follow-ups
 
 - **No Orthanc/PACS server exists in this repository.** The module stores an
   `imaging_id` or DICOM `StudyInstanceUID`, retrieves stored metadata and links to

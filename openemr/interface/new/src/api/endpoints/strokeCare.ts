@@ -1556,3 +1556,56 @@ export async function getStrokeTransferSummaryFhir(transferId: number) {
   );
   return r.data;
 }
+
+export async function listFacilityStrokeUsers(facilityId: number) {
+  const r = await nestClient.get(
+    `/stroke-care/facilities/${facilityId}/users`,
+  );
+  return r.data as Array<{
+    id: number;
+    user_id: number;
+    facility_id: number;
+    username?: string | null;
+    fname?: string | null;
+    lname?: string | null;
+    role?: string | null;
+  }>;
+}
+
+export async function setFacilityStrokeUser(
+  facilityId: number,
+  userId: number,
+  enabled: boolean,
+) {
+  const r = await nestClient.put(
+    `/stroke-care/facilities/${facilityId}/users`,
+    { userId, enabled },
+  );
+  return r.data;
+}
+
+export async function getStrokeFhirMetadata() {
+  const r = await nestClient.get('/stroke-care/fhir/metadata');
+  return r.data as {
+    fhirVersion: string;
+    supportedResources: string[];
+    profiles: Record<string, string>;
+    validation: string;
+    nihssLoinc: unknown;
+  };
+}
+
+export async function validateStrokeFhir(activationId: number) {
+  const r = await nestClient.get(
+    `/stroke-care/activations/${activationId}/fhir/validation`,
+  );
+  return r.data as {
+    valid: boolean;
+    fhirVersion: string;
+    checkedResources: number;
+    checkedReferences: number;
+    errors: Array<{ path: string; message: string }>;
+    warnings: Array<{ path: string; message: string }>;
+    conformanceStatement: string;
+  };
+}
