@@ -1823,7 +1823,7 @@ export class StrokeCareService implements OnModuleInit {
   async listFacilityUsers(facilityId: number) {
     return this.dataSource.query<Array<Record<string, unknown>>>(
       `SELECT f.id, f.facility_id, f.user_id, f.created_at,
-              u.username, u.fname, u.lname, u.role
+              u.username, u.fname, u.lname, u.main_menu_role AS role
          FROM stroke_facility_users f
          LEFT JOIN users u ON u.id = f.user_id
         WHERE f.facility_id = ?
