@@ -101,6 +101,13 @@ const menuSections: MenuSection[] = [
     ],
   },
   {
+    label: 'Stroke Care', icon: 'bi-activity',
+    roles: ['admin', 'physician', 'nurse', 'registered_nurse', 'midwife', 'front_desk', 'lab_tech'],
+    children: [
+      { to: '/stroke-care', label: 'Stroke Board', icon: 'bi-activity', roles: ['admin', 'physician', 'nurse', 'registered_nurse', 'midwife', 'front_desk', 'lab_tech'] },
+    ],
+  },
+  {
     label: 'Clinical', icon: 'bi-heart-pulse',
     roles: ['admin', 'physician'],
     children: [

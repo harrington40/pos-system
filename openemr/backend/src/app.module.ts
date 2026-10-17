@@ -41,6 +41,7 @@ import { EmergencyModule } from './emergency/emergency.module';
 import { MedicationAdministrationModule } from './medication-administration/medication-administration.module';
 import { TelehealthModule } from './telehealth/telehealth.module';
 import { SettingsModule } from './settings/settings.module';
+import { StrokeCareModule } from './stroke-care/stroke-care.module';
 
 @Module({
     controllers: [AppConfigController],
@@ -121,6 +122,7 @@ import { SettingsModule } from './settings/settings.module';
         MidwifeModule,
         TelehealthModule,
         SettingsModule,
+        StrokeCareModule,
     ],
 })
 export class AppModule {}

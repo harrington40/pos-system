@@ -63,6 +63,7 @@ import DbAdminPage from './features/admin/DbAdminPage';
 import WikiPage from './features/help/WikiPage';
 import CommunityForumPage from './features/help/CommunityForumPage';
 import InpatientDashboardPage from './features/inpatient/InpatientDashboardPage';
+import StrokeCarePage from './features/stroke-care/StrokeCarePage';
 import InventoryPage from './features/inventory/InventoryPage';
 import VendorPortalPage from './features/inventory/VendorPortalPage';
 import BookAppointmentPage from './features/booking/BookAppointmentPage';
@@ -133,6 +134,7 @@ export default function App() {
           <Route path="/appointments/screening" element={<DrugScreeningPage />} />
             <Route path="/inpatient" element={<InpatientDashboardPage />} />
             <Route path="/emergency" element={<EmergencyBoardPage />} />
+            <Route path="/stroke-care" element={<StrokeCarePage />} />
           <Route path="/billing" element={<BillingDashboardPage />} />
           <Route path="/billing/medical" element={<MedicalBillingPage />} />
           <Route path="/cds" element={<ClinicalDecisionSupport />} />
