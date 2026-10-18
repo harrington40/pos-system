@@ -45,6 +45,8 @@ import {
   STROKE_FHIR_PROFILES,
   STROKE_FHIR_VERSION,
   applyFhirProfiles,
+  fhirDateTime,
+  fhirUrn,
   validateFhirBundle,
   type FhirBundle,
   type FhirResource,
@@ -3680,7 +3682,7 @@ export class StrokeCareService implements OnModuleInit {
               display: 'emergency',
             },
             subject: { reference: patientRef },
-            period: { start: activation.arrival_at ?? undefined },
+            period: { start: fhirDateTime(activation.arrival_at) },
           },
         },
         {
@@ -3716,7 +3718,7 @@ export class StrokeCareService implements OnModuleInit {
             code: { text: 'Inter-facility stroke transfer' },
             subject: { reference: patientRef },
             encounter: { reference: encounterRef },
-            authoredOn: transfer.created_at,
+            authoredOn: fhirDateTime(transfer.created_at),
             performer: transfer.referring_clinician_name
               ? [{ display: transfer.referring_clinician_name }]
               : undefined,
@@ -7006,7 +7008,7 @@ export class StrokeCareService implements OnModuleInit {
   async toFhirBundle(activationId: number) {
     const record = await this.getActivation(activationId);
     const a = record.activation;
-    const patientRef = `Patient/${a.pid}`;
+    const patientRef = fhirUrn(`patient:${a.pid}`);
     const encoded =
       STROKE_CONDITION_CODES[a.stroke_type] ??
       STROKE_CONDITION_CODES.not_documented;
@@ -7043,7 +7045,7 @@ export class StrokeCareService implements OnModuleInit {
 
     const entries: NonNullable<FhirBundle['entry']> = [
       {
-        fullUrl: `urn:uuid:patient-${a.pid}`,
+        fullUrl: fhirUrn(`patient:${a.pid}`),
         resource: {
           resourceType: 'Patient',
           id: String(a.pid),
@@ -7058,7 +7060,7 @@ export class StrokeCareService implements OnModuleInit {
         },
       },
       {
-        fullUrl: `urn:uuid:condition-${a.id}`,
+        fullUrl: fhirUrn(`condition:${a.id}`),
         resource: {
           resourceType: 'Condition',
           id: `stroke-condition-${a.id}`,
@@ -7085,12 +7087,12 @@ export class StrokeCareService implements OnModuleInit {
           },
           code: { coding: [coding] },
           subject: { reference: patientRef },
-          onsetDateTime: a.lkw_at || a.arrival_at,
-          recordedDate: a.created_at,
+          onsetDateTime: fhirDateTime(a.lkw_at || a.arrival_at),
+          recordedDate: fhirDateTime(a.created_at),
         },
       },
       {
-        fullUrl: `urn:uuid:encounter-${a.id}`,
+        fullUrl: fhirUrn(`encounter:${a.id}`),
         resource: {
           resourceType: 'Encounter',
           id: `stroke-encounter-${a.id}`,
@@ -7104,8 +7106,8 @@ export class StrokeCareService implements OnModuleInit {
           class: encounterClass,
           subject: { reference: patientRef },
           period: {
-            start: a.arrival_at,
-            end: a.disposition_at ?? undefined,
+            start: fhirDateTime(a.arrival_at),
+            end: fhirDateTime(a.disposition_at),
           },
           reasonCode: [{ coding: [coding] }],
         },
@@ -7126,6 +7128,8 @@ export class StrokeCareService implements OnModuleInit {
     const untestable = (assessment.untestable ?? {}) as Record<string, unknown>;
     const observationStatus =
       assessment.status === 'finalized' ? 'final' : 'preliminary';
+    // Patient and Encounter are not entries in this assessment-only Bundle.
+    // Use ordinary relative references rather than bundle-local UUID URNs.
     const patientRef = `Patient/${assessment.pid}`;
     const encounterRef = `Encounter/stroke-encounter-${assessment.activation_id}`;
     const meta = {
@@ -7137,13 +7141,16 @@ export class StrokeCareService implements OnModuleInit {
         },
       ],
     };
+    const performerName =
+      assessment.finalized_by_name ?? assessment.assessed_by_name;
+    const performer = performerName ? [{ display: performerName }] : undefined;
     const itemRefs: string[] = [];
     const entries: NonNullable<FhirBundle['entry']> = [];
 
     for (const item of NIHSS_ITEMS) {
       const loinc =
         NIHSS_LOINC.items[item.key as keyof typeof NIHSS_LOINC.items];
-      const fullUrl = `urn:uuid:nihss-${assessment.id}-${item.key}`;
+      const fullUrl = fhirUrn(`nihss-item:${assessment.id}:${item.key}`);
       itemRefs.push(fullUrl);
       const scored = items[item.key];
       const reason = untestable[item.key];
@@ -7179,7 +7186,8 @@ export class StrokeCareService implements OnModuleInit {
           },
           subject: { reference: patientRef },
           encounter: { reference: encounterRef },
-          effectiveDateTime: assessment.assessed_at,
+          performer,
+          effectiveDateTime: fhirDateTime(assessment.assessed_at),
           ...(scored === undefined
             ? {
                 dataAbsentReason: {
@@ -7208,7 +7216,7 @@ export class StrokeCareService implements OnModuleInit {
     }
 
     entries.unshift({
-      fullUrl: `urn:uuid:nihss-panel-${assessment.id}`,
+      fullUrl: fhirUrn(`nihss-panel:${assessment.id}`),
       resource: {
         resourceType: 'Observation',
         id: `stroke-nihss-panel-${assessment.id}`,
@@ -7235,7 +7243,8 @@ export class StrokeCareService implements OnModuleInit {
         },
         subject: { reference: patientRef },
         encounter: { reference: encounterRef },
-        effectiveDateTime: assessment.assessed_at,
+        performer,
+        effectiveDateTime: fhirDateTime(assessment.assessed_at),
         hasMember: itemRefs.map((reference) => ({ reference })),
         meta,
       },
@@ -7245,7 +7254,7 @@ export class StrokeCareService implements OnModuleInit {
       (key) => untestable[key],
     );
     entries.push({
-      fullUrl: `urn:uuid:nihss-total-${assessment.id}`,
+      fullUrl: fhirUrn(`nihss-total:${assessment.id}`),
       resource: {
         resourceType: 'Observation',
         id: `stroke-nihss-total-${assessment.id}`,
@@ -7272,7 +7281,8 @@ export class StrokeCareService implements OnModuleInit {
         },
         subject: { reference: patientRef },
         encounter: { reference: encounterRef },
-        effectiveDateTime: assessment.assessed_at,
+        performer,
+        effectiveDateTime: fhirDateTime(assessment.assessed_at),
         valueQuantity: {
           value: assessment.total_score,
           unit: 'score',
@@ -7297,13 +7307,15 @@ export class StrokeCareService implements OnModuleInit {
       .map((entry) => entry.fullUrl)
       .filter((url): url is string => Boolean(url));
     entries.push({
-      fullUrl: `urn:uuid:provenance-nihss-${assessment.id}`,
+      fullUrl: fhirUrn(`provenance-nihss:${assessment.id}`),
       resource: {
         resourceType: 'Provenance',
         id: `provenance-nihss-${assessment.id}`,
         meta,
         target: targetReferences.map((reference) => ({ reference })),
-        recorded: assessment.finalized_at ?? assessment.assessed_at,
+        recorded: fhirDateTime(
+          assessment.finalized_at ?? assessment.assessed_at,
+        ),
         activity: {
           coding: [
             {
@@ -7319,9 +7331,9 @@ export class StrokeCareService implements OnModuleInit {
               coding: [
                 {
                   system:
-                    'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
-                  code: 'AUT',
-                  display: 'author',
+                    'http://terminology.hl7.org/CodeSystem/provenance-participant-type',
+                  code: 'author',
+                  display: 'Author',
                 },
               ],
             },
@@ -7406,8 +7418,8 @@ export class StrokeCareService implements OnModuleInit {
     entries: NonNullable<FhirBundle['entry']>,
   ) {
     const a = record.activation;
-    const patientRef = `Patient/${a.pid}`;
-    const encounterRef = `Encounter/stroke-encounter-${a.id}`;
+    const patientRef = fhirUrn(`patient:${a.pid}`);
+    const encounterRef = fhirUrn(`encounter:${a.id}`);
     const meta = {
       tag: [
         {
@@ -7423,7 +7435,7 @@ export class StrokeCareService implements OnModuleInit {
       resource: Omit<FhirResource, 'resourceType' | 'id'>,
     ) => {
       entries.push({
-        fullUrl: `urn:uuid:${type.toLowerCase()}-${id}`,
+        fullUrl: fhirUrn(`${type.toLowerCase()}:${id}`),
         resource: {
           resourceType: type,
           id: `${type.toLowerCase()}-${id}`,
@@ -7437,7 +7449,7 @@ export class StrokeCareService implements OnModuleInit {
     );
     if (latest) {
       entries.push({
-        fullUrl: `urn:uuid:nihss-${latest.id}`,
+        fullUrl: fhirUrn(`nihss-total:${latest.id}`),
         resource: {
           resourceType: 'Observation',
           id: `stroke-nihss-${latest.id}`,
@@ -7462,11 +7474,18 @@ export class StrokeCareService implements OnModuleInit {
               },
             ],
           },
-          subject: { reference: `Patient/${a.pid}` },
-          encounter: {
-            reference: `Encounter/stroke-encounter-${a.id}`,
-          },
-          effectiveDateTime: latest.assessed_at,
+          subject: { reference: patientRef },
+          encounter: { reference: encounterRef },
+          performer:
+            latest.finalized_by_name || latest.assessed_by_name
+              ? [
+                  {
+                    display:
+                      latest.finalized_by_name ?? latest.assessed_by_name ?? '',
+                  },
+                ]
+              : undefined,
+          effectiveDateTime: fhirDateTime(latest.assessed_at),
           valueQuantity: {
             value: latest.total_score,
             unit: 'score',
@@ -7537,12 +7556,12 @@ export class StrokeCareService implements OnModuleInit {
           {
             system: 'http://dicom.nema.org/resources/ontology/DCM',
             code: fhirDicomModality(study.modality),
-            display: study.modality.toUpperCase(),
+            display: fhirDicomDisplay(study.modality),
           },
         ],
         numberOfSeries: study.series_count ?? undefined,
         numberOfInstances: study.instance_count ?? undefined,
-        started: study.performed_at ?? study.study_date ?? undefined,
+        started: fhirDateTime(study.performed_at ?? study.study_date),
         description: study.study_description ?? undefined,
         note: study.findings ? [{ text: study.findings }] : undefined,
       });
@@ -7569,18 +7588,18 @@ export class StrokeCareService implements OnModuleInit {
             {
               system: 'http://loinc.org',
               code: '18748-4',
-              display: 'Diagnostic imaging report',
+              display: 'Diagnostic imaging study',
             },
           ],
         },
-        effectiveDateTime: report.reported_at,
-        issued: report.reported_at,
+        effectiveDateTime: fhirDateTime(report.reported_at),
+        issued: fhirDateTime(report.reported_at),
         conclusion: report.impression ?? undefined,
         performer: report.reported_by_name
           ? [{ display: report.reported_by_name }]
           : undefined,
         imagingStudy: imagingStudy
-          ? [{ reference: `ImagingStudy/imagingstudy-${imagingStudy.id}` }]
+          ? [{ reference: fhirUrn(`imagingstudy:${imagingStudy.id}`) }]
           : undefined,
       });
       if (report.report_text) {
@@ -7591,12 +7610,12 @@ export class StrokeCareService implements OnModuleInit {
               {
                 system: 'http://loinc.org',
                 code: '18748-4',
-                display: 'Diagnostic imaging report',
+                display: 'Diagnostic imaging study',
               },
             ],
           },
           subject: { reference: patientRef },
-          date: report.reported_at,
+          date: fhirDateTime(report.reported_at),
           context: { encounter: [{ reference: encounterRef }] },
           description: report.impression ?? 'Radiology report',
           author: report.reported_by_name
@@ -7631,7 +7650,7 @@ export class StrokeCareService implements OnModuleInit {
         code: {
           text: `Stroke treatment: ${event.event_type.replace(/_/g, ' ')}`,
         },
-        performedDateTime: event.occurred_at ?? undefined,
+        performedDateTime: fhirDateTime(event.occurred_at),
         performer: event.specialist_name
           ? [{ display: event.specialist_name }]
           : undefined,
@@ -7648,7 +7667,7 @@ export class StrokeCareService implements OnModuleInit {
           intent: 'order',
           subject: { reference: patientRef },
           encounter: { reference: encounterRef },
-          authoredOn: event.occurred_at ?? event.created_at,
+          authoredOn: fhirDateTime(event.occurred_at ?? event.created_at),
           medicationCodeableConcept: { text: event.medication },
           dosageInstruction: [
             {
@@ -7676,7 +7695,7 @@ export class StrokeCareService implements OnModuleInit {
         subject: { reference: patientRef },
         encounter: { reference: encounterRef },
         code: { text: order.order_set_label },
-        authoredOn: order.acknowledged_at,
+        authoredOn: fhirDateTime(order.acknowledged_at),
         requester: order.ordered_by_name
           ? { display: order.ordered_by_name }
           : undefined,
@@ -7691,6 +7710,20 @@ export class StrokeCareService implements OnModuleInit {
         ? String(plan.status)
         : 'active';
       const goals = Array.isArray(plan.goals) ? plan.goals : [];
+      const goalRefs = goals.map((goal, goalIndex) => {
+        const goalId = `${String(plan.id)}-${index}-${goalIndex}`;
+        push('Goal', goalId, {
+          lifecycleStatus:
+            planStatus === 'completed'
+              ? 'completed'
+              : planStatus === 'cancelled'
+                ? 'cancelled'
+                : 'active',
+          description: { text: String(goal) },
+          subject: { reference: patientRef },
+        });
+        return { reference: fhirUrn(`goal:${goalId}`) };
+      });
       push('CarePlan', `${String(plan.id)}-${index}`, {
         status: planStatus,
         intent: 'plan',
@@ -7702,12 +7735,8 @@ export class StrokeCareService implements OnModuleInit {
           typeof plan.summary === 'string' ? plan.summary : undefined,
         subject: { reference: patientRef },
         encounter: { reference: encounterRef },
-        created:
-          typeof plan.created_at === 'string' ? plan.created_at : undefined,
-        goal: goals.map((goal) => ({
-          description: { text: String(goal) },
-          status: planStatus === 'completed' ? 'completed' : 'in-progress',
-        })),
+        created: fhirDateTime(plan.created_at),
+        goal: goalRefs,
       });
     }
 
@@ -7729,7 +7758,7 @@ export class StrokeCareService implements OnModuleInit {
         subject: { reference: patientRef },
         encounter: { reference: encounterRef },
         code: { text: 'Inter-facility stroke transfer' },
-        authoredOn: transfer.created_at,
+        authoredOn: fhirDateTime(transfer.created_at),
         reasonCode: transfer.reason ? [{ text: transfer.reason }] : undefined,
         note: transfer.clinical_summary
           ? [{ text: transfer.clinical_summary }]
@@ -7741,7 +7770,7 @@ export class StrokeCareService implements OnModuleInit {
       .map((entry) => entry.fullUrl)
       .filter((url): url is string => Boolean(url));
     entries.push({
-      fullUrl: `urn:uuid:provenance-stroke-${a.id}`,
+      fullUrl: fhirUrn(`provenance-stroke:${a.id}`),
       resource: {
         resourceType: 'Provenance',
         id: `provenance-stroke-${a.id}`,
@@ -7763,9 +7792,9 @@ export class StrokeCareService implements OnModuleInit {
               coding: [
                 {
                   system:
-                    'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
-                  code: 'AUT',
-                  display: 'author',
+                    'http://terminology.hl7.org/CodeSystem/provenance-participant-type',
+                  code: 'author',
+                  display: 'Author',
                 },
               ],
             },
@@ -7774,6 +7803,13 @@ export class StrokeCareService implements OnModuleInit {
         ],
         reason: [
           {
+            coding: [
+              {
+                system: 'http://terminology.hl7.org/CodeSystem/v3-ActReason',
+                code: 'TREAT',
+                display: 'treatment',
+              },
+            ],
             text: `Generated from stroke activation ${a.activation_code} for interoperability export.`,
           },
         ],
@@ -7846,6 +7882,26 @@ function fhirGender(sex: unknown): string | undefined {
   if (value.startsWith('f')) return 'female';
   if (value === '' || value === 'unknown') return 'unknown';
   return 'other';
+}
+
+/** Display names published for the DICOM modality codes used by OpenRx. */
+function fhirDicomDisplay(modality: string): string | undefined {
+  switch (fhirDicomModality(modality)) {
+    case 'CT':
+      return 'Computed Tomography';
+    case 'MR':
+      return 'Magnetic Resonance';
+    case 'XA':
+      return 'X-Ray Angiography';
+    case 'US':
+      return 'Ultrasound';
+    case 'PT':
+      return 'Positron Emission Tomography';
+    case 'NM':
+      return 'Nuclear Medicine';
+    default:
+      return undefined;
+  }
 }
 
 /** Map the stroke module's modality labels to DICOM modality codes. */

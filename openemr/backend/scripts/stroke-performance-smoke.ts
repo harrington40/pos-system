@@ -13,6 +13,7 @@ import {
 } from '../src/stroke-care/stroke-protocols';
 import {
   applyFhirProfiles,
+  fhirUrn,
   validateFhirBundle,
   type FhirBundle,
 } from '../src/stroke-care/stroke-fhir';
@@ -34,7 +35,7 @@ const bundle = applyFhirProfiles<FhirBundle>({
   type: 'collection',
   entry: [
     {
-      fullUrl: 'urn:uuid:patient-1',
+      fullUrl: fhirUrn('patient:1'),
       resource: {
         resourceType: 'Patient',
         id: '1',
@@ -42,7 +43,7 @@ const bundle = applyFhirProfiles<FhirBundle>({
       },
     },
     {
-      fullUrl: 'urn:uuid:nihss-total-1',
+      fullUrl: fhirUrn('nihss-total:1'),
       resource: {
         resourceType: 'Observation',
         id: 'nihss-total-1',
@@ -56,7 +57,7 @@ const bundle = applyFhirProfiles<FhirBundle>({
             },
           ],
         },
-        subject: { reference: 'Patient/1' },
+        subject: { reference: fhirUrn('patient:1') },
         effectiveDateTime: '2026-01-01T00:00:00Z',
         valueQuantity: {
           value: 0,
@@ -83,8 +84,7 @@ const result = {
   fhirMs,
   validationFailures,
   maxMs: MAX_MS,
-  passed:
-    scoreMs <= MAX_MS && fhirMs <= MAX_MS && validationFailures === 0,
+  passed: scoreMs <= MAX_MS && fhirMs <= MAX_MS && validationFailures === 0,
 };
 console.log(JSON.stringify(result, null, 2));
 process.exit(result.passed ? 0 : 1);

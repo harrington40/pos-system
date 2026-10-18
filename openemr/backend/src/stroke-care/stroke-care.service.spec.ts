@@ -828,6 +828,7 @@ describe('StrokeCareService', () => {
         'ServiceRequest',
         'MedicationRequest',
         'CarePlan',
+        'Goal',
         'Procedure',
         'DocumentReference',
         'Provenance',

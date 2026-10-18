@@ -18,8 +18,9 @@ The shared pipeline adds one stage:
 
 1. Verifies the additive migration and the Modules D–H rollback script exist.
 2. Runs `npx jest src/stroke-care --ci --runInBand`.
-3. Runs the stroke Vitest suites (`strokeCare.test.ts`, `strokeCareUI.test.ts`).
-4. Enforces the production rollout gate:
+3. Runs `npm run test:stroke:performance` (CPU-path NIHSS/FHIR smoke).
+4. Runs the stroke Vitest suites (`strokeCare.test.ts`, `strokeCareUI.test.ts`).
+5. Enforces the production rollout gate:
    - `STROKE_RELEASE_APPROVED=true` is required to enable Stroke Care, **or**
    - `STROKE_CARE_ENABLED=false` keeps the feature disabled.
 
@@ -39,6 +40,33 @@ reliability report.
    `backend/migrations/2026-10-18-stroke-care-modules-d-h-down.sql`.
    This is destructive for D–H data and preserves Modules A–C.
 6. Deploy the backend and frontend, restart PM2, and run the smoke job.
+
+## Manual release validation
+
+These are deliberately not part of every CI run because they need an external
+validator, a disposable database, or an approved test environment.
+
+Official FHIR validation (standalone validator 7.0.2 used for the Phase 7 run):
+
+```bash
+FHIR_VALIDATOR_JAR=/opt/validator_cli.jar \
+STROKE_BUNDLE_FILE=/tmp/stroke-fhir.json \
+bash tests/ci/stroke-fhir-conformance.sh
+```
+
+Rollback rehearsal against a disposable schema only:
+
+```bash
+DB_HOST=127.0.0.1 DB_PORT=3307 DB_USERNAME=root DB_PASSWORD=... \
+STROKE_REHEARSAL_DATABASE=openrx_stroke_rehearsal \
+ALLOW_STROKE_ROLLBACK_REHEARSAL=true \
+bash tests/ci/stroke-rollback-rehearsal.sh
+```
+
+Phase 7 result: the additive migration created 30 tables, the D–H rollback left
+15, and re-applying the additive migration restored 30. Official validation of
+synthetic activation and assessment Bundles returned 0 errors (17 and 19
+best-practice warnings respectively).
 
 ## Playwright
 

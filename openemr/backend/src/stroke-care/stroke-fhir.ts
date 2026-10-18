@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { NIHSS_ITEMS, NIHSS_LOINC } from './stroke-protocols';
 
 /**
@@ -22,6 +23,7 @@ export const STROKE_FHIR_PROFILES: Record<string, string> = {
   MedicationRequest:
     'http://hl7.org/fhir/StructureDefinition/MedicationRequest',
   CarePlan: 'http://hl7.org/fhir/StructureDefinition/CarePlan',
+  Goal: 'http://hl7.org/fhir/StructureDefinition/Goal',
   Procedure: 'http://hl7.org/fhir/StructureDefinition/Procedure',
   DocumentReference:
     'http://hl7.org/fhir/StructureDefinition/DocumentReference',
@@ -29,6 +31,42 @@ export const STROKE_FHIR_PROFILES: Record<string, string> = {
 };
 
 export const STROKE_FHIR_RESOURCE_TYPES = Object.keys(STROKE_FHIR_PROFILES);
+
+const FHIR_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/**
+ * Deterministic, RFC 4122-shaped UUID for Bundle.fullUrl values.
+ *
+ * FHIR requires `urn:uuid:` values to contain a real lowercase UUID. Resource
+ * ids in OpenRx remain human-readable; only the bundle-local fullUrl uses this
+ * name-based identifier so repeated exports are stable.
+ */
+export function deterministicFhirUuid(seed: string): string {
+  const hex = createHash('sha1').update(`openrx-stroke:${seed}`).digest('hex');
+  const variant = ((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80)
+    .toString(16)
+    .padStart(2, '0');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(18, 20)}-${hex.slice(20, 32)}`;
+}
+
+export function fhirUrn(seed: string): string {
+  return `urn:uuid:${deterministicFhirUuid(seed)}`;
+}
+
+/**
+ * Normalise a database timestamp for FHIR.
+ *
+ * MySQL DATETIME values have no timezone. FHIR dateTime/instant values that
+ * include a time must declare one, so timezone-less values are interpreted in
+ * the server's local timezone and serialised as UTC. Date-only inputs are not
+ * accepted here; callers that emit a birthDate must keep the date-only value.
+ */
+export function fhirDateTime(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  const parsed = new Date(value.trim().replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
 
 const LOINC_SYSTEM = 'http://loinc.org';
 const UCUM_SYSTEM = 'http://unitsofmeasure.org';
@@ -167,9 +205,30 @@ export function validateFhirBundle(
   const warnings: FhirValidationIssue[] = [];
   const entries = bundle.entry ?? [];
   const resolvable = new Set<string>();
+  const seenFullUrls = new Set<string>();
 
-  for (const entry of entries) {
-    if (entry.fullUrl) resolvable.add(entry.fullUrl);
+  for (const [index, entry] of entries.entries()) {
+    if (entry.fullUrl) {
+      if (seenFullUrls.has(entry.fullUrl)) {
+        errors.push({
+          severity: 'error',
+          path: `Bundle.entry[${index}].fullUrl`,
+          message: `Duplicate Bundle.fullUrl "${entry.fullUrl}".`,
+        });
+      }
+      seenFullUrls.add(entry.fullUrl);
+      resolvable.add(entry.fullUrl);
+      if (
+        entry.fullUrl.startsWith('urn:uuid:') &&
+        !FHIR_UUID_PATTERN.test(entry.fullUrl.slice('urn:uuid:'.length))
+      ) {
+        errors.push({
+          severity: 'error',
+          path: `Bundle.entry[${index}].fullUrl`,
+          message: `Bundle.fullUrl "${entry.fullUrl}" must contain a valid lowercase UUID.`,
+        });
+      }
+    }
     const resource = entry.resource;
     if (resource?.resourceType && resource.id) {
       resolvable.add(`${resource.resourceType}/${resource.id}`);

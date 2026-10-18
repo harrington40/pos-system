@@ -6,8 +6,10 @@
 -- notifications, treatment events, and audit) are intentionally preserved so
 -- the original stroke workflow remains usable.
 --
--- Every statement is a plain DROP TABLE; there is no CASCADE and no change to
--- existing OpenRx patient, encounter, facility, medication or appointment data.
+-- Module D–H tables are dropped whole. The remaining ALTER statements only
+-- remove interoperability columns added by this phase from preserved tables.
+-- There is no CASCADE and no change to existing OpenRx patient, encounter,
+-- facility, medication or appointment data.
 
 DROP TABLE IF EXISTS stroke_assessment_items;
 DROP TABLE IF EXISTS stroke_bp_readings;
@@ -34,11 +36,6 @@ ALTER TABLE stroke_imaging_studies
   DROP COLUMN IF EXISTS encounter_id,
   DROP COLUMN IF EXISTS facility_id,
   DROP COLUMN IF EXISTS version;
-
-ALTER TABLE stroke_clinic_visits
-  DROP COLUMN IF EXISTS medication_reconciliation_status,
-  DROP COLUMN IF EXISTS medication_reconciled_at,
-  DROP COLUMN IF EXISTS medication_reconciled_by_name;
 
 ALTER TABLE stroke_treatment_events
   DROP COLUMN IF EXISTS encounter_id,

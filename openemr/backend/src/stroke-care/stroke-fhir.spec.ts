@@ -2,6 +2,8 @@ import {
   STROKE_FHIR_PROFILES,
   STROKE_FHIR_VERSION,
   applyFhirProfiles,
+  fhirDateTime,
+  fhirUrn,
   validateFhirBundle,
   type FhirBundle,
 } from './stroke-fhir';
@@ -14,7 +16,7 @@ function validBundle(): FhirBundle {
     timestamp: '2026-05-01T10:00:00Z',
     entry: [
       {
-        fullUrl: 'urn:uuid:patient-17',
+        fullUrl: fhirUrn('patient:17'),
         resource: {
           resourceType: 'Patient',
           id: '17',
@@ -23,7 +25,7 @@ function validBundle(): FhirBundle {
         },
       },
       {
-        fullUrl: 'urn:uuid:encounter-5',
+        fullUrl: fhirUrn('encounter:5'),
         resource: {
           resourceType: 'Encounter',
           id: 'stroke-encounter-5',
@@ -32,11 +34,11 @@ function validBundle(): FhirBundle {
             system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
             code: 'EMER',
           },
-          subject: { reference: 'Patient/17' },
+          subject: { reference: fhirUrn('patient:17') },
         },
       },
       {
-        fullUrl: 'urn:uuid:nihss-total-1',
+        fullUrl: fhirUrn('nihss-total:1'),
         resource: {
           resourceType: 'Observation',
           id: 'stroke-nihss-total-1',
@@ -50,8 +52,8 @@ function validBundle(): FhirBundle {
               },
             ],
           },
-          subject: { reference: 'Patient/17' },
-          encounter: { reference: 'Encounter/stroke-encounter-5' },
+          subject: { reference: fhirUrn('patient:17') },
+          encounter: { reference: fhirUrn('encounter:5') },
           effectiveDateTime: '2026-05-01T10:00:00Z',
           valueQuantity: {
             value: 4,
@@ -62,12 +64,12 @@ function validBundle(): FhirBundle {
         },
       },
       {
-        fullUrl: 'urn:uuid:provenance-1',
+        fullUrl: fhirUrn('provenance:1'),
         resource: {
           resourceType: 'Provenance',
           id: 'provenance-1',
           recorded: '2026-05-01T10:01:00Z',
-          target: [{ reference: 'urn:uuid:nihss-total-1' }],
+          target: [{ reference: fhirUrn('nihss-total:1') }],
           agent: [{ who: { display: 'OpenRx Stroke Care' } }],
         },
       },
@@ -107,12 +109,13 @@ describe('Stroke FHIR R4 interoperability', () => {
     const observation = bundle.entry?.find(
       (entry) => entry.resource?.resourceType === 'Observation',
     )?.resource;
-    observation!.subject = { reference: 'Patient/999' };
+    const missing = fhirUrn('patient:999');
+    observation!.subject = { reference: missing };
     const result = validateFhirBundle(bundle);
     expect(result.valid).toBe(false);
-    expect(
-      result.errors.some((error) => error.message.includes('Patient/999')),
-    ).toBe(true);
+    expect(result.errors.some((error) => error.message.includes(missing))).toBe(
+      true,
+    );
   });
 
   it('rejects an Observation without a value or data-absent reason', () => {
@@ -152,11 +155,52 @@ describe('Stroke FHIR R4 interoperability', () => {
   it('rejects a Provenance with an unresolved target', () => {
     const bundle = validBundle();
     const provenance = bundle.entry?.[3].resource;
-    provenance!.target = [{ reference: 'urn:uuid:missing' }];
+    const missing = fhirUrn('provenance:missing');
+    provenance!.target = [{ reference: missing }];
     const result = validateFhirBundle(bundle);
     expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.message.includes(missing))).toBe(
+      true,
+    );
+  });
+
+  it('serialises timezone-less database timestamps as UTC instants', () => {
+    const local = '2026-05-01T10:30:00';
+    expect(fhirDateTime(local)).toBe(new Date(local).toISOString());
+    expect(fhirDateTime('2026-05-01T10:30:00Z')).toBe(
+      '2026-05-01T10:30:00.000Z',
+    );
+    expect(fhirDateTime('')).toBeUndefined();
+    expect(fhirDateTime('not-a-date')).toBeUndefined();
+  });
+
+  it('uses stable, valid lowercase UUID fullUrls', () => {
+    const first = validBundle();
+    const second = validBundle();
+    const urls = (first.entry ?? []).map((entry) => entry.fullUrl);
+    expect(urls).toEqual((second.entry ?? []).map((entry) => entry.fullUrl));
+    for (const url of urls) {
+      expect(url).toMatch(
+        /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    }
+  });
+
+  it('rejects malformed or duplicate urn:uuid fullUrls', () => {
+    const malformed = validBundle();
+    malformed.entry![0].fullUrl = 'urn:uuid:patient-17';
     expect(
-      result.errors.some((error) => error.message.includes('urn:uuid:missing')),
+      validateFhirBundle(malformed).errors.some((error) =>
+        error.message.includes('valid lowercase UUID'),
+      ),
+    ).toBe(true);
+
+    const duplicate = validBundle();
+    duplicate.entry![1].fullUrl = duplicate.entry![0].fullUrl;
+    expect(
+      validateFhirBundle(duplicate).errors.some((error) =>
+        error.message.includes('Duplicate Bundle.fullUrl'),
+      ),
     ).toBe(true);
   });
 

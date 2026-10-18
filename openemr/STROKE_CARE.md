@@ -348,7 +348,10 @@ shape and writes a `fhir_exported` audit event.
 `4.0.1`. `GET /stroke-care/activations/:id/fhir` now emits a comprehensive
 collection Bundle covering Patient, Encounter, Observation, Condition,
 DiagnosticReport, ImagingStudy, ServiceRequest, MedicationRequest, CarePlan,
-Procedure, DocumentReference and Provenance. The latest finalized NIHSS remains
+Goal, Procedure, DocumentReference and Provenance. Bundle-local `fullUrl`
+values use deterministic lowercase UUIDs, references inside a Bundle point at
+those URNs, and timezone-less MySQL timestamps are serialised as UTC instants so
+the Bundle passes the official FHIR validator. The latest finalized NIHSS remains
 in the Bundle as LOINC `72089-6`, and the per-assessment export
 (`GET /stroke-care/assessments/:id/fhir`) emits panel `70182-1`, all 15 item
 LOINC codes and the total. Untestable items use `dataAbsentReason` and are never
@@ -358,9 +361,12 @@ exported as zero.
 scope. `GET /stroke-care/activations/:id/fhir/validation` and
 `GET /stroke-care/assessments/:id/fhir/validation` run structural validation:
 required R4 elements, profile declaration, internal reference resolution, status
-values, NIHSS LOINC terminology and UCUM `{score}` units. This is **not** a claim
-of HL7 conformance; the official HL7 validator and terminology server must be
-run against the deployed endpoint before conformance is asserted.
+values, NIHSS LOINC terminology and UCUM `{score}` units. The official HL7
+validator 7.0.2 and the public R4 terminology server have been run against
+synthetic activation and assessment Bundles with 0 errors; only best-practice
+warnings remain. This is **not** a claim of conformance for a deployed endpoint:
+a de-identified production-shaped Bundle and target-system interoperability
+testing are still required.
 
 **Persistence.** The module keeps the existing patient, encounter, facility,
 medication, appointment and audit architecture. Signed NIHSS assessments retain
@@ -407,7 +413,7 @@ falls back to the English stroke namespace until reviewed translations exist.
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (104 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (107 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
 # Frontend — NIHSS preview/unit tests (7 tests)
@@ -417,7 +423,7 @@ cd interface/new && npx vitest run src/test/strokeCare.test.ts
 cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
-cd backend && npx jest --runInBand        # 523 passed (full regression)
+cd backend && npx jest --runInBand        # 526 passed (full regression)
 cd interface/new && npx vitest run        # 120 passed
 ```
 
