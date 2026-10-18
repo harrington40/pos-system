@@ -3,6 +3,7 @@ import { StrokeCareController } from './stroke-care.controller';
 import { StrokeCareService } from './stroke-care.service';
 import { StrokeNotificationScheduler } from './stroke-notification.scheduler';
 import { StrokeFacilityGuard } from './stroke-facility.guard';
+import { StrokeFeatureGuard } from './stroke-feature.guard';
 
 /**
  * OpenRx Stroke Care.
@@ -17,6 +18,7 @@ import { StrokeFacilityGuard } from './stroke-facility.guard';
     StrokeCareService,
     StrokeNotificationScheduler,
     StrokeFacilityGuard,
+    StrokeFeatureGuard,
   ],
   exports: [StrokeCareService],
 })

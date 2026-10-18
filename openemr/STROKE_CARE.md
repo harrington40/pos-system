@@ -368,12 +368,27 @@ falls back to the English stroke namespace until reviewed translations exist.
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (74 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (85 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
-# Frontend — NIHSS preview, untestable handling, formatting (7 tests)
+# Frontend — NIHSS preview/unit tests (7 tests)
 cd interface/new && npx vitest run src/test/strokeCare.test.ts
+
+# Frontend — dashboard, NIHSS form, history, role and facility UI (8 tests)
+cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
+
+# Full regression (executed 2026-10-17)
+cd backend && npx jest --runInBand        # 504 passed (full regression)
+cd interface/new && npx vitest run        # 118 passed
 ```
+
+Additional stroke UI coverage includes dashboard rendering, role-gated facility
+configuration, facility module visibility, NIHSS entry, validation errors,
+untestable-item reasons and score history with patient-context preservation.
+Playwright coverage is in `tests/ui-tests/test_stroke_ui.py`; the write workflow
+is intentionally gated behind `OPENRX_STROKE_WRITE_E2E=true` and an approved
+isolated test patient. Collection was verified; the write journey was not run
+against production.
 
 Covered behaviours include: NIHSS max/invalid/missing fields, severity bands,
 4.5-hour and 24-hour windows, `unknown` CT results, haemorrhage handling, raised
@@ -381,6 +396,22 @@ BP, mandatory signatures, order-set acknowledgements, withheld-decision reasons,
 facility module validation, audit writes, and null quality denominators.
 
 ---
+
+## 6b. CI/CD and rollout gate
+
+The existing jobs **OpenRx-CI**, **OpenRx-Nightly**, **OpenRx-Release** and
+**OpenRx-Smoke** share `backend/tests/api-tests/Jenkinsfile`; no duplicate jobs
+were created. The pipeline adds a **Stroke Care verification** stage that:
+
+1. checks the additive migration and D–H rollback script,
+2. runs the stroke Jest and Vitest suites,
+3. enforces the rollout gate. Unless `STROKE_RELEASE_APPROVED=true`, the
+   pipeline requires `STROKE_CARE_ENABLED=false`.
+
+`STROKE_CARE_ENABLED=false` makes every Stroke Care endpoint return HTTP 503.
+Production must remain disabled until clinical validation and deployment
+approval are recorded. Job parameters and the release/rollback procedure are in
+`tests/ci/README.md`.
 
 ## 7. Security, downtime and clinical validation
 

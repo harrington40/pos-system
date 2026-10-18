@@ -42,6 +42,7 @@ ROUTES: tuple[UiRoute, ...] = (
     # clinical / inpatient / emergency
     UiRoute("/inpatient", "Inpatient", "inpatient"),
     UiRoute("/emergency", "Emergency Board", "emergency"),
+    UiRoute("/stroke-care", "Stroke Care", "stroke"),
     UiRoute("/cds", "Clinical Decision Support", "cds"),
     # billing / reports
     UiRoute("/billing", "Billing", "billing"),

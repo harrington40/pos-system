@@ -17,6 +17,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { parseNumericId } from '../common/id.util';
 import { StrokeCareService } from './stroke-care.service';
 import { StrokeFacilityGuard } from './stroke-facility.guard';
+import { StrokeFeatureGuard } from './stroke-feature.guard';
 import type {
   ActivationDto,
   ActivationUpdateDto,
@@ -100,7 +101,7 @@ function actor(req: StrokeRequest): StrokeActor {
 @ApiTags('Stroke Care')
 @ApiBearerAuth()
 @Controller('stroke-care')
-@UseGuards(JwtAuthGuard, RolesGuard, StrokeFacilityGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, StrokeFeatureGuard, StrokeFacilityGuard)
 export class StrokeCareController {
   constructor(private readonly stroke: StrokeCareService) {}
 

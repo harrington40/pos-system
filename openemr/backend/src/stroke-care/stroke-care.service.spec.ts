@@ -3,6 +3,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { StrokeCareService } from './stroke-care.service';
@@ -1046,6 +1047,197 @@ describe('StrokeCareService', () => {
             q.params.includes('fhir_exported'),
         ),
       ).toBe(true);
+    });
+  });
+
+  describe('facility access, alerting and transfer regression', () => {
+    it('denies a facility outside the clinician assignment', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM stroke_facility_users'))
+          return [{ facility_id: 1 }];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).assertFacilityAccess(
+          { id: 42, role: 'physician' },
+          2,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('allows an assigned facility and preserves unassigned legacy access', async () => {
+      const assigned = build((sql) => {
+        if (sql.includes('FROM stroke_facility_users'))
+          return [{ facility_id: 1 }];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(assigned.dataSource)).assertFacilityAccess(
+          { id: 42, role: 'physician' },
+          1,
+        ),
+      ).resolves.toBeUndefined();
+
+      const unassigned = build(() => []);
+      await expect(
+        (await service(unassigned.dataSource)).assertFacilityAccess(
+          { id: 43, role: 'nurse' },
+          9,
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it('lets an administrator bypass facility assignments', async () => {
+      const { dataSource, queries } = build(() => []);
+      await (
+        await service(dataSource)
+      ).assertFacilityAccess({ id: 1, role: 'admin' }, 999);
+      expect(
+        queries.some((query) =>
+          query.sql.includes('FROM stroke_facility_users'),
+        ),
+      ).toBe(false);
+    });
+
+    it('acknowledges a stroke-team alert and its notifications', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM stroke_alert_team t'))
+          return [{ id: 3, user_id: 42, pid: 17 }];
+        if (sql.includes('FROM stroke_alert_team')) return [];
+        return { affectedRows: 1 };
+      });
+      await (
+        await service(dataSource)
+      ).acknowledgeTeamMember(5, { id: 42, role: 'physician' });
+      expect(
+        queries.some(
+          (query) =>
+            query.sql.includes('UPDATE stroke_alert_team') &&
+            query.params.includes(42),
+        ),
+      ).toBe(true);
+      expect(
+        queries.some(
+          (query) =>
+            query.sql.includes('UPDATE stroke_notifications') &&
+            query.params.includes(5),
+        ),
+      ).toBe(true);
+      expect(
+        queries.some(
+          (query) =>
+            query.sql.includes('stroke_audit_events') &&
+            query.params.includes('stroke_team'),
+        ),
+      ).toBe(true);
+    });
+
+    it('records requested transfers with priority and structured summary', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        if (sql.includes('FROM stroke_transfers'))
+          return [
+            {
+              id: 12,
+              activation_id: 5,
+              pid: 17,
+              from_facility_id: 1,
+              to_facility_id: 2,
+              reason: 'Thrombectomy',
+              status: 'requested',
+              accepted_by_name: null,
+              transferred_at: null,
+              priority: 'emergent',
+              clinical_summary: 'NIHSS 12',
+              created_at: '2026-05-01T10:00:00',
+            },
+          ];
+        return { affectedRows: 1, insertId: 12 };
+      });
+      const transfer = await (
+        await service(dataSource)
+      ).addTransfer(
+        5,
+        {
+          toFacilityId: 2,
+          reason: 'Thrombectomy',
+          transferType: 'inpatient_stroke_unit',
+          priority: 'emergent',
+          clinicalSummary: 'NIHSS 12',
+          transportStatus: 'arranged',
+        },
+        { id: 42, role: 'physician' },
+      );
+      expect(transfer.id).toBe(12);
+      const insert = queries.find((query) =>
+        query.sql.includes('INSERT INTO stroke_transfers'),
+      );
+      expect(insert?.params).toContain('emergent');
+      expect(insert?.params).toContain('NIHSS 12');
+      expect(insert?.params).toContain('inpatient_stroke_unit');
+    });
+
+    it('refuses a transfer to the current facility', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).addTransfer(5, { toFacilityId: 1 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(
+        queries.some((query) =>
+          query.sql.includes('INSERT INTO stroke_transfers'),
+        ),
+      ).toBe(false);
+    });
+
+    it('tracks transfer acceptance and arrival without rewriting history', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM stroke_transfers'))
+          return [
+            {
+              id: 12,
+              activation_id: 5,
+              pid: 17,
+              status: 'accepted',
+              accepted_at: '2026-05-01T10:05:00',
+              created_at: '2026-05-01T10:00:00',
+            },
+          ];
+        return { affectedRows: 1 };
+      });
+      await (
+        await service(dataSource)
+      ).updateTransfer(
+        12,
+        {
+          status: 'accepted',
+          acceptedByName: 'Dr Receiving',
+          transportStatus: 'en_route',
+          arrivalConfirmedAt: '2026-05-01T11:00:00',
+        },
+        { id: 42, role: 'physician' },
+      );
+      const update = queries.find((query) =>
+        query.sql.includes('UPDATE stroke_transfers'),
+      );
+      expect(update?.sql).toContain('accepted_at = COALESCE');
+      expect(update?.sql).toContain('arrival_confirmed_at');
+      expect(update?.params).toContain('accepted');
+    });
+
+    it('requires a timestamp when a milestone is not unknown', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).recordMilestone(5, {
+          milestoneKey: 'imaging_interpretation',
+          timeQuality: 'estimated',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

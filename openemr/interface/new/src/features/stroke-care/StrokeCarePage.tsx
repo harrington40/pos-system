@@ -198,11 +198,15 @@ export default function StrokeCarePage() {
             label: t('tabs.protocols'),
             icon: 'bi-journal-medical',
           },
-          {
-            key: 'configuration',
-            label: t('tabs.configuration'),
-            icon: 'bi-sliders',
-          },
+          ...(user?.role === 'admin'
+            ? [
+                {
+                  key: 'configuration',
+                  label: t('tabs.configuration'),
+                  icon: 'bi-sliders',
+                },
+              ]
+            : []),
         ].map((entry) => (
           <li className="nav-item" key={entry.key}>
             <button

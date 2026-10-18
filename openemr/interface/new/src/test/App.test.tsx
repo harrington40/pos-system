@@ -11,8 +11,8 @@ describe('App', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('OpenRx')).toBeInTheDocument();
-    expect(screen.getByText('Electronic Prescription & Health Records')).toBeInTheDocument();
+    expect(screen.getAllByText('OpenRx Health').length).toBeGreaterThan(0);
+    expect(screen.getByText('Sign in to your workspace')).toBeInTheDocument();
   });
 
   it('shows sign in button on login page', () => {
@@ -22,6 +22,6 @@ describe('App', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Sign In with OpenRx')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();
   });
 });

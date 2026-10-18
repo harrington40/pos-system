@@ -67,6 +67,12 @@ pipeline {
             description: 'SPA origin for UI tests, e.g. https://openrx.transtechologies.com')
         booleanParam(name: 'RUN_JS_TESTS', defaultValue: true,
             description: 'Run the Jest/Vitest unit suites so the reliability report uses fresh JS numbers (needs node/npm; skipped automatically if absent).')
+        booleanParam(name: 'RUN_STROKE_TESTS', defaultValue: true,
+            description: 'Run Stroke Care Jest/Vitest suites, migration checks and the release rollout gate.')
+        booleanParam(name: 'STROKE_RELEASE_APPROVED', defaultValue: false,
+            description: 'Clinical validation + deployment approval recorded. Leave false to require STROKE_CARE_ENABLED=false.')
+        string(name: 'STROKE_CARE_ENABLED', defaultValue: 'false',
+            description: 'Production Stroke Care rollout flag. Must remain false until STROKE_RELEASE_APPROVED is true.')
     }
 
     environment {
@@ -186,6 +192,53 @@ pipeline {
                         --outputFile="$ART_ABS/vitest-results.json" || true )
                     echo "[js] artifacts:"; ls -la "$ART" || true
                     echo "[js] done"
+                '''
+            }
+        }
+
+        // Stroke Care: clinical regression, migration integrity and the
+        // production rollout gate. This stage complements (does not duplicate)
+        // the full Jest/Vitest stage above.
+        stage('Stroke Care verification') {
+            when { expression { return params.RUN_STROKE_TESTS } }
+            steps {
+                sh '''
+                    set -e
+                    BASE="."
+                    [ -d openemr/tests ] && BASE="openemr"
+                    ART="$BASE/tests/reliability-artifacts"
+                    ART_ABS="$(pwd)/$ART"
+                    mkdir -p "$ART"
+
+                    if ! command -v npm >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
+                        echo "[stroke] node/npm not available; stroke suites not run"
+                        exit 0
+                    fi
+
+                    echo "[stroke] migration integrity"
+                    UP="$BASE/backend/migrations/2026-10-17-stroke-care.sql"
+                    DOWN="$BASE/backend/migrations/2026-10-18-stroke-care-modules-d-h-down.sql"
+                    test -s "$UP" || { echo "missing $UP"; exit 1; }
+                    test -s "$DOWN" || { echo "missing rollback $DOWN"; exit 1; }
+                    grep -q "CREATE TABLE IF NOT EXISTS stroke_activations" "$UP"
+                    grep -q "DROP TABLE IF EXISTS stroke_bp_readings" "$DOWN"
+                    grep -q "Preserve" "$DOWN" || grep -q "preserved" "$DOWN"
+
+                    echo "[stroke] backend Jest"
+                    ( cd "$BASE/backend" && npx jest src/stroke-care --ci --runInBand \
+                        --json --outputFile="$ART_ABS/stroke-jest-results.json" )
+
+                    echo "[stroke] frontend Vitest"
+                    ( cd "$BASE/interface/new" && npx vitest run \
+                        src/test/strokeCare.test.ts src/test/strokeCareUI.test.ts \
+                        --reporter=json --outputFile="$ART_ABS/stroke-vitest-results.json" )
+
+                    echo "[stroke] release rollout gate"
+                    if [ "$STROKE_RELEASE_APPROVED" != "true" ] && [ "$STROKE_CARE_ENABLED" != "false" ]; then
+                        echo "ERROR: Stroke Care is not approved for production; set STROKE_CARE_ENABLED=false"
+                        exit 1
+                    fi
+                    echo "[stroke] rollout gate satisfied (approved=$STROKE_RELEASE_APPROVED, enabled=$STROKE_CARE_ENABLED)"
                 '''
             }
         }
