@@ -9,6 +9,7 @@
 -- Every statement is a plain DROP TABLE; there is no CASCADE and no change to
 -- existing OpenRx patient, encounter, facility, medication or appointment data.
 
+DROP TABLE IF EXISTS stroke_assessment_items;
 DROP TABLE IF EXISTS stroke_bp_readings;
 DROP TABLE IF EXISTS stroke_clinic_visits;
 DROP TABLE IF EXISTS stroke_functional_assessments;

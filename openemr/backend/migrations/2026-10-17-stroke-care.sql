@@ -82,6 +82,23 @@ CREATE TABLE IF NOT EXISTS stroke_assessments (
   INDEX idx_stroke_assessment_pid (pid, assessed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS stroke_assessment_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  assessment_id INT NOT NULL,
+  activation_id INT NOT NULL,
+  pid INT NOT NULL,
+  item_key VARCHAR(8) NOT NULL,
+  loinc_code VARCHAR(16) NOT NULL,
+  loinc_display VARCHAR(255) NOT NULL,
+  score INT NULL,
+  untestable_reason TEXT NULL,
+  data_absent_reason VARCHAR(30) NULL,
+  assessed_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_stroke_assessment_item (assessment_id, item_key),
+  INDEX idx_stroke_assessment_item_pid (pid, item_key, assessed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS stroke_orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   activation_id INT NOT NULL,

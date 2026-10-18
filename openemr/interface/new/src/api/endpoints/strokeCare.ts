@@ -719,6 +719,32 @@ export async function getNihssTrend(
   return r.data;
 }
 
+export async function listPatientNihssAssessments(
+  pid: number,
+  page = 1,
+  pageSize = 25,
+): Promise<{
+  data: Array<Record<string, unknown>>;
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
+  const r = await nestClient.get(
+    `/stroke-care/patients/${pid}/nihss-assessments`,
+    { params: { page, pageSize } },
+  );
+  return r.data;
+}
+
+export async function listNihssAssessmentItems(
+  assessmentId: number,
+): Promise<Array<Record<string, unknown>>> {
+  const r = await nestClient.get(
+    `/stroke-care/assessments/${assessmentId}/items`,
+  );
+  return r.data;
+}
+
 export async function getStrokeEncounterContext(
   activationId: number,
 ): Promise<EncounterContext> {

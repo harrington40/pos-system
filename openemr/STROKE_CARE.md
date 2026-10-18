@@ -272,7 +272,7 @@ treat local testing accordingly. Credentials live only in the git-ignored
 
 ## 5b. Modules D–H
 
-All five modules extend the same stroke module and 28 `stroke_*` tables. They
+All five modules extend the same stroke module and 29 `stroke_*` tables. They
 reuse existing OpenRx data rather than duplicating it: `patient_care_assignment`
 for beds, `form_vitals` for vital signs, `medication_administration_orders` for
 MAR due counts, `procedure_order`/`procedure_report` for laboratory review, and
@@ -358,6 +358,14 @@ enforces explicit facility scope. Administrators can configure modules and
 facility user assignments through `/facilities/:id/modules` and
 `/facilities/:id/users`.
 
+**NIHSS item persistence and history.** Each assessment now also writes 15
+normalized `stroke_assessment_items` rows carrying the item key, LOINC code and
+display, score, untestable reason and `data_absent_reason`. The JSON snapshot
+remains the signed source of truth. Drafts can only be edited by their author or
+an administrator, and `GET /stroke-care/patients/:pid/nihss-assessments` provides
+paginated patient-level history. `GET /stroke-care/assessments/:id/items`
+returns the normalized item rows.
+
 **Frontend and i18n.** Existing React pages remain in one responsive stroke
 workspace with dedicated tabs for the stroke board, emergency board, activation,
 quality, protocols and facility configuration, plus the Module D–H detail tabs.
@@ -368,7 +376,7 @@ falls back to the English stroke namespace until reviewed translations exist.
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (85 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (88 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
 # Frontend — NIHSS preview/unit tests (7 tests)
@@ -378,7 +386,7 @@ cd interface/new && npx vitest run src/test/strokeCare.test.ts
 cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
-cd backend && npx jest --runInBand        # 504 passed (full regression)
+cd backend && npx jest --runInBand        # 507 passed (full regression)
 cd interface/new && npx vitest run        # 118 passed
 ```
 

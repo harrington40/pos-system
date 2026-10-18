@@ -86,7 +86,7 @@ describe('StrokeCareService', () => {
     const creates = queries.filter((q) =>
       q.sql.includes('CREATE TABLE IF NOT EXISTS stroke_'),
     );
-    expect(creates).toHaveLength(28);
+    expect(creates).toHaveLength(29);
     expect(queries.some((q) => q.sql.includes('ALTER TABLE'))).toBe(false);
   });
 
@@ -549,6 +549,84 @@ describe('StrokeCareService', () => {
       expect(
         queries.filter((q) => q.sql.includes('UPDATE stroke_assessments')),
       ).toHaveLength(0);
+    });
+
+    it('normalizes every item into a LOINC-coded assessment item row', async () => {
+      const items = { ...ITEMS } as Record<string, number>;
+      delete items['5a'];
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM patient_data WHERE pid')) return [{ pid: 17 }];
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        if (sql.includes('FROM stroke_assessments')) return [assessmentRow()];
+        if (sql.startsWith('INSERT')) return { affectedRows: 1, insertId: 7 };
+        return { affectedRows: 1 };
+      });
+      await (
+        await service(dataSource)
+      ).addAssessment(5, {
+        items,
+        untestable: { '5a': 'Left arm amputated' },
+        signedByName: 'Dr Test',
+        signatureConfirmed: true,
+      });
+      const insert = queries.find((query) =>
+        query.sql.includes('INSERT INTO stroke_assessment_items'),
+      );
+      expect(insert).toBeDefined();
+      expect(insert?.params).toHaveLength(15 * 10);
+      expect(insert?.params).toContain('70967-5');
+      expect(insert?.params).toContain('Left arm amputated');
+      expect(insert?.params).toContain('not-performed');
+    });
+
+    it('only lets the draft author or an administrator edit a draft', async () => {
+      const draft = assessmentRow({ status: 'draft', assessed_by: 42 });
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM stroke_assessments')) return [draft];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).updateDraftAssessment(
+          7,
+          { items: ITEMS },
+          { id: 99, role: 'physician' },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(
+        queries.some((query) =>
+          query.sql.includes('UPDATE stroke_assessments'),
+        ),
+      ).toBe(false);
+    });
+
+    it('returns paginated patient-level NIHSS history', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM patient_data WHERE pid')) return [{ pid: 17 }];
+        if (sql.includes('COUNT(*) AS total FROM stroke_assessments'))
+          return [{ total: 12 }];
+        if (sql.includes('FROM stroke_assessments a'))
+          return [
+            {
+              id: 7,
+              activation_id: 5,
+              total_score: 3,
+              severity: 'minor',
+              status: 'finalized',
+              version: 1,
+              assessed_at: '2026-05-01T10:00:00',
+            },
+          ];
+        return [];
+      });
+      const history = await (
+        await service(dataSource)
+      ).listPatientAssessments(17, 2, 10);
+      expect(history.total).toBe(12);
+      expect(history.page).toBe(2);
+      expect(history.pageSize).toBe(10);
+      expect(history.data).toHaveLength(1);
+      const sql = queries.map((query) => query.sql).join('\n');
+      expect(sql).toContain('LIMIT 10 OFFSET 10');
     });
   });
 

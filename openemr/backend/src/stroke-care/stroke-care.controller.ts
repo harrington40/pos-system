@@ -501,6 +501,28 @@ export class StrokeCareController {
     );
   }
 
+  /** Normalized LOINC-coded NIHSS items for one assessment. */
+  @Get('assessments/:id/items')
+  @Roles(...READ_ROLES)
+  listAssessmentItems(@Param('id') id: string) {
+    return this.stroke.listAssessmentItems(parseNumericId(id, 'assessment id'));
+  }
+
+  /** Paginated NIHSS history for one patient across encounters. */
+  @Get('patients/:pid/nihss-assessments')
+  @Roles(...READ_ROLES)
+  listPatientAssessments(
+    @Param('pid') pid: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.stroke.listPatientAssessments(
+      parseNumericId(pid, 'patient id'),
+      page,
+      pageSize,
+    );
+  }
+
   /** Finalized NIHSS history for the trend chart. */
   @Get('patients/:pid/nihss-trend')
   @Roles(...READ_ROLES)

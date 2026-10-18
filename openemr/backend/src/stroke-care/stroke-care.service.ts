@@ -629,6 +629,7 @@ interface AssessmentRow {
   amends_id: number | null;
   amendment_reason: string | null;
   assessed_at: string;
+  assessed_by?: number | null;
   assessed_by_name: string | null;
   signed_by_name: string;
   signed_at: string;
@@ -1004,6 +1005,25 @@ export class StrokeCareService implements OnModuleInit {
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_stroke_assessment_activation (activation_id, assessed_at),
         INDEX idx_stroke_assessment_pid (pid, assessed_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS stroke_assessment_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        assessment_id INT NOT NULL,
+        activation_id INT NOT NULL,
+        pid INT NOT NULL,
+        item_key VARCHAR(8) NOT NULL,
+        loinc_code VARCHAR(16) NOT NULL,
+        loinc_display VARCHAR(255) NOT NULL,
+        score INT NULL,
+        untestable_reason TEXT NULL,
+        data_absent_reason VARCHAR(30) NULL,
+        assessed_at DATETIME NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_stroke_assessment_item (assessment_id, item_key),
+        INDEX idx_stroke_assessment_item_pid (pid, item_key, assessed_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
@@ -2369,6 +2389,14 @@ export class StrokeCareService implements OnModuleInit {
         NIHSS_PROTOCOL.version,
       ],
     );
+    await this.syncAssessmentItems(
+      result.insertId,
+      activationId,
+      activation.pid,
+      score.byItem,
+      untestable,
+      assessedAt,
+    );
 
     if (finalize) {
       await this.applyScoreToActivation(
@@ -2404,6 +2432,16 @@ export class StrokeCareService implements OnModuleInit {
     if (existing.status !== 'draft') {
       throw new ConflictException(
         'Only a draft assessment can be edited; amend a finalized assessment instead.',
+      );
+    }
+    if (
+      existing.assessed_by !== null &&
+      existing.assessed_by !== undefined &&
+      actor?.role !== 'admin' &&
+      Number(existing.assessed_by) !== Number(actor?.id)
+    ) {
+      throw new ForbiddenException(
+        'Only the clinician who created this draft, or an administrator, can edit it.',
       );
     }
     if (!dto?.items || typeof dto.items !== 'object') {
@@ -2443,6 +2481,14 @@ export class StrokeCareService implements OnModuleInit {
         dto.notes === undefined ? null : optionalText(dto.notes, 'notes', 4000),
         assessmentId,
       ],
+    );
+    await this.syncAssessmentItems(
+      assessmentId,
+      existing.activation_id,
+      existing.pid,
+      score.byItem,
+      untestable,
+      assessedAt ?? existing.assessed_at,
     );
     await this.audit(
       'stroke_assessment',
@@ -2501,6 +2547,14 @@ export class StrokeCareService implements OnModuleInit {
         dto.notes === undefined ? null : optionalText(dto.notes, 'notes', 4000),
         assessmentId,
       ],
+    );
+    await this.syncAssessmentItems(
+      assessmentId,
+      existing.activation_id,
+      existing.pid,
+      items,
+      untestable,
+      assessedAt ?? existing.assessed_at,
     );
     await this.applyScoreToActivation(
       existing.activation_id,
@@ -2588,6 +2642,14 @@ export class StrokeCareService implements OnModuleInit {
         NIHSS_PROTOCOL.version,
       ],
     );
+    await this.syncAssessmentItems(
+      result.insertId,
+      original.activation_id,
+      original.pid,
+      score.byItem,
+      untestable,
+      assessedAt,
+    );
     await this.applyScoreToActivation(
       original.activation_id,
       score.total,
@@ -2615,6 +2677,108 @@ export class StrokeCareService implements OnModuleInit {
         WHERE id = ?`,
       [total, severity, activationId],
     );
+  }
+
+  /**
+   * Normalize each NIHSS item into a LOINC-coded row. The JSON columns remain
+   * the signed clinical snapshot; this table supports item-level reporting and
+   * interoperability without changing that immutable history.
+   */
+  private async syncAssessmentItems(
+    assessmentId: number,
+    activationId: number,
+    pid: number,
+    items: Record<string, number>,
+    untestable: NihssUntestableMap,
+    assessedAt: string,
+  ): Promise<void> {
+    await this.dataSource.query(
+      `DELETE FROM stroke_assessment_items WHERE assessment_id = ?`,
+      [assessmentId],
+    );
+    if (!NIHSS_ITEMS.length) return;
+    const params: unknown[] = [];
+    for (const item of NIHSS_ITEMS) {
+      const loinc =
+        NIHSS_LOINC.items[item.key as keyof typeof NIHSS_LOINC.items];
+      const score = items[item.key];
+      const reason = untestable[item.key];
+      params.push(
+        assessmentId,
+        activationId,
+        pid,
+        item.key,
+        loinc.code,
+        loinc.display,
+        typeof score === 'number' ? score : null,
+        typeof reason === 'string' && reason.trim() ? reason.trim() : null,
+        typeof score === 'number' ? null : 'not-performed',
+        assessedAt,
+      );
+    }
+    const placeholders = NIHSS_ITEMS.map(
+      () => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).join(', ');
+    await this.dataSource.query(
+      `INSERT INTO stroke_assessment_items
+         (assessment_id, activation_id, pid, item_key, loinc_code,
+          loinc_display, score, untestable_reason, data_absent_reason,
+          assessed_at)
+       VALUES ${placeholders}`,
+      params,
+    );
+  }
+
+  async listAssessmentItems(assessmentId: number) {
+    await this.getAssessment(assessmentId);
+    return this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT id, assessment_id, item_key, loinc_code, loinc_display, score,
+              untestable_reason, data_absent_reason,
+              DATE_FORMAT(assessed_at, '%Y-%m-%dT%H:%i:%s') AS assessed_at
+         FROM stroke_assessment_items
+        WHERE assessment_id = ?
+        ORDER BY id ASC`,
+      [assessmentId],
+    );
+  }
+
+  /** Paginated NIHSS history for one patient across all stroke encounters. */
+  async listPatientAssessments(
+    pid: number,
+    pageInput?: unknown,
+    pageSizeInput?: unknown,
+  ) {
+    await this.assertPatient(pid);
+    const page = optionalInteger(pageInput, 'page', 1) ?? 1;
+    const pageSize = Math.min(
+      optionalInteger(pageSizeInput, 'pageSize', 1, 200) ?? 25,
+      200,
+    );
+    const offset = (page - 1) * pageSize;
+    const count = await this.dataSource.query<Array<{ total: number }>>(
+      `SELECT COUNT(*) AS total FROM stroke_assessments WHERE pid = ?`,
+      [pid],
+    );
+    const rows = await this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT a.id, a.activation_id, a.total_score, a.severity, a.status,
+              a.version, a.amends_id, a.amendment_reason, a.protocol_version,
+              a.assessed_by_name, a.finalized_by_name,
+              act.activation_code,
+              DATE_FORMAT(a.assessed_at, '%Y-%m-%dT%H:%i:%s') AS assessed_at,
+              DATE_FORMAT(a.finalized_at, '%Y-%m-%dT%H:%i:%s') AS finalized_at
+         FROM stroke_assessments a
+         LEFT JOIN stroke_activations act ON act.id = a.activation_id
+        WHERE a.pid = ?
+        ORDER BY a.assessed_at DESC, a.id DESC
+        LIMIT ${pageSize} OFFSET ${offset}`,
+      [pid],
+    );
+    return {
+      data: rows,
+      total: Number(count[0]?.total ?? 0),
+      page,
+      pageSize,
+    };
   }
 
   async getAssessment(assessmentId: number): Promise<AssessmentRow> {
