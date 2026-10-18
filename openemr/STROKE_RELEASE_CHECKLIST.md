@@ -7,7 +7,7 @@ Status as of the Phase 7 release-preparation pass.
 - [x] Branch confirmed: `feature/stroke-care`
 - [x] Backend stroke suite: 5 suites, 107 tests
 - [x] Backend full regression: 34 suites, 526 tests
-- [x] Frontend full regression: 9 files, 120 tests
+- [x] Frontend full regression: 9 files, 121 tests
 - [x] Backend TypeScript/build passes
 - [x] Frontend TypeScript/build passes
 - [x] Security regression tests cover facility scope, auth-required facility checks, role metadata and patient-context mismatches

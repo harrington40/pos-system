@@ -14,7 +14,8 @@
 #   ./deploy-local.sh --dry-run       # show remote actions, change nothing
 #   ./deploy-local.sh --no-verify     # skip post-deploy HTTP checks
 #
-# Env overrides: OPENRX_SERVER, OPENRX_REMOTE_DIR, OPENRX_SITE_URL, KEEP
+# Env overrides: OPENRX_SERVER, OPENRX_REMOTE_DIR, OPENRX_SITE_URL, KEEP,
+#                OPENRX_VERIFY_ATTEMPTS (default 30; two-second interval)
 #
 set -euo pipefail
 
@@ -129,10 +130,17 @@ fi
 if (( DO_VERIFY == 1 && UPLOAD_ONLY == 0 )) && (( ${#DRY_ARGS[@]} == 0 )); then
   log "verifying $SITE_URL"
   verify_route() {
-    local path="$1" code
-    code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$SITE_URL$path" 2>/dev/null || echo 000)"
+    local path="$1" code attempt
+    local attempts="${OPENRX_VERIFY_ATTEMPTS:-30}"
+    for ((attempt = 1; attempt <= attempts; attempt++)); do
+      code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$SITE_URL$path" 2>/dev/null || echo 000)"
+      [[ "$code" == "200" ]] && break
+      # The backend takes a few seconds to boot after PM2 restarts it; retry
+      # 502/000 instead of failing a successful deploy during startup.
+      sleep 2
+    done
     if [[ "$code" != "200" ]]; then
-      die "post-deploy check failed: $path returned HTTP $code"
+      die "post-deploy check failed: $path returned HTTP $code after $attempts attempts"
     fi
     ok "$path → HTTP $code"
   }

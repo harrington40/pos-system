@@ -426,7 +426,7 @@ cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
 cd backend && npx jest --runInBand        # 526 passed (full regression)
-cd interface/new && npx vitest run        # 120 passed
+cd interface/new && npx vitest run        # 121 passed
 ```
 
 Additional stroke UI coverage includes dashboard rendering, role-gated facility

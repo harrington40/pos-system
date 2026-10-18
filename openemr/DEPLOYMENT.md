@@ -25,7 +25,9 @@ bash deploy/openrx.sh                   # interactive control center (deploy/mon
   - `backups/{backend,frontend}/dist-<ts>` — previous dists (used by rollback)
   - `releases/`       — archived deploy tarballs
   - `ecosystem.config.js` — PM2 descriptor (app `openrx-backend`, `cwd=backend`, `script=dist/main.js`, `NODE_ENV=production`)
-- **Public URL:** https://openrx.transtechologies.com (Cloudflare) — SPA at `/`, API at `/api` (proxied to NestJS `:3002`).
+- **Public URL:** https://openrx.transtechologies.com (Cloudflare) — SPA at `/`,
+  Stroke workspace at `/stroke` (`/stroke-care` retained as an alias), API at
+  `/api` (proxied to NestJS `:3002`).
 - **Process manager:** PM2 app name **`openrx-backend`**.
 
 ## Deploy model (tarball swap)
@@ -51,8 +53,10 @@ bash deploy/deploy-local.sh --no-verify      # skip post-deploy HTTP checks
 
 After a real deploy the script verifies `/`, `/stroke`, `/stroke-care`,
 `/portal/login` and `/api/config` against `OPENRX_SITE_URL` (default
-`https://openrx.transtechologies.com`). A non-200 response fails the deployment
-after the normal backup/rollback artifacts have been retained.
+`https://openrx.transtechologies.com`). The API check retries during the normal
+PM2 startup window (`OPENRX_VERIFY_ATTEMPTS`, default 30 at two-second intervals).
+A persistent non-200 response fails the deployment after the normal
+backup/rollback artifacts have been retained.
 
 Env overrides: `OPENRX_SERVER` (default `dev@94.250.201.58`),
 `OPENRX_REMOTE_DIR` (default `/home/dev/openrx`), `OPENRX_SITE_URL` (default

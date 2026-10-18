@@ -72,6 +72,7 @@ do_status() {
   echo
   echo "  ${B}Site${N}"
   printf '    frontend    HTTP %s\n' "$(http_code "$SITE/")"
+  printf '    stroke      HTTP %s\n' "$(http_code "$SITE/stroke")"
   printf '    api/config  HTTP %s\n' "$(http_code "$SITE/api/config")"
   echo
   echo "  ${B}Recent backend errors${N}"
