@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -83,6 +84,18 @@ const CLINICIAN_ROLES = ['admin', 'physician', 'nurse', 'registered_nurse'];
 
 /** Reperfusion decisions are the treating physician's (or an admin's). */
 const DECISION_ROLES = ['admin', 'physician'];
+
+/** Quality and audit reports. */
+const QUALITY_ROLES = [
+  'admin',
+  'physician',
+  'nurse',
+  'registered_nurse',
+  'midwife',
+];
+
+/** Audit exports contain PHI and are restricted to senior clinical roles. */
+const AUDIT_ROLES = ['admin', 'physician'];
 
 function actor(req: StrokeRequest): StrokeActor {
   return {
@@ -267,12 +280,72 @@ export class StrokeCareController {
   }
 
   @Get('quality')
-  @Roles('admin', 'physician', 'nurse', 'registered_nurse', 'midwife')
+  @Roles(...QUALITY_ROLES)
   getQuality(
     @Query('days') days?: string,
     @Query('facilityId') facilityId?: string,
   ) {
     return this.stroke.getQuality(days, facilityId);
+  }
+
+  @Get('quality/activations')
+  @Roles(...QUALITY_ROLES)
+  getQualityActivations(
+    @Query('days') days?: string,
+    @Query('facilityId') facilityId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.stroke.getQualityActivations(days, facilityId, page, pageSize);
+  }
+
+  @Get('quality/export.csv')
+  @Roles(...QUALITY_ROLES)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="stroke-quality.csv"')
+  exportQuality(
+    @Query('days') days?: string,
+    @Query('facilityId') facilityId?: string,
+  ) {
+    return this.stroke.exportQualityCsv(days, facilityId);
+  }
+
+  @Get('audit')
+  @Roles(...AUDIT_ROLES)
+  listAuditReport(
+    @Query('days') days?: string,
+    @Query('entityType') entityType?: string,
+    @Query('action') action?: string,
+    @Query('patientId') patientId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.stroke.listAuditReport({
+      days,
+      entityType,
+      action,
+      patientId,
+      page,
+      pageSize,
+    });
+  }
+
+  @Get('audit/export.csv')
+  @Roles(...AUDIT_ROLES)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="stroke-audit.csv"')
+  exportAudit(
+    @Query('days') days?: string,
+    @Query('entityType') entityType?: string,
+    @Query('action') action?: string,
+    @Query('patientId') patientId?: string,
+  ) {
+    return this.stroke.exportAuditCsv({
+      days,
+      entityType,
+      action,
+      patientId,
+    });
   }
 
   // ── Activations ─────────────────────────────────────────────────────────

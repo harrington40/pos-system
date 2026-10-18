@@ -3,9 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  getStrokeAuditCsv,
   getStrokeOverview,
   getStrokeProtocols,
   getStrokeQuality,
+  getStrokeQualityActivations,
+  getStrokeQualityCsv,
 } from '../../api/endpoints/strokeCare';
 import { formatMinutes, severityBadge, severityLabel } from './nihss';
 import ActivationForm from './components/ActivationForm';
@@ -68,6 +71,25 @@ export default function StrokeCarePage() {
     queryFn: () => getStrokeQuality(30, facilityId),
     enabled: tab === 'quality',
   });
+
+  const { data: qualityDetail } = useQuery({
+    queryKey: ['stroke-quality-detail', facilityId],
+    queryFn: () => getStrokeQualityActivations(30, facilityId, 1, 25),
+    enabled: tab === 'quality',
+  });
+
+  const downloadCsv = async (kind: 'quality' | 'audit') => {
+    const blob =
+      kind === 'quality'
+        ? await getStrokeQualityCsv(30, facilityId)
+        : await getStrokeAuditCsv(30);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = kind === 'quality' ? 'stroke-quality.csv' : 'stroke-audit.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['stroke-overview'] });
@@ -409,6 +431,98 @@ export default function StrokeCarePage() {
               Timings come from the recorded arrival, imaging and treatment
               milestones. Percentages are withheld when the denominator is zero —
               an empty service has no performance figure, not 0 %.
+            </div>
+          </div>
+          <div className="col-12">
+            <div className="card border-0 shadow-sm">
+              <div className="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span className="fw-semibold">Activation-level quality report</span>
+                <div className="d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={() => void downloadCsv('quality')}
+                  >
+                    Export quality CSV
+                  </button>
+                  {['admin', 'physician'].includes(user?.role || '') && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => void downloadCsv('audit')}
+                    >
+                      Export audit CSV
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="card-body p-0">
+                {!qualityDetail || qualityDetail.data.length === 0 ? (
+                  <p className="text-muted small p-3 mb-0">
+                    No activations in this reporting window.
+                  </p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-sm align-middle mb-0 small">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Code</th>
+                          <th>Patient</th>
+                          <th>Arrival</th>
+                          <th>Door → CT</th>
+                          <th>CT target</th>
+                          <th>Door → needle</th>
+                          <th>Needle target</th>
+                          <th>Thrombolysis</th>
+                          <th>Thrombectomy</th>
+                          <th>Outcome</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {qualityDetail.data.map((row) => (
+                          <tr key={String(row.id)}>
+                            <td>{String(row.activation_code ?? '')}</td>
+                            <td>
+                              {String(row.fname ?? '')}{' '}
+                              {String(row.lname ?? '')}
+                            </td>
+                            <td>
+                              {String(row.arrival_at ?? '').replace('T', ' ')}
+                            </td>
+                            <td>
+                              {formatMinutes(
+                                row.door_to_ct_minutes == null
+                                  ? null
+                                  : Number(row.door_to_ct_minutes),
+                              )}
+                            </td>
+                            <td>
+                              {row.ctWithinTarget === null ? '—' : row.ctWithinTarget ? 'Yes' : 'No'}
+                            </td>
+                            <td>
+                              {formatMinutes(
+                                row.door_to_needle_minutes == null
+                                  ? null
+                                  : Number(row.door_to_needle_minutes),
+                              )}
+                            </td>
+                            <td>
+                              {row.needleWithinTarget === null
+                                ? '—'
+                                : row.needleWithinTarget
+                                  ? 'Yes'
+                                  : 'No'}
+                            </td>
+                            <td>{String(row.tpa_status ?? '—')}</td>
+                            <td>{String(row.thrombectomy_status ?? '—')}</td>
+                            <td>{String(row.outcome ?? '—')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

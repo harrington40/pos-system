@@ -278,6 +278,14 @@ for beds, `form_vitals` for vital signs, `medication_administration_orders` for
 MAR due counts, `procedure_order`/`procedure_report` for laboratory review, and
 the existing imaging store plus authorized `/dicom` viewer.
 
+**Quality and audit reporting.** `GET /stroke-care/quality/activations` returns
+paginated activation-level timing rows with CT/needle target flags;
+`GET /stroke-care/quality/export.csv` exports the same report. Audit drill-down is
+available at `GET /stroke-care/audit` and `GET /stroke-care/audit/export.csv`
+with date/entity/action/patient filters. CSV cells are RFC 4180-escaped because
+patient names and audit details contain commas and quotes. Audit export is
+restricted to administrators and physicians.
+
 **Acute SLAs and transfer flow.** Facility settings now define alert escalation
 and transfer acceptance minutes (`GET/PUT /stroke-care/facilities/:id/settings`).
 The notification sweep reads those thresholds with 5/30-minute defaults, and the
@@ -399,7 +407,7 @@ falls back to the English stroke namespace until reviewed translations exist.
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (96 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (98 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
 # Frontend — NIHSS preview/unit tests (7 tests)
@@ -409,7 +417,7 @@ cd interface/new && npx vitest run src/test/strokeCare.test.ts
 cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
-cd backend && npx jest --runInBand        # 515 passed (full regression)
+cd backend && npx jest --runInBand        # 517 passed (full regression)
 cd interface/new && npx vitest run        # 120 passed
 ```
 

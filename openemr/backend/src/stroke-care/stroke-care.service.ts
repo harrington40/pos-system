@@ -6760,6 +6760,237 @@ export class StrokeCareService implements OnModuleInit {
     };
   }
 
+  /** Per-activation quality drill-down for reporting and review. */
+  async getQualityActivations(
+    daysInput?: unknown,
+    facilityId?: unknown,
+    pageInput?: unknown,
+    pageSizeInput?: unknown,
+  ) {
+    const days = Math.min(
+      optionalInteger(daysInput, 'days', 1, 3650) ?? 30,
+      3650,
+    );
+    const facility = optionalInteger(facilityId, 'facilityId', 0);
+    const page = optionalInteger(pageInput, 'page', 1) ?? 1;
+    const pageSize = Math.min(
+      optionalInteger(pageSizeInput, 'pageSize', 1, 200) ?? 25,
+      200,
+    );
+    const where = ['a.arrival_at >= DATE_SUB(NOW(), INTERVAL ? DAY)'];
+    const params: unknown[] = [days];
+    if (facility !== null) {
+      where.push('a.facility_id = ?');
+      params.push(facility);
+    }
+    const count = await this.dataSource.query<Array<{ total: number }>>(
+      `SELECT COUNT(*) AS total FROM stroke_activations a
+        WHERE ${where.join(' AND ')}`,
+      params,
+    );
+    const rows = await this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT a.id, a.activation_code, a.pid, a.facility_id, a.care_setting,
+              a.status, a.stroke_type, a.tpa_status, a.thrombectomy_status,
+              a.outcome, pd.fname, pd.lname,
+              DATE_FORMAT(a.arrival_at, '%Y-%m-%dT%H:%i:%s') AS arrival_at,
+              DATE_FORMAT(a.ct_performed_at, '%Y-%m-%dT%H:%i:%s') AS ct_performed_at,
+              DATE_FORMAT(a.tpa_given_at, '%Y-%m-%dT%H:%i:%s') AS tpa_given_at,
+              TIMESTAMPDIFF(MINUTE, a.arrival_at, a.ct_performed_at) AS door_to_ct_minutes,
+              TIMESTAMPDIFF(MINUTE, a.arrival_at, a.tpa_given_at) AS door_to_needle_minutes
+         FROM stroke_activations a
+         JOIN patient_data pd ON pd.pid = a.pid
+        WHERE ${where.join(' AND ')}
+        ORDER BY a.arrival_at DESC, a.id DESC
+        LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+      params,
+    );
+    const data: Array<Record<string, unknown>> = rows.map((row) => ({
+      ...row,
+      ctWithinTarget:
+        row.door_to_ct_minutes === null || row.door_to_ct_minutes === undefined
+          ? null
+          : Number(row.door_to_ct_minutes) <=
+            STROKE_TIMING_TARGETS.doorToImagingMinutes,
+      needleWithinTarget:
+        row.door_to_needle_minutes === null ||
+        row.door_to_needle_minutes === undefined
+          ? null
+          : Number(row.door_to_needle_minutes) <=
+            STROKE_TIMING_TARGETS.doorToNeedleMinutes,
+    }));
+    return {
+      data,
+      total: Number(count[0]?.total ?? 0),
+      page,
+      pageSize,
+      days,
+      facilityId: facility,
+      targets: STROKE_TIMING_TARGETS,
+    };
+  }
+
+  async exportQualityCsv(
+    daysInput?: unknown,
+    facilityId?: unknown,
+  ): Promise<string> {
+    const report = await this.getQualityActivations(
+      daysInput,
+      facilityId,
+      1,
+      200,
+    );
+    const header = [
+      'activation_id',
+      'activation_code',
+      'pid',
+      'patient',
+      'facility_id',
+      'care_setting',
+      'status',
+      'stroke_type',
+      'arrival_at',
+      'ct_performed_at',
+      'door_to_ct_minutes',
+      'ct_within_target',
+      'tpa_status',
+      'tpa_given_at',
+      'door_to_needle_minutes',
+      'needle_within_target',
+      'thrombectomy_status',
+      'outcome',
+    ];
+    const lines = [header.join(',')];
+    for (const row of report.data) {
+      lines.push(
+        [
+          row.id,
+          row.activation_code,
+          row.pid,
+          `${typeof row.fname === 'string' ? row.fname : ''} ${
+            typeof row.lname === 'string' ? row.lname : ''
+          }`.trim(),
+          row.facility_id,
+          row.care_setting,
+          row.status,
+          row.stroke_type,
+          row.arrival_at,
+          row.ct_performed_at,
+          row.door_to_ct_minutes,
+          row.ctWithinTarget,
+          row.tpa_status,
+          row.tpa_given_at,
+          row.door_to_needle_minutes,
+          row.needleWithinTarget,
+          row.thrombectomy_status,
+          row.outcome,
+        ]
+          .map(csvCell)
+          .join(','),
+      );
+    }
+    return lines.join('\r\n');
+  }
+
+  /** Paginated audit report with date/entity/action filters. */
+  async listAuditReport(filters: {
+    days?: unknown;
+    entityType?: unknown;
+    action?: unknown;
+    patientId?: unknown;
+    page?: unknown;
+    pageSize?: unknown;
+  }) {
+    const days = Math.min(
+      optionalInteger(filters.days, 'days', 1, 3650) ?? 30,
+      3650,
+    );
+    const page = optionalInteger(filters.page, 'page', 1) ?? 1;
+    const pageSize = Math.min(
+      optionalInteger(filters.pageSize, 'pageSize', 1, 200) ?? 50,
+      200,
+    );
+    const patientId = optionalInteger(filters.patientId, 'patientId', 1);
+    const where = ['created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)'];
+    const params: unknown[] = [days];
+    if (typeof filters.entityType === 'string' && filters.entityType !== '') {
+      where.push('entity_type = ?');
+      params.push(filters.entityType);
+    }
+    if (typeof filters.action === 'string' && filters.action !== '') {
+      where.push('action = ?');
+      params.push(filters.action);
+    }
+    if (patientId !== null) {
+      where.push('patient_pid = ?');
+      params.push(patientId);
+    }
+    const count = await this.dataSource.query<Array<{ total: number }>>(
+      `SELECT COUNT(*) AS total FROM stroke_audit_events
+        WHERE ${where.join(' AND ')}`,
+      params,
+    );
+    const rows = await this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT id, entity_type, entity_id, patient_pid, action, actor_id,
+              actor_name, detail_json,
+              DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s') AS created_at
+         FROM stroke_audit_events
+        WHERE ${where.join(' AND ')}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+      params,
+    );
+    return {
+      data: rows,
+      total: Number(count[0]?.total ?? 0),
+      page,
+      pageSize,
+      days,
+    };
+  }
+
+  async exportAuditCsv(filters: {
+    days?: unknown;
+    entityType?: unknown;
+    action?: unknown;
+    patientId?: unknown;
+  }): Promise<string> {
+    const report = await this.listAuditReport({
+      ...filters,
+      page: 1,
+      pageSize: 200,
+    });
+    const header = [
+      'id',
+      'created_at',
+      'entity_type',
+      'entity_id',
+      'patient_pid',
+      'action',
+      'actor_id',
+      'actor_name',
+      'detail_json',
+    ];
+    const lines = [header.join(',')];
+    for (const row of report.data) {
+      lines.push(
+        [
+          row.id,
+          row.created_at,
+          row.entity_type,
+          row.entity_id,
+          row.patient_pid,
+          row.action,
+          row.actor_id,
+          row.actor_name,
+          row.detail_json,
+        ]
+          .map(csvCell)
+          .join(','),
+      );
+    }
+    return lines.join('\r\n');
+  }
+
   // ── HL7 FHIR R4 export ──────────────────────────────────────────────────
 
   /**
@@ -7566,6 +7797,18 @@ export class StrokeCareService implements OnModuleInit {
     };
     return applyFhirProfiles(bundle);
   }
+}
+
+/** RFC 4180-style CSV cell escaping. */
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const text =
+    typeof value === 'string'
+      ? value
+      : typeof value === 'number' || typeof value === 'boolean'
+        ? String(value)
+        : JSON.stringify(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 /** ICD-10 codes used only to label the stroke type that was documented. */

@@ -833,6 +833,52 @@ export async function getStrokeQuality(
   return r.data;
 }
 
+export async function getStrokeQualityActivations(
+  days = 30,
+  facilityId?: number | null,
+  page = 1,
+  pageSize = 25,
+): Promise<{
+  data: Array<Record<string, unknown>>;
+  total: number;
+  page: number;
+  pageSize: number;
+  days: number;
+  facilityId: number | null;
+}> {
+  const r = await nestClient.get('/stroke-care/quality/activations', {
+    params: {
+      days,
+      page,
+      pageSize,
+      ...(facilityId ? { facilityId } : {}),
+    },
+  });
+  return r.data;
+}
+
+export async function getStrokeQualityCsv(
+  days = 30,
+  facilityId?: number | null,
+): Promise<Blob> {
+  const r = await nestClient.get('/stroke-care/quality/export.csv', {
+    params: { days, ...(facilityId ? { facilityId } : {}) },
+    responseType: 'blob',
+  });
+  return r.data;
+}
+
+export async function getStrokeAuditCsv(
+  days = 30,
+  patientId?: number | null,
+): Promise<Blob> {
+  const r = await nestClient.get('/stroke-care/audit/export.csv', {
+    params: { days, ...(patientId ? { patientId } : {}) },
+    responseType: 'blob',
+  });
+  return r.data;
+}
+
 export async function getStrokePatientRecord(pid: number) {
   const r = await nestClient.get(`/stroke-care/patients/${pid}`);
   return r.data;

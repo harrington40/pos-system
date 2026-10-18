@@ -1513,6 +1513,78 @@ describe('StrokeCareService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
+    it('exports activation-level quality rows with timing flags', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('COUNT(*) AS total FROM stroke_activations a'))
+          return [{ total: 1 }];
+        if (sql.includes('FROM stroke_activations a'))
+          return [
+            {
+              id: 5,
+              activation_code: 'SC-1',
+              pid: 17,
+              facility_id: 1,
+              care_setting: 'acute',
+              status: 'completed',
+              stroke_type: 'ischemic',
+              tpa_status: 'given',
+              thrombectomy_status: 'withheld',
+              outcome: 'discharged',
+              fname: 'Doe, Jane',
+              lname: 'Patient',
+              arrival_at: '2026-05-01T10:00:00',
+              ct_performed_at: '2026-05-01T10:20:00',
+              tpa_given_at: '2026-05-01T11:30:00',
+              door_to_ct_minutes: 20,
+              door_to_needle_minutes: 90,
+            },
+          ];
+        return [];
+      });
+      const report = await (
+        await service(dataSource)
+      ).getQualityActivations(30, 1, 1, 10);
+      expect(report.total).toBe(1);
+      expect(report.data[0].ctWithinTarget).toBe(true);
+      expect(report.data[0].needleWithinTarget).toBe(false);
+
+      const csv = await (await service(dataSource)).exportQualityCsv(30, 1);
+      expect(csv.split('\r\n')[0]).toContain('activation_code');
+      expect(csv).toContain('"Doe, Jane Patient"');
+      expect(csv).toContain('true');
+    });
+
+    it('filters and CSV-escapes the audit report', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('COUNT(*) AS total FROM stroke_audit_events'))
+          return [{ total: 1 }];
+        if (sql.includes('FROM stroke_audit_events'))
+          return [
+            {
+              id: 9,
+              created_at: '2026-05-01T10:00:00',
+              entity_type: 'stroke_activation',
+              entity_id: 5,
+              patient_pid: 17,
+              action: 'created',
+              actor_id: 42,
+              actor_name: 'Dr Test',
+              detail_json: '{"note":"a,b"}',
+            },
+          ];
+        return [];
+      });
+      const report = await (
+        await service(dataSource)
+      ).listAuditReport({ days: 30, action: 'created', page: 1, pageSize: 10 });
+      expect(report.total).toBe(1);
+      const csv = await (
+        await service(dataSource)
+      ).exportAuditCsv({ days: 30, action: 'created' });
+      expect(csv).toContain('stroke_activation');
+      expect(csv).toContain('"{""note"":""a,b""}"');
+    });
+
     it('requires structured swallow, neuro and mobility observations', async () => {
       const stay = {
         id: 1,
