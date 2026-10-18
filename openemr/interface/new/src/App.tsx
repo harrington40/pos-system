@@ -134,6 +134,9 @@ export default function App() {
           <Route path="/appointments/screening" element={<DrugScreeningPage />} />
             <Route path="/inpatient" element={<InpatientDashboardPage />} />
             <Route path="/emergency" element={<EmergencyBoardPage />} />
+            {/* Canonical Stroke workspace URL. Keep /stroke-care as an alias for
+                existing bookmarks and links. */}
+            <Route path="/stroke" element={<StrokeCarePage />} />
             <Route path="/stroke-care" element={<StrokeCarePage />} />
           <Route path="/billing" element={<BillingDashboardPage />} />
           <Route path="/billing/medical" element={<MedicalBillingPage />} />

@@ -16,7 +16,7 @@ pytestmark = pytest.mark.stroke
 
 def _open_stroke(page, ui_settings):
     page.goto(
-        f"{ui_settings.base_url}/stroke-care",
+        f"{ui_settings.base_url}/stroke",
         wait_until=ui_settings.nav_wait,
         timeout=ui_settings.timeout_ms,
     )
@@ -29,6 +29,18 @@ def test_stroke_dashboard_and_tabs_render(page, ui_settings, session_state):
     _open_stroke(page, ui_settings)
     for label in ("Stroke board", "Emergency board", "Quality", "Protocols"):
         assert page.get_by_role("button", name=label).is_visible()
+
+
+def test_legacy_stroke_care_alias_still_works(page, ui_settings, session_state):
+    """/stroke-care remains available for existing bookmarks and integrations."""
+    if session_state is None:
+        pytest.skip("no UI session — set UI_TOKEN or valid UI_USER/UI_PASSWORD")
+    page.goto(
+        f"{ui_settings.base_url}/stroke-care",
+        wait_until=ui_settings.nav_wait,
+        timeout=ui_settings.timeout_ms,
+    )
+    page.get_by_text("OpenRx Stroke Care").wait_for(timeout=ui_settings.timeout_ms)
 
 
 def test_emergency_alert_board_opens(page, ui_settings, session_state):

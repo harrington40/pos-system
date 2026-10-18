@@ -25,7 +25,7 @@ The feature branch is `feature/stroke-care`. Nothing in this module writes to
 | Auth | `JwtAuthGuard`, `RolesGuard`, `@Roles(...)` | Every endpoint is guarded; role lists are in the controller |
 | Imaging | Existing `imaging` entity + B2 storage; **no Orthanc server is configured in this repository** | Stroke rows link `imaging.id` and/or a DICOM `StudyInstanceUID`; no image bytes are duplicated |
 | FHIR | Existing `fhir.service.ts` | A stroke-specific R4 collection Bundle export endpoint |
-| Frontend | React 18 + Vite + React Query + Bootstrap under `interface/new/src` | `features/stroke-care/`, `api/endpoints/strokeCare.ts`, route `/stroke-care` |
+| Frontend | React 18 + Vite + React Query + Bootstrap under `interface/new/src` | `features/stroke-care/`, `api/endpoints/strokeCare.ts`, routes `/stroke` and `/stroke-care` |
 | Tests | Jest colocated `*.spec.ts`; Vitest in `interface/new/src/test` | Added both |
 
 No MongoDB or PostgreSQL was assumed or introduced.
@@ -255,7 +255,9 @@ treat local testing accordingly. Credentials live only in the git-ignored
 
 ## 5. Frontend
 
-- Route: `/stroke-care` (protected, inside `AppLayout`).
+- Route: `/stroke` (canonical, protected, inside `AppLayout`); `/stroke-care`
+  remains as an alias for existing bookmarks. Deep links preserve `/stroke`
+  through login.
 - Sidebar: **Stroke Care → Stroke Board** for clinical roles.
 - Board: facility filter, summary counters, activation table, selected-record
   detail with ten panes — encounter profile, NIHSS, order sets, reperfusion,

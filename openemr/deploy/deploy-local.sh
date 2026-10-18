@@ -12,15 +12,18 @@
 #   ./deploy-local.sh --skip-build    # upload existing dist/ folders (no build)
 #   ./deploy-local.sh --keep 5        # keep 5 old backups on the server
 #   ./deploy-local.sh --dry-run       # show remote actions, change nothing
+#   ./deploy-local.sh --no-verify     # skip post-deploy HTTP checks
 #
-# Env overrides: OPENRX_SERVER, OPENRX_REMOTE_DIR, KEEP
+# Env overrides: OPENRX_SERVER, OPENRX_REMOTE_DIR, OPENRX_SITE_URL, KEEP
 #
 set -euo pipefail
 
 SERVER="${OPENRX_SERVER:-dev@94.250.201.58}"
 REMOTE_DIR="${OPENRX_REMOTE_DIR:-/home/dev/openrx}"
 REMOTE_INCOMING="$REMOTE_DIR/incoming"
+SITE_URL="${OPENRX_SITE_URL:-https://openrx.transtechologies.com}"
 KEEP="${KEEP:-3}"
+DO_VERIFY=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"          # openemr repo root
@@ -44,7 +47,8 @@ while [[ $# -gt 0 ]]; do
     --upload-only) UPLOAD_ONLY=1; shift ;;
     --keep)        KEEP="${2:?--keep needs a number}"; shift 2 ;;
     --dry-run)     DRY_ARGS+=(--dry-run); shift ;;
-    -h|--help)    sed -n '3,18p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
+    --no-verify)   DO_VERIFY=0; shift ;;
+    -h|--help)    sed -n '3,20p' "$0" | sed -E 's/^# ?//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -117,6 +121,28 @@ else
   ssh "$SERVER" "cd '$REMOTE_DIR' && ./deploy.sh ${REMOTE_ARGS[*]} ${DRY_ARGS[*]:-}"
 fi
 
-# ---- 5. tidy local stage ----------------------------------------------------
+# ---- 5. post-deploy verification -------------------------------------------
+# A successful upload is not enough: verify the SPA root, the canonical Stroke
+# URL, the retained Stroke alias, the patient portal and the API all still
+# answer. This catches a bad frontend swap or a failed backend restart before
+# the deploy is considered complete.
+if (( DO_VERIFY == 1 && UPLOAD_ONLY == 0 )) && (( ${#DRY_ARGS[@]} == 0 )); then
+  log "verifying $SITE_URL"
+  verify_route() {
+    local path="$1" code
+    code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$SITE_URL$path" 2>/dev/null || echo 000)"
+    if [[ "$code" != "200" ]]; then
+      die "post-deploy check failed: $path returned HTTP $code"
+    fi
+    ok "$path → HTTP $code"
+  }
+  verify_route /
+  verify_route /stroke
+  verify_route /stroke-care
+  verify_route /portal/login
+  verify_route /api/config
+fi
+
+# ---- 6. tidy local stage ----------------------------------------------------
 rm -rf "$STAGE"
 log "done ($TS)."

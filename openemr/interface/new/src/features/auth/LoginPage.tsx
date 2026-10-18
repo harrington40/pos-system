@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, NavLink } from 'react-router-dom';
+import { useNavigate, useSearchParams, NavLink } from 'react-router-dom';
 import nestClient from '../../api/nest-client';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -73,6 +73,7 @@ const CONTACT_EMAIL = 'dev@transtechologies.com';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -92,12 +93,21 @@ export default function LoginPage() {
         // Update the auth context (also persists to localStorage) so the
         // sidebar and role-based UI update immediately without a refresh.
         login({ ...user, token });
-        navigate(homeForRole(user.role, user.main_menu_role), { replace: true });
+        // Preserve deep links such as /stroke after authentication. Only
+        // same-origin absolute paths are accepted to avoid an open redirect.
+        const requested = searchParams.get('next');
+        const target =
+          requested && requested.startsWith('/') && !requested.startsWith('//')
+            ? requested
+            : homeForRole(user.role, user.main_menu_role);
+        navigate(target, { replace: true });
       } else {
         setError('Invalid response from server');
       }
-    } catch (err: any) {
-      const msg = err.response?.data?.message || 'Login failed';
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } }).response?.data
+          ?.message || 'Login failed';
       setError(msg);
     } finally {
       setLoading(false);
