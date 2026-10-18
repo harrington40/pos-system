@@ -1413,6 +1413,36 @@ describe('StrokeCareService', () => {
       ).toBe(false);
     });
 
+    it('preserves patient context when linking a clinic activation', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM patient_data WHERE pid')) return [{ pid: 99 }];
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).addClinicVisit(99, {
+          activationId: 5,
+          visitAt: '2026-05-01T10:00:00Z',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('preserves patient context when linking a functional assessment', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM patient_data WHERE pid')) return [{ pid: 99 }];
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).addFunctionalAssessment(99, {
+          instrument: 'mrs',
+          score: 2,
+          assessedAt: '2026-05-01T10:00:00Z',
+          activationId: 5,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('updates follow-up details and the linked appointment', async () => {
       const { dataSource, queries } = build((sql) => {
         if (sql.includes('FROM stroke_clinic_visits')) return [VISIT];

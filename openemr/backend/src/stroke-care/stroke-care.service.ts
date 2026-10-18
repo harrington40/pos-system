@@ -6070,7 +6070,12 @@ export class StrokeCareService implements OnModuleInit {
     }
     const activationId = optionalInteger(dto.activationId, 'activationId', 1);
     if (activationId !== null) {
-      await this.findActivation(activationId);
+      const activation = await this.findActivation(activationId);
+      if (activation.pid !== patient.pid) {
+        throw new BadRequestException(
+          'The activation does not belong to this patient.',
+        );
+      }
     }
     const result = await this.dataSource.query<AffectedRowsResult>(
       `INSERT INTO stroke_functional_assessments

@@ -228,6 +228,9 @@ pipeline {
                     ( cd "$BASE/backend" && npx jest src/stroke-care --ci --runInBand \
                         --json --outputFile="$ART_ABS/stroke-jest-results.json" )
 
+                    echo "[stroke] performance smoke"
+                    ( cd "$BASE/backend" && npm run test:stroke:performance )
+
                     echo "[stroke] frontend Vitest"
                     ( cd "$BASE/interface/new" && npx vitest run \
                         src/test/strokeCare.test.ts src/test/strokeCareUI.test.ts \

@@ -407,7 +407,7 @@ falls back to the English stroke namespace until reviewed translations exist.
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (98 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (104 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
 # Frontend — NIHSS preview/unit tests (7 tests)
@@ -417,13 +417,19 @@ cd interface/new && npx vitest run src/test/strokeCare.test.ts
 cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
-cd backend && npx jest --runInBand        # 517 passed (full regression)
+cd backend && npx jest --runInBand        # 523 passed (full regression)
 cd interface/new && npx vitest run        # 120 passed
 ```
 
 Additional stroke UI coverage includes dashboard rendering, role-gated facility
 configuration, facility module visibility, NIHSS entry, validation errors,
 untestable-item reasons and score history with patient-context preservation.
+Release preparation includes `npm run test:stroke:performance` (CPU-path smoke),
+`tests/ci/stroke-fhir-conformance.sh` (official HL7 validator, requires an
+external endpoint) and `tests/ci/stroke-rollback-rehearsal.sh` (dedicated
+disposable database only). The release checklist is in
+`STROKE_RELEASE_CHECKLIST.md`.
+
 Playwright coverage is in `tests/ui-tests/test_stroke_ui.py`; the write workflow
 is intentionally gated behind `OPENRX_STROKE_WRITE_E2E=true` and an approved
 isolated test patient. Collection was verified; the write journey was not run
