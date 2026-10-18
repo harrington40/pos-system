@@ -14,6 +14,7 @@ import {
 } from '../../../api/endpoints/strokeCare';
 import { formatWhen } from '../nihss';
 import { apiErrorMessage } from '../errors';
+import MedicationReconciliationPanel from './MedicationReconciliationPanel';
 
 interface Props {
   pid: number;
@@ -550,6 +551,12 @@ export default function RehabClinicPanel({
           </ul>
         </div>
       </div>
+
+      <MedicationReconciliationPanel
+        visits={visits}
+        canDocument={canDocument}
+        onSaved={refresh}
+      />
     </div>
   );
 }

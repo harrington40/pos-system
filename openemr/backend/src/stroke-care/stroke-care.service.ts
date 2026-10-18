@@ -502,6 +502,28 @@ export interface ClinicVisitDto {
   status?: string;
 }
 
+export interface MedicationReconciliationItemDto {
+  prescriptionId?: number | string;
+  status?: string;
+  notes?: string | null;
+}
+
+export interface MedicationReconciliationDto {
+  items?: MedicationReconciliationItemDto[];
+  signedByName?: string;
+  signatureConfirmed?: boolean;
+  complete?: boolean;
+}
+
+export interface ClinicVisitUpdateDto {
+  status?: string;
+  nextFollowupDate?: string | null;
+  appointmentId?: number | string | null;
+  carePlan?: string | null;
+  functionalStatus?: string | null;
+  patientEducation?: string | null;
+}
+
 export interface BpReadingDto {
   visitId?: number | string | null;
   systolic?: number | string;
@@ -1472,6 +1494,9 @@ export class StrokeCareService implements OnModuleInit {
         visit_type VARCHAR(40) NOT NULL DEFAULT 'follow_up',
         history_review TEXT NULL,
         medication_reconciliation_json MEDIUMTEXT NULL,
+        medication_reconciliation_status VARCHAR(20) NOT NULL DEFAULT 'not_reviewed',
+        medication_reconciled_at DATETIME NULL,
+        medication_reconciled_by_name VARCHAR(120) NULL,
         risk_factors_json MEDIUMTEXT NULL,
         hba1c DECIMAL(5,2) NULL,
         ldl DECIMAL(6,2) NULL,
@@ -1562,6 +1587,21 @@ export class StrokeCareService implements OnModuleInit {
     for (const [column, definition] of imagingColumns) {
       await this.ensureColumn(
         'stroke_imaging_studies',
+        column,
+        `${column} ${definition}`,
+      );
+    }
+    const clinicColumns: Array<[string, string]> = [
+      [
+        'medication_reconciliation_status',
+        "VARCHAR(20) NOT NULL DEFAULT 'not_reviewed'",
+      ],
+      ['medication_reconciled_at', 'DATETIME NULL'],
+      ['medication_reconciled_by_name', 'VARCHAR(120) NULL'],
+    ];
+    for (const [column, definition] of clinicColumns) {
+      await this.ensureColumn(
+        'stroke_clinic_visits',
         column,
         `${column} ${definition}`,
       );
@@ -5852,6 +5892,14 @@ export class StrokeCareService implements OnModuleInit {
         );
       }
     }
+    const appointmentId = optionalInteger(
+      dto.appointmentId,
+      'appointmentId',
+      0,
+    );
+    if (appointmentId !== null) {
+      await this.assertAppointmentForPatient(patient.pid, appointmentId);
+    }
     const result = await this.dataSource.query<AffectedRowsResult>(
       `INSERT INTO stroke_clinic_visits
          (activation_id, pid, facility_id, visit_at, neurologist_name,
@@ -5884,7 +5932,7 @@ export class StrokeCareService implements OnModuleInit {
         optionalText(dto.patientEducation, 'patientEducation', 8000),
         optionalText(dto.carePlan, 'carePlan', 8000),
         optionalDate(dto.nextFollowupDate, 'nextFollowupDate'),
-        optionalInteger(dto.appointmentId, 'appointmentId', 0),
+        appointmentId,
         oneOf(
           dto.status,
           ['scheduled', 'completed', 'cancelled'],
@@ -5929,6 +5977,9 @@ export class StrokeCareService implements OnModuleInit {
               v.risk_factors_json, v.hba1c, v.ldl, v.diabetes_plan,
               v.lipid_plan, v.functional_status, v.patient_education,
               v.care_plan, v.appointment_id, v.status, v.created_by_name,
+              v.medication_reconciliation_status,
+              v.medication_reconciled_by_name,
+              DATE_FORMAT(v.medication_reconciled_at, '%Y-%m-%dT%H:%i:%s') AS medication_reconciled_at,
               DATE_FORMAT(v.visit_at, '%Y-%m-%dT%H:%i:%s') AS visit_at,
               DATE_FORMAT(v.next_followup_date, '%Y-%m-%d') AS next_followup_date,
               v.created_at, pd.fname, pd.lname
@@ -5992,6 +6043,311 @@ export class StrokeCareService implements OnModuleInit {
         ORDER BY measured_at ASC, id ASC`,
       [pid],
     );
+  }
+
+  private async findClinicVisit(visitId: number) {
+    const rows = await this.dataSource.query<
+      Array<{
+        id: number;
+        activation_id: number | null;
+        pid: number;
+        facility_id: number | null;
+        status: string;
+        appointment_id: number | null;
+        medication_reconciliation_json: string | null;
+        medication_reconciliation_status: string;
+        medication_reconciled_by_name: string | null;
+        medication_reconciled_at: string | null;
+      }>
+    >(
+      `SELECT id, activation_id, pid, facility_id, status, appointment_id,
+              medication_reconciliation_json,
+              medication_reconciliation_status,
+              medication_reconciled_by_name,
+              DATE_FORMAT(medication_reconciled_at, '%Y-%m-%dT%H:%i:%s') AS medication_reconciled_at
+         FROM stroke_clinic_visits WHERE id = ?`,
+      [visitId],
+    );
+    if (!rows.length) {
+      throw new NotFoundException(
+        `Stroke clinic visit ${visitId} was not found.`,
+      );
+    }
+    return rows[0];
+  }
+
+  /** Validate a linked appointment through the existing calendar table. */
+  private async assertAppointmentForPatient(
+    pid: number,
+    appointmentId: number,
+  ): Promise<void> {
+    const rows = await this.dataSource.query<
+      Array<{ pc_eid: number; pc_pid: string | null }>
+    >(
+      `SELECT pc_eid, pc_pid FROM openemr_postcalendar_events
+        WHERE pc_eid = ? LIMIT 1`,
+      [appointmentId],
+    );
+    if (!rows.length) {
+      throw new BadRequestException(
+        `Appointment ${appointmentId} was not found.`,
+      );
+    }
+    if (rows[0].pc_pid && Number(rows[0].pc_pid) !== pid) {
+      throw new BadRequestException(
+        'The appointment belongs to a different patient.',
+      );
+    }
+  }
+
+  async getMedicationReconciliation(visitId: number) {
+    const visit = await this.findClinicVisit(visitId);
+    const meds = await this.dataSource.query<
+      Array<{
+        id: number;
+        drug: string | null;
+        dosage: string | null;
+        route: string | null;
+        refills: number | null;
+        start_date: string | null;
+        end_date: string | null;
+        active: number;
+        note: string | null;
+      }>
+    >(
+      `SELECT id, drug, dosage, route, refills,
+              DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+              DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date,
+              active, note
+         FROM prescriptions
+        WHERE patient_id = ?
+        ORDER BY active DESC, drug ASC`,
+      [visit.pid],
+    );
+    const savedRaw = safeJson(visit.medication_reconciliation_json);
+    const saved = Array.isArray(savedRaw)
+      ? (savedRaw as Array<Record<string, unknown>>)
+      : [];
+    const savedById = new Map(
+      saved.map((item) => [Number(item.prescriptionId), item]),
+    );
+    return {
+      visitId,
+      pid: visit.pid,
+      status: visit.medication_reconciliation_status,
+      reconciledAt: visit.medication_reconciled_at,
+      reconciledBy: visit.medication_reconciled_by_name,
+      medications: meds.map((med) => {
+        const previous = savedById.get(Number(med.id));
+        return {
+          prescriptionId: med.id,
+          drug: med.drug,
+          dosage: med.dosage,
+          route: med.route,
+          refills: med.refills,
+          startDate: med.start_date,
+          endDate: med.end_date,
+          active: Number(med.active) === 1,
+          note: med.note,
+          status:
+            typeof previous?.status === 'string'
+              ? previous.status
+              : 'not_reviewed',
+          reconciliationNotes:
+            typeof previous?.notes === 'string' ? previous.notes : null,
+        };
+      }),
+    };
+  }
+
+  /**
+   * Complete medication reconciliation for a clinic visit. Every active
+   * prescription must be explicitly addressed; the snapshot stores the drug
+   * and dose that were reviewed, not just a prescription id.
+   */
+  async reconcileClinicMedications(
+    visitId: number,
+    dto: MedicationReconciliationDto,
+    actor?: StrokeActor,
+  ) {
+    const visit = await this.findClinicVisit(visitId);
+    if (!Array.isArray(dto?.items)) {
+      throw new BadRequestException('items must be an array.');
+    }
+    const signedByName = requiredText(dto.signedByName, 'signedByName');
+    requireSignature(dto.signatureConfirmed, 'signatureConfirmed');
+    const complete = dto.complete !== false;
+    const statuses = [
+      'continued',
+      'changed',
+      'stopped',
+      'started',
+      'not_reviewed',
+    ] as const;
+    const supplied = new Map<
+      number,
+      { status: string; notes: string | null }
+    >();
+    for (const item of dto.items) {
+      const id = optionalInteger(item?.prescriptionId, 'prescriptionId', 1);
+      if (id === null) {
+        throw new BadRequestException('prescriptionId is required.');
+      }
+      if (supplied.has(id)) {
+        throw new BadRequestException(
+          `Prescription ${id} appears more than once.`,
+        );
+      }
+      supplied.set(id, {
+        status: oneOf(item.status, statuses, 'status', 'not_reviewed'),
+        notes: optionalText(item.notes, 'notes', 1000),
+      });
+    }
+
+    const prescriptions = await this.dataSource.query<
+      Array<{
+        id: number;
+        drug: string | null;
+        dosage: string | null;
+        route: string | null;
+        active: number;
+      }>
+    >(
+      `SELECT id, drug, dosage, route, active FROM prescriptions
+        WHERE patient_id = ?`,
+      [visit.pid],
+    );
+    const byId = new Map(prescriptions.map((row) => [Number(row.id), row]));
+    for (const id of supplied.keys()) {
+      if (!byId.has(id)) {
+        throw new BadRequestException(
+          `Prescription ${id} does not belong to this patient.`,
+        );
+      }
+    }
+    const active = prescriptions.filter((row) => Number(row.active) === 1);
+    if (complete) {
+      const missing = active
+        .filter((row) => {
+          const item = supplied.get(Number(row.id));
+          return !item || item.status === 'not_reviewed';
+        })
+        .map((row) => row.id);
+      if (missing.length) {
+        throw new BadRequestException(
+          `Every active medication must be reconciled; missing: ${missing.join(
+            ', ',
+          )}.`,
+        );
+      }
+    }
+
+    const reconciledAt = new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ');
+    const snapshot = [...supplied.entries()].map(([id, item]) => {
+      const prescription = byId.get(id);
+      return {
+        prescriptionId: id,
+        drug: prescription?.drug ?? null,
+        dosage: prescription?.dosage ?? null,
+        route: prescription?.route ?? null,
+        active: Number(prescription?.active) === 1,
+        status: item.status,
+        notes: item.notes,
+        reconciledBy: this.actorName(actor),
+        reconciledAt,
+      };
+    });
+    await this.dataSource.query(
+      `UPDATE stroke_clinic_visits
+          SET medication_reconciliation_json = ?,
+              medication_reconciliation_status = 'completed',
+              medication_reconciled_at = ?,
+              medication_reconciled_by_name = ?,
+              updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`,
+      [
+        JSON.stringify({ signedByName, complete, items: snapshot }),
+        reconciledAt,
+        this.actorName(actor),
+        visitId,
+      ],
+    );
+    await this.audit(
+      'stroke_clinic_visit',
+      visitId,
+      'medication_reconciled',
+      actor,
+      visit.pid,
+      { medications: snapshot.length, complete, signedByName },
+    );
+    return this.getMedicationReconciliation(visitId);
+  }
+
+  /** Update follow-up details on an existing clinic visit. */
+  async updateClinicVisit(
+    visitId: number,
+    dto: ClinicVisitUpdateDto,
+    actor?: StrokeActor,
+  ) {
+    const visit = await this.findClinicVisit(visitId);
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    if (dto.status !== undefined) {
+      sets.push('status = ?');
+      params.push(
+        oneOf(dto.status, ['scheduled', 'completed', 'cancelled'], 'status'),
+      );
+    }
+    if (dto.nextFollowupDate !== undefined) {
+      sets.push('next_followup_date = ?');
+      params.push(optionalDate(dto.nextFollowupDate, 'nextFollowupDate'));
+    }
+    if (dto.appointmentId !== undefined) {
+      const appointmentId = optionalInteger(
+        dto.appointmentId,
+        'appointmentId',
+        0,
+      );
+      if (appointmentId !== null) {
+        await this.assertAppointmentForPatient(visit.pid, appointmentId);
+      }
+      sets.push('appointment_id = ?');
+      params.push(appointmentId);
+    }
+    if (dto.carePlan !== undefined) {
+      sets.push('care_plan = ?');
+      params.push(optionalText(dto.carePlan, 'carePlan', 8000));
+    }
+    if (dto.functionalStatus !== undefined) {
+      sets.push('functional_status = ?');
+      params.push(optionalText(dto.functionalStatus, 'functionalStatus', 4000));
+    }
+    if (dto.patientEducation !== undefined) {
+      sets.push('patient_education = ?');
+      params.push(optionalText(dto.patientEducation, 'patientEducation', 8000));
+    }
+    if (!sets.length) {
+      throw new BadRequestException('No supported fields were supplied.');
+    }
+    await this.dataSource.query(
+      `UPDATE stroke_clinic_visits SET ${sets.join(', ')},
+              updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`,
+      [...params, visitId],
+    );
+    await this.audit(
+      'stroke_clinic_visit',
+      visitId,
+      'updated',
+      actor,
+      visit.pid,
+      dto,
+    );
+    const rows = await this.listClinicVisits(visit.pid);
+    return rows.find((row) => Number(row.id) === visitId) ?? rows[0];
   }
 
   /** Cross-facility longitudinal clinic view for one patient. */

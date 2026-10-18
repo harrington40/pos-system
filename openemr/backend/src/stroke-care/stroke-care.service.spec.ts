@@ -1318,4 +1318,128 @@ describe('StrokeCareService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
+
+  describe('outpatient medication reconciliation and follow-up', () => {
+    const VISIT = {
+      id: 21,
+      activation_id: 5,
+      pid: 17,
+      facility_id: 1,
+      status: 'completed',
+      appointment_id: 77,
+      medication_reconciliation_json: null,
+      medication_reconciliation_status: 'not_reviewed',
+      medication_reconciled_by_name: null,
+      medication_reconciled_at: null,
+    };
+    const rx = [
+      { id: 101, drug: 'Aspirin', dosage: '81 mg', route: 'PO', active: 1 },
+      {
+        id: 102,
+        drug: 'Atorvastatin',
+        dosage: '40 mg',
+        route: 'PO',
+        active: 1,
+      },
+    ];
+
+    it('requires every active prescription to be addressed', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM stroke_clinic_visits')) return [VISIT];
+        if (sql.includes('FROM prescriptions')) return rx;
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).reconcileClinicMedications(21, {
+          items: [{ prescriptionId: 101, status: 'continued' }],
+          signedByName: 'Dr Test',
+          signatureConfirmed: true,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('stores a signed medication snapshot and audits it', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM stroke_clinic_visits')) return [VISIT];
+        if (sql.includes('FROM prescriptions')) return rx;
+        return { affectedRows: 1 };
+      });
+      await (
+        await service(dataSource)
+      ).reconcileClinicMedications(
+        21,
+        {
+          items: [
+            { prescriptionId: 101, status: 'continued' },
+            { prescriptionId: 102, status: 'stopped', notes: 'Statin changed' },
+          ],
+          signedByName: 'Dr Test',
+          signatureConfirmed: true,
+        },
+        { id: 42, displayName: 'Dr Test' },
+      );
+      const update = queries.find((query) =>
+        query.sql.includes('UPDATE stroke_clinic_visits'),
+      );
+      expect(update?.params[0]).toContain('Atorvastatin');
+      expect(update?.params[0]).toContain('"status":"stopped"');
+      expect(update?.params[2]).toBe('Dr Test');
+      expect(
+        queries.some(
+          (query) =>
+            query.sql.includes('stroke_audit_events') &&
+            query.params.includes('medication_reconciled'),
+        ),
+      ).toBe(true);
+    });
+
+    it('rejects an appointment linked to a different patient', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM patient_data WHERE pid')) return [{ pid: 17 }];
+        if (sql.includes('FROM openemr_postcalendar_events'))
+          return [{ pc_eid: 77, pc_pid: '99' }];
+        return { affectedRows: 1, insertId: 21 };
+      });
+      await expect(
+        (await service(dataSource)).addClinicVisit(17, {
+          visitAt: '2026-05-01T10:00:00Z',
+          appointmentId: 77,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(
+        queries.some((query) =>
+          query.sql.includes('INSERT INTO stroke_clinic_visits'),
+        ),
+      ).toBe(false);
+    });
+
+    it('updates follow-up details and the linked appointment', async () => {
+      const { dataSource, queries } = build((sql) => {
+        if (sql.includes('FROM stroke_clinic_visits')) return [VISIT];
+        if (sql.includes('FROM openemr_postcalendar_events'))
+          return [{ pc_eid: 78, pc_pid: '17' }];
+        if (sql.includes('FROM patient_data')) return [{ pid: 17 }];
+        if (sql.includes('FROM stroke_clinic_visits v')) return [];
+        return { affectedRows: 1 };
+      });
+      await (
+        await service(dataSource)
+      ).updateClinicVisit(
+        21,
+        {
+          status: 'completed',
+          nextFollowupDate: '2026-06-01',
+          appointmentId: 78,
+          carePlan: 'Continue secondary prevention',
+        },
+        { id: 42, displayName: 'Dr Test' },
+      );
+      const update = queries.find((query) =>
+        query.sql.includes('UPDATE stroke_clinic_visits'),
+      );
+      expect(update?.sql).toContain('next_followup_date');
+      expect(update?.sql).toContain('appointment_id');
+      expect(update?.params).toContain('Continue secondary prevention');
+    });
+  });
 });

@@ -591,6 +591,11 @@ ALTER TABLE stroke_imaging_studies
   ADD COLUMN IF NOT EXISTS dicom_patient_id VARCHAR(120) NULL,
   ADD COLUMN IF NOT EXISTS patient_match_status VARCHAR(20) NOT NULL DEFAULT 'unverified';
 
+ALTER TABLE stroke_clinic_visits
+  ADD COLUMN IF NOT EXISTS medication_reconciliation_status VARCHAR(20) NOT NULL DEFAULT 'not_reviewed',
+  ADD COLUMN IF NOT EXISTS medication_reconciled_at DATETIME NULL,
+  ADD COLUMN IF NOT EXISTS medication_reconciled_by_name VARCHAR(120) NULL;
+
 ALTER TABLE stroke_treatment_events
   ADD COLUMN IF NOT EXISTS encounter_id INT NULL,
   ADD COLUMN IF NOT EXISTS facility_id INT NULL,

@@ -12,6 +12,8 @@ const api = vi.hoisted(() => ({
   users: vi.fn(),
   trend: vi.fn(),
   sign: vi.fn(),
+  reconciliation: vi.fn(),
+  saveReconciliation: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ role: 'physician' }));
 const strings = vi.hoisted<Record<string, string>>(() => ({
@@ -66,6 +68,8 @@ vi.mock('../api/endpoints/strokeCare', async () => {
     listFacilityStrokeUsers: api.users,
     getNihssTrend: api.trend,
     signStrokeAssessment: api.sign,
+    getStrokeMedicationReconciliation: api.reconciliation,
+    saveStrokeMedicationReconciliation: api.saveReconciliation,
   };
 });
 
@@ -73,9 +77,11 @@ import StrokeCarePage from '../features/stroke-care/StrokeCarePage';
 import FacilityConfigPanel from '../features/stroke-care/components/FacilityConfigPanel';
 import NihssForm from '../features/stroke-care/components/NihssForm';
 import NihssTrendPanel from '../features/stroke-care/components/NihssTrendPanel';
+import MedicationReconciliationPanel from '../features/stroke-care/components/MedicationReconciliationPanel';
 import type {
   NihssItemDef,
   ProtocolCatalogue,
+  StrokeClinicVisit,
   StrokeOverview,
 } from '../api/endpoints/strokeCare';
 
@@ -232,6 +238,29 @@ beforeEach(() => {
     ],
   });
   api.users.mockResolvedValue([]);
+  api.reconciliation.mockResolvedValue({
+    visitId: 21,
+    pid: 17,
+    status: 'not_reviewed',
+    reconciledAt: null,
+    reconciledBy: null,
+    medications: [
+      {
+        prescriptionId: 101,
+        drug: 'Aspirin',
+        dosage: '81 mg',
+        route: 'PO',
+        refills: 3,
+        startDate: '2026-01-01',
+        endDate: null,
+        active: true,
+        note: null,
+        status: 'not_reviewed',
+        reconciliationNotes: null,
+      },
+    ],
+  });
+  api.saveReconciliation.mockResolvedValue({});
 });
 
 afterEach(() => cleanup());
@@ -351,6 +380,68 @@ describe('NIHSS assessment entry', () => {
     );
     fireEvent.click(screen.getByLabelText('Untestable'));
     expect(screen.getByText(/Reason required: 5a/)).toBeInTheDocument();
+  });
+});
+
+describe('outpatient medication reconciliation', () => {
+  const visits = [
+    {
+      id: 21,
+      visit_at: '2026-05-01T10:00:00',
+      neurologist_name: 'Dr Test',
+    } as unknown as StrokeClinicVisit,
+  ];
+
+  it('renders active prescriptions and requires a status for each', async () => {
+    renderWithProviders(
+      <MedicationReconciliationPanel
+        visits={visits}
+        canDocument
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText('Aspirin')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign reconciliation' }),
+    ).toBeDisabled();
+    fireEvent.change(
+      screen.getByLabelText('Reconciliation status for Aspirin'),
+      { target: { value: 'continued' } },
+    );
+    expect(
+      screen.getByRole('button', { name: 'Sign reconciliation' }),
+    ).toBeEnabled();
+  });
+
+  it('signs the reconciled medication snapshot', async () => {
+    renderWithProviders(
+      <MedicationReconciliationPanel
+        visits={visits}
+        canDocument
+        onSaved={vi.fn()}
+      />,
+    );
+    await screen.findByText('Aspirin');
+    fireEvent.change(
+      screen.getByLabelText('Reconciliation status for Aspirin'),
+      { target: { value: 'continued' } },
+    );
+    fireEvent.change(screen.getByLabelText('Signed by'), {
+      target: { value: 'Dr Test' },
+    });
+    fireEvent.click(
+      screen.getByLabelText('I reviewed every active medication.'),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Sign reconciliation' }),
+    );
+    await waitFor(() =>
+      expect(api.saveReconciliation).toHaveBeenCalledWith(21, {
+        items: [{ prescriptionId: 101, status: 'continued' }],
+        signedByName: 'Dr Test',
+        signatureConfirmed: true,
+      }),
+    );
   });
 });
 

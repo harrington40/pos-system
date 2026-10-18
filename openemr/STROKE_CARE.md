@@ -304,8 +304,12 @@ session counts. Instrument licensing notes are returned with `rehab-progress`.
 **G — Outpatient clinic.** Clinic visits with neurologist, history review,
 medication reconciliation, risk factors, HbA1c/LDL plans, functional status,
 education, care plan, next follow-up and optional existing appointment id.
-Longitudinal BP readings and a cross-facility patient summary are available.
-Repeat NIHSS continues to use the existing assessments workflow.
+Medication reconciliation reads the existing `prescriptions` table, requires
+every active medication to be explicitly continued/changed/stopped/started, and
+stores a signed snapshot with the reviewing clinician and time. Appointment
+links are validated against `openemr_postcalendar_events` and must belong to the
+same patient. Longitudinal BP readings and a cross-facility patient summary are
+available. Repeat NIHSS continues to use the existing assessments workflow.
 
 **H — Transfer/referral.** Transfers now carry sending/receiving facilities,
 reason, type (clinic, ED, inpatient stroke unit, rehab, external hospital),
@@ -358,6 +362,12 @@ enforces explicit facility scope. Administrators can configure modules and
 facility user assignments through `/facilities/:id/modules` and
 `/facilities/:id/users`.
 
+**Outpatient reconciliation APIs.** `GET /stroke-care/clinic-visits/:id/medication-reconciliation`
+returns active/inactive prescriptions with prior reconciliation status;
+`PUT /stroke-care/clinic-visits/:id/medication-reconciliation` validates and
+signs the snapshot. `PATCH /stroke-care/clinic-visits/:id` updates status,
+next follow-up, care plan and a validated appointment link.
+
 **NIHSS item persistence and history.** Each assessment now also writes 15
 normalized `stroke_assessment_items` rows carrying the item key, LOINC code and
 display, score, untestable reason and `data_absent_reason`. The JSON snapshot
@@ -376,18 +386,18 @@ falls back to the English stroke namespace until reviewed translations exist.
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (88 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (92 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
 # Frontend — NIHSS preview/unit tests (7 tests)
 cd interface/new && npx vitest run src/test/strokeCare.test.ts
 
-# Frontend — dashboard, NIHSS form, history, role and facility UI (8 tests)
+# Frontend — dashboard, NIHSS form, history, role/facility and reconciliation UI (10 tests)
 cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
-cd backend && npx jest --runInBand        # 507 passed (full regression)
-cd interface/new && npx vitest run        # 118 passed
+cd backend && npx jest --runInBand        # 511 passed (full regression)
+cd interface/new && npx vitest run        # 120 passed
 ```
 
 Additional stroke UI coverage includes dashboard rendering, role-gated facility

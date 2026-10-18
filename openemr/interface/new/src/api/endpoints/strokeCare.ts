@@ -1574,6 +1574,74 @@ export async function getStrokeClinicSummary(pid: number) {
   return r.data;
 }
 
+export interface StrokeMedicationReconciliation {
+  visitId: number;
+  pid: number;
+  status: string;
+  reconciledAt: string | null;
+  reconciledBy: string | null;
+  medications: Array<{
+    prescriptionId: number;
+    drug: string | null;
+    dosage: string | null;
+    route: string | null;
+    refills: number | null;
+    startDate: string | null;
+    endDate: string | null;
+    active: boolean;
+    note: string | null;
+    status: string;
+    reconciliationNotes: string | null;
+  }>;
+}
+
+export async function getStrokeMedicationReconciliation(
+  visitId: number,
+): Promise<StrokeMedicationReconciliation> {
+  const r = await nestClient.get(
+    `/stroke-care/clinic-visits/${visitId}/medication-reconciliation`,
+  );
+  return r.data;
+}
+
+export async function saveStrokeMedicationReconciliation(
+  visitId: number,
+  input: {
+    items: Array<{
+      prescriptionId: number;
+      status: string;
+      notes?: string | null;
+    }>;
+    signedByName: string;
+    signatureConfirmed: true;
+    complete?: boolean;
+  },
+): Promise<StrokeMedicationReconciliation> {
+  const r = await nestClient.put(
+    `/stroke-care/clinic-visits/${visitId}/medication-reconciliation`,
+    input,
+  );
+  return r.data;
+}
+
+export async function updateStrokeClinicVisit(
+  visitId: number,
+  input: {
+    status?: string;
+    nextFollowupDate?: string | null;
+    appointmentId?: number | null;
+    carePlan?: string | null;
+    functionalStatus?: string | null;
+    patientEducation?: string | null;
+  },
+) {
+  const r = await nestClient.patch(
+    `/stroke-care/clinic-visits/${visitId}`,
+    input,
+  );
+  return r.data;
+}
+
 // ── Module H: transfer interoperability ────────────────────────────────
 
 export async function getStrokeTransferSummaryFhir(transferId: number) {

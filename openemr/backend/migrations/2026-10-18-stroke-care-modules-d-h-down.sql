@@ -34,6 +34,11 @@ ALTER TABLE stroke_imaging_studies
   DROP COLUMN IF EXISTS facility_id,
   DROP COLUMN IF EXISTS version;
 
+ALTER TABLE stroke_clinic_visits
+  DROP COLUMN IF EXISTS medication_reconciliation_status,
+  DROP COLUMN IF EXISTS medication_reconciled_at,
+  DROP COLUMN IF EXISTS medication_reconciled_by_name;
+
 ALTER TABLE stroke_treatment_events
   DROP COLUMN IF EXISTS encounter_id,
   DROP COLUMN IF EXISTS facility_id,

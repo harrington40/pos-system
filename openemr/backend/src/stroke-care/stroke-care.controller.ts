@@ -26,6 +26,7 @@ import type {
   BpReadingDto,
   CarePlanDto,
   ClinicVisitDto,
+  ClinicVisitUpdateDto,
   CloseActivationDto,
   ComplicationDto,
   DecisionDto,
@@ -39,6 +40,7 @@ import type {
   ImagingUpdateDto,
   InpatientAdmitDto,
   InpatientAssessmentDto,
+  MedicationReconciliationDto,
   MilestoneDto,
   OrderDto,
   RadiologyReportDto,
@@ -1040,6 +1042,42 @@ export class StrokeCareController {
   @Roles(...READ_ROLES)
   listClinicVisitsAcrossPatients(@Query('facilityId') facilityId?: string) {
     return this.stroke.listClinicVisits(undefined, facilityId);
+  }
+
+  @Patch('clinic-visits/:id')
+  @Roles(...CLINICIAN_ROLES)
+  updateClinicVisit(
+    @Param('id') id: string,
+    @Body() dto: ClinicVisitUpdateDto,
+    @Req() req: StrokeRequest,
+  ) {
+    return this.stroke.updateClinicVisit(
+      parseNumericId(id, 'clinic visit id'),
+      dto || {},
+      actor(req),
+    );
+  }
+
+  @Get('clinic-visits/:id/medication-reconciliation')
+  @Roles(...READ_ROLES)
+  getMedicationReconciliation(@Param('id') id: string) {
+    return this.stroke.getMedicationReconciliation(
+      parseNumericId(id, 'clinic visit id'),
+    );
+  }
+
+  @Put('clinic-visits/:id/medication-reconciliation')
+  @Roles(...CLINICIAN_ROLES)
+  reconcileClinicMedications(
+    @Param('id') id: string,
+    @Body() dto: MedicationReconciliationDto,
+    @Req() req: StrokeRequest,
+  ) {
+    return this.stroke.reconcileClinicMedications(
+      parseNumericId(id, 'clinic visit id'),
+      dto || {},
+      actor(req),
+    );
   }
 
   @Get('patients/:pid/bp-readings')
