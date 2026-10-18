@@ -19,6 +19,14 @@ CREATE TABLE IF NOT EXISTS stroke_facility_modules (
   INDEX idx_stroke_facility (facility_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS stroke_facility_settings (
+  facility_id INT NOT NULL PRIMARY KEY,
+  alert_escalation_minutes INT NOT NULL DEFAULT 5,
+  transfer_acceptance_minutes INT NOT NULL DEFAULT 30,
+  updated_by INT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS stroke_facility_users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   facility_id INT NOT NULL,

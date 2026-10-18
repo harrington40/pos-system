@@ -23,6 +23,7 @@ DROP TABLE IF EXISTS stroke_inpatient_assessments;
 DROP TABLE IF EXISTS stroke_inpatient_stays;
 DROP TABLE IF EXISTS stroke_radiology_reports;
 DROP TABLE IF EXISTS stroke_facility_users;
+DROP TABLE IF EXISTS stroke_facility_settings;
 
 -- Remove only the interoperability context columns added by this phase.
 ALTER TABLE stroke_assessments

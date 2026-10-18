@@ -33,6 +33,7 @@ import type {
   DischargePlanDto,
   EncounterProfileDto,
   FacilityModulesDto,
+  FacilityStrokeSettingsDto,
   FinalizeAssessmentDto,
   FollowUpDto,
   FunctionalAssessmentDto,
@@ -168,6 +169,28 @@ export class StrokeCareController {
       parseNumericId(facilityId, 'facilityId'),
       parseNumericId(String(dto?.userId ?? ''), 'userId'),
       dto?.enabled !== false,
+      actor(req),
+    );
+  }
+
+  @Get('facilities/:facilityId/settings')
+  @Roles(...READ_ROLES)
+  getFacilitySettings(@Param('facilityId') facilityId: string) {
+    return this.stroke.getFacilitySettings(
+      parseNumericId(facilityId, 'facilityId'),
+    );
+  }
+
+  @Put('facilities/:facilityId/settings')
+  @Roles('admin')
+  setFacilitySettings(
+    @Param('facilityId') facilityId: string,
+    @Body() dto: FacilityStrokeSettingsDto,
+    @Req() req: StrokeRequest,
+  ) {
+    return this.stroke.setFacilitySettings(
+      parseNumericId(facilityId, 'facilityId'),
+      dto || {},
       actor(req),
     );
   }

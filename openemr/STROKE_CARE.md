@@ -272,11 +272,24 @@ treat local testing accordingly. Credentials live only in the git-ignored
 
 ## 5b. Modules D–H
 
-All five modules extend the same stroke module and 29 `stroke_*` tables. They
+All five modules extend the same stroke module and 30 `stroke_*` tables. They
 reuse existing OpenRx data rather than duplicating it: `patient_care_assignment`
 for beds, `form_vitals` for vital signs, `medication_administration_orders` for
 MAR due counts, `procedure_order`/`procedure_report` for laboratory review, and
 the existing imaging store plus authorized `/dicom` viewer.
+
+**Acute SLAs and transfer flow.** Facility settings now define alert escalation
+and transfer acceptance minutes (`GET/PUT /stroke-care/facilities/:id/settings`).
+The notification sweep reads those thresholds with 5/30-minute defaults, and the
+emergency dashboard returns overdue transfer requests. Transfer status changes
+are constrained to request → accepted → departed → arrived/cancelled, with
+accepting-clinician identity and departure/arrival timestamps enforced.
+
+**Inpatient safety.** Bed assignment rejects an occupied room unless a physician
+or administrator explicitly forces reassignment. Swallow, neuro and mobility
+assessments require structured results; fall-risk assessments require a score or
+risk level. The inpatient dashboard now reports overdue tasks, open task details
+and due care-plan reviews in addition to vitals, MAR, labs and complications.
 
 **D — Imaging integration.** `stroke_imaging_studies` now stores DICOM study
 description, accession, series/instance counts, study date, DICOM PatientID and
@@ -386,7 +399,7 @@ falls back to the English stroke namespace until reviewed translations exist.
 ## 6. Tests
 
 ```bash
-# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (92 tests)
+# Backend — protocols, lifecycle, FHIR, profile, Modules C–H (96 tests)
 cd backend && npx jest src/stroke-care --runInBand
 
 # Frontend — NIHSS preview/unit tests (7 tests)
@@ -396,7 +409,7 @@ cd interface/new && npx vitest run src/test/strokeCare.test.ts
 cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
-cd backend && npx jest --runInBand        # 511 passed (full regression)
+cd backend && npx jest --runInBand        # 515 passed (full regression)
 cd interface/new && npx vitest run        # 120 passed
 ```
 

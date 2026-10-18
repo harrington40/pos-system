@@ -3,8 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   getFacilityStrokeModules,
+  getFacilityStrokeSettings,
   listFacilityStrokeUsers,
   setFacilityStrokeModules,
+  setFacilityStrokeSettings,
   setFacilityStrokeUser,
   type CareSetting,
   type StrokeModule,
@@ -33,6 +35,8 @@ export default function FacilityConfigPanel({ facilityId, isAdmin }: Props) {
   const [setting, setSetting] = useState<CareSetting>('comprehensive');
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [userId, setUserId] = useState('');
+  const [escalationMinutes, setEscalationMinutes] = useState('5');
+  const [transferMinutes, setTransferMinutes] = useState('30');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
 
@@ -41,6 +45,18 @@ export default function FacilityConfigPanel({ facilityId, isAdmin }: Props) {
     queryFn: () => getFacilityStrokeModules(facilityId as number, setting),
     enabled: Boolean(facilityId),
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ['stroke-facility-settings', facilityId],
+    queryFn: () => getFacilityStrokeSettings(facilityId as number),
+    enabled: Boolean(facilityId),
+  });
+
+  useEffect(() => {
+    if (!settings) return;
+    setEscalationMinutes(String(settings.alertEscalationMinutes));
+    setTransferMinutes(String(settings.transferAcceptanceMinutes));
+  }, [settings]);
 
   const { data: users = [] } = useQuery({
     queryKey: ['stroke-facility-users', facilityId],
@@ -75,6 +91,20 @@ export default function FacilityConfigPanel({ facilityId, isAdmin }: Props) {
       qc.invalidateQueries({ queryKey: ['stroke-facility-modules'] });
     },
     onError: (e) => setError(apiErrorMessage(e, 'Configuration failed')),
+  });
+
+  const saveSettings = useMutation({
+    mutationFn: () =>
+      setFacilityStrokeSettings(facilityId as number, {
+        alertEscalationMinutes: Number(escalationMinutes),
+        transferAcceptanceMinutes: Number(transferMinutes),
+      }),
+    onSuccess: () => {
+      setError('');
+      setSaved(t('configuration.saved'));
+      qc.invalidateQueries({ queryKey: ['stroke-facility-settings'] });
+    },
+    onError: (e) => setError(apiErrorMessage(e, 'SLA configuration failed')),
   });
 
   const assign = useMutation({
@@ -168,6 +198,49 @@ export default function FacilityConfigPanel({ facilityId, isAdmin }: Props) {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="border-top pt-3 mt-2">
+          <div className="fw-semibold mb-1">Acute response SLAs</div>
+          <div className="row g-2 align-items-end">
+            <div className="col-md-3">
+              <label className="form-label" htmlFor="stroke-escalation-minutes">
+                Alert escalation (minutes)
+              </label>
+              <input
+                id="stroke-escalation-minutes"
+                className="form-control form-control-sm"
+                inputMode="numeric"
+                value={escalationMinutes}
+                onChange={(event) => setEscalationMinutes(event.target.value)}
+              />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label" htmlFor="stroke-transfer-minutes">
+                Transfer acceptance (minutes)
+              </label>
+              <input
+                id="stroke-transfer-minutes"
+                className="form-control form-control-sm"
+                inputMode="numeric"
+                value={transferMinutes}
+                onChange={(event) => setTransferMinutes(event.target.value)}
+              />
+            </div>
+            <div className="col-md-3">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={() => saveSettings.mutate()}
+                disabled={saveSettings.isPending}
+              >
+                Save SLAs
+              </button>
+            </div>
+            <div className="col-md-3 small text-muted">
+              Defaults: 5-minute escalation, 30-minute acceptance.
+            </div>
+          </div>
         </div>
 
         <h6 className="fw-semibold mt-4">{t('configuration.users')}</h6>

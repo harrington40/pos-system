@@ -30,6 +30,11 @@ const ASSESSMENT_TYPES = [
   'mobility',
 ];
 const RISK_LEVELS = ['low', 'moderate', 'high', 'critical'];
+const DETAIL_OPTIONS: Record<string, string[]> = {
+  neuro: ['alert', 'voice', 'pain', 'unresponsive'],
+  swallow: ['pass', 'fail', 'declined'],
+  mobility: ['independent', 'assisted', 'supervised', 'bedbound'],
+};
 
 /**
  * Module E. Admission, neuro/nursing observations, swallow, fall-risk,
@@ -46,6 +51,7 @@ export default function InpatientPanel({
   const [room, setRoom] = useState('');
   const [attending, setAttending] = useState('');
   const [assessmentType, setAssessmentType] = useState('neuro');
+  const [detailValue, setDetailValue] = useState('alert');
   const [riskLevel, setRiskLevel] = useState('low');
   const [score, setScore] = useState('');
   const [notes, setNotes] = useState('');
@@ -121,7 +127,14 @@ export default function InpatientPanel({
         riskLevel,
         score: score.trim() ? Number(score) : null,
         notes: notes.trim() || null,
-        data: { documented: true },
+        data:
+          assessmentType === 'neuro'
+            ? { consciousness: detailValue }
+            : assessmentType === 'swallow'
+              ? { result: detailValue }
+              : assessmentType === 'mobility'
+                ? { mobilityLevel: detailValue }
+                : { documented: true },
       }),
     onSuccess: () => {
       setNotes('');
@@ -263,9 +276,13 @@ export default function InpatientPanel({
               <div className="border rounded p-2 h-100">
                 <div className="fw-semibold">Outstanding tasks</div>
                 <div>
-                  Tasks {card?.outstandingTasks ?? 0} · MAR due{' '}
-                  {card?.medicationsDueSoon ?? 0} · labs 24h{' '}
+                  Tasks {card?.outstandingTasks ?? 0}
+                  {card?.overdueTasks ? ` (${card.overdueTasks} overdue)` : ''} ·
+                  MAR due {card?.medicationsDueSoon ?? 0} · labs 24h{' '}
                   {card?.labsReported24h ?? 0}
+                </div>
+                <div>
+                  Care-plan reviews due {card?.pendingCarePlanReviews ?? 0}
                 </div>
                 <div>
                   Unresolved complications {card?.unresolvedComplications ?? 0}
@@ -307,7 +324,11 @@ export default function InpatientPanel({
                       aria-label="Assessment type"
                       className="form-select form-select-sm"
                       value={assessmentType}
-                      onChange={(e) => setAssessmentType(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setAssessmentType(next);
+                        setDetailValue(DETAIL_OPTIONS[next]?.[0] ?? '');
+                      }}
                     >
                       {ASSESSMENT_TYPES.map((type) => (
                         <option key={type} value={type}>
@@ -316,6 +337,22 @@ export default function InpatientPanel({
                       ))}
                     </select>
                   </div>
+                  {DETAIL_OPTIONS[assessmentType] && (
+                    <div className="col-3">
+                      <select
+                        aria-label="Assessment detail"
+                        className="form-select form-select-sm"
+                        value={detailValue}
+                        onChange={(e) => setDetailValue(e.target.value)}
+                      >
+                        {DETAIL_OPTIONS[assessmentType].map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="col-3">
                     <select
                       aria-label="Risk level"

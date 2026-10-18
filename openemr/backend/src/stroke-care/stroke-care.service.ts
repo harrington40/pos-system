@@ -106,6 +106,13 @@ const TRANSFER_TYPES = [
   'rehabilitation_facility',
   'external_hospital',
 ] as const;
+const TRANSFER_TRANSITIONS: Record<string, string[]> = {
+  requested: ['accepted', 'cancelled'],
+  accepted: ['departed', 'cancelled'],
+  departed: ['arrived', 'cancelled'],
+  arrived: [],
+  cancelled: [],
+};
 const TRANSFER_PRIORITIES = ['routine', 'urgent', 'emergent'] as const;
 const TRANSPORT_STATUSES = [
   'arranged',
@@ -408,6 +415,7 @@ export interface InpatientAdmitDto {
   unit?: string | null;
   admittedAt?: string;
   room?: string | null;
+  forceRoomAssignment?: boolean;
   attendingName?: string | null;
   notes?: string | null;
 }
@@ -500,6 +508,11 @@ export interface ClinicVisitDto {
   nextFollowupDate?: string | null;
   appointmentId?: number | string | null;
   status?: string;
+}
+
+export interface FacilityStrokeSettingsDto {
+  alertEscalationMinutes?: number | string;
+  transferAcceptanceMinutes?: number | string;
 }
 
 export interface MedicationReconciliationItemDto {
@@ -949,6 +962,16 @@ export class StrokeCareService implements OnModuleInit {
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uniq_stroke_facility_module (facility_id, module_key),
         INDEX idx_stroke_facility (facility_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS stroke_facility_settings (
+        facility_id INT NOT NULL PRIMARY KEY,
+        alert_escalation_minutes INT NOT NULL DEFAULT 5,
+        transfer_acceptance_minutes INT NOT NULL DEFAULT 30,
+        updated_by INT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
@@ -1944,6 +1967,79 @@ export class StrokeCareService implements OnModuleInit {
         'Official HL7 validator/terminology conformance testing remains required.',
       nihssLoinc: NIHSS_LOINC,
     };
+  }
+
+  /** Facility-level acute SLAs. Defaults apply when no row exists. */
+  async getFacilitySettings(facilityId: number) {
+    const rows = await this.dataSource.query<
+      Array<{
+        facility_id: number;
+        alert_escalation_minutes: number;
+        transfer_acceptance_minutes: number;
+        updated_by: number | null;
+        updated_at: string | null;
+      }>
+    >(
+      `SELECT facility_id, alert_escalation_minutes,
+              transfer_acceptance_minutes, updated_by,
+              DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s') AS updated_at
+         FROM stroke_facility_settings WHERE facility_id = ?`,
+      [facilityId],
+    );
+    const row = rows[0];
+    return {
+      facilityId,
+      alertEscalationMinutes: Number(row?.alert_escalation_minutes ?? 5),
+      transferAcceptanceMinutes: Number(row?.transfer_acceptance_minutes ?? 30),
+      updatedBy: row?.updated_by ?? null,
+      updatedAt: row?.updated_at ?? null,
+      defaults:
+        'Facilities without an explicit row use 5-minute alert escalation and 30-minute transfer acceptance.',
+    };
+  }
+
+  async setFacilitySettings(
+    facilityId: number,
+    dto: FacilityStrokeSettingsDto,
+    actor?: StrokeActor,
+  ) {
+    const alertEscalationMinutes = requiredInteger(
+      dto.alertEscalationMinutes,
+      'alertEscalationMinutes',
+      1,
+      120,
+    );
+    const transferAcceptanceMinutes = requiredInteger(
+      dto.transferAcceptanceMinutes,
+      'transferAcceptanceMinutes',
+      5,
+      1440,
+    );
+    await this.dataSource.query(
+      `INSERT INTO stroke_facility_settings
+         (facility_id, alert_escalation_minutes, transfer_acceptance_minutes,
+          updated_by, updated_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE
+         alert_escalation_minutes = VALUES(alert_escalation_minutes),
+         transfer_acceptance_minutes = VALUES(transfer_acceptance_minutes),
+         updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP`,
+      [
+        facilityId,
+        alertEscalationMinutes,
+        transferAcceptanceMinutes,
+        actor?.id ?? null,
+      ],
+    );
+    await this.audit(
+      'stroke_facility_settings',
+      facilityId,
+      'configured',
+      actor,
+      null,
+      { alertEscalationMinutes, transferAcceptanceMinutes },
+    );
+    return this.getFacilitySettings(facilityId);
   }
 
   // ── Activations ──────────────────────────────────────────────────────────
@@ -3362,19 +3458,66 @@ export class StrokeCareService implements OnModuleInit {
     actor?: StrokeActor,
   ) {
     const rows = await this.dataSource.query<
-      Array<{ id: number; activation_id: number; pid: number }>
-    >(`SELECT id, activation_id, pid FROM stroke_transfers WHERE id = ?`, [
-      transferId,
-    ]);
+      Array<{
+        id: number;
+        activation_id: number;
+        pid: number;
+        status: string;
+        accepted_by_name: string | null;
+        accepting_clinician_name: string | null;
+      }>
+    >(
+      `SELECT id, activation_id, pid, status, accepted_by_name,
+              accepting_clinician_name
+         FROM stroke_transfers WHERE id = ?`,
+      [transferId],
+    );
     if (!rows.length) {
       throw new NotFoundException(`Transfer ${transferId} was not found.`);
     }
+    const current = rows[0];
     const sets: string[] = [];
     const params: unknown[] = [];
     if (dto.status !== undefined) {
+      const next = oneOf(dto.status, TRANSFER_STATUSES, 'status');
+      if (
+        next !== current.status &&
+        !(TRANSFER_TRANSITIONS[current.status] ?? []).includes(next)
+      ) {
+        throw new ConflictException(
+          `Transfer cannot move from ${current.status} to ${next}.`,
+        );
+      }
+      if (
+        next === 'accepted' &&
+        !(
+          dto.acceptedByName ||
+          dto.acceptingClinicianName ||
+          current.accepted_by_name ||
+          current.accepting_clinician_name
+        )
+      ) {
+        throw new BadRequestException(
+          'An accepted transfer requires the accepting clinician.',
+        );
+      }
+      if (next === 'departed' && dto.departureAt === undefined) {
+        throw new BadRequestException(
+          'A departed transfer requires departureAt.',
+        );
+      }
+      if (
+        next === 'arrived' &&
+        dto.arrivalAt === undefined &&
+        dto.arrivalConfirmedAt === undefined
+      ) {
+        throw new BadRequestException(
+          'An arrived transfer requires arrivalAt or arrivalConfirmedAt.',
+        );
+      }
       sets.push('status = ?');
-      params.push(oneOf(dto.status, TRANSFER_STATUSES, 'status'));
-      if (dto.status === 'accepted') {
+      params.push(next);
+      if (next === 'accepted') {
         sets.push('accepted_at = COALESCE(accepted_at, CURRENT_TIMESTAMP)');
       }
     }
@@ -4783,14 +4926,30 @@ export class StrokeCareService implements OnModuleInit {
               escalated_at = CURRENT_TIMESTAMP
         WHERE status IN ('pending','delivered')
           AND severity = 'critical'
-          AND created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
+          AND created_at < DATE_SUB(
+            NOW(),
+            INTERVAL COALESCE((
+              SELECT s.alert_escalation_minutes
+                FROM stroke_facility_settings s
+                JOIN stroke_activations a ON a.facility_id = s.facility_id
+               WHERE a.id = stroke_notifications.activation_id
+               LIMIT 1
+            ), 5) MINUTE)`,
     );
     const teamEscalated = await this.dataSource.query<AffectedRowsResult>(
       `UPDATE stroke_alert_team
           SET escalation_level = escalation_level + 1, escalated_at = CURRENT_TIMESTAMP
         WHERE acknowledged_at IS NULL
           AND escalated_at IS NULL
-          AND assigned_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
+          AND assigned_at < DATE_SUB(
+            NOW(),
+            INTERVAL COALESCE((
+              SELECT s.alert_escalation_minutes
+                FROM stroke_facility_settings s
+                JOIN stroke_activations a ON a.facility_id = s.facility_id
+               WHERE a.id = stroke_alert_team.activation_id
+               LIMIT 1
+            ), 5) MINUTE)`,
     );
     const summary = {
       ranAt: new Date().toISOString(),
@@ -4935,11 +5094,36 @@ export class StrokeCareService implements OnModuleInit {
       }),
     );
 
+    const overdueTransfers = await this.dataSource.query<
+      Array<Record<string, unknown>>
+    >(
+      `SELECT t.id, t.activation_id, t.to_facility_id, t.status,
+              a.facility_id,
+              DATE_FORMAT(t.created_at, '%Y-%m-%dT%H:%i:%s') AS created_at,
+              TIMESTAMPDIFF(MINUTE, t.created_at, NOW()) AS waiting_minutes
+         FROM stroke_transfers t
+         JOIN stroke_activations a ON a.id = t.activation_id
+        WHERE t.status = 'requested'
+          AND t.created_at < DATE_SUB(
+            NOW(),
+            INTERVAL COALESCE((
+              SELECT s.transfer_acceptance_minutes
+                FROM stroke_facility_settings s
+               WHERE s.facility_id = a.facility_id
+               LIMIT 1
+            ), 30) MINUTE)
+          ${id !== null ? 'AND a.facility_id = ?' : ''}
+        ORDER BY t.created_at ASC`,
+      id !== null ? [id] : [],
+    );
+
     return {
       generatedAt: new Date().toISOString(),
       facilityId: id,
+      overdueTransfers,
       summary: {
         activeAlerts: alerts.length,
+        overdueTransfers: overdueTransfers.length,
         unassignedAlerts: alerts.filter((alert) => alert.team.length === 0)
           .length,
         pendingAcknowledgments: alerts.reduce(
@@ -5149,6 +5333,25 @@ export class StrokeCareService implements OnModuleInit {
     );
     const room = optionalText(dto.room, 'room', 40);
     if (room !== null) {
+      const occupied = await this.dataSource.query<
+        Array<{ pid: number; room: string | null }>
+      >(
+        `SELECT pid, room FROM patient_care_assignment
+          WHERE room = ? AND pid <> ? LIMIT 1`,
+        [room, activation.pid],
+      );
+      if (occupied.length) {
+        if (dto.forceRoomAssignment !== true) {
+          throw new ConflictException(
+            `Room ${room} is already assigned to another patient. An authorized clinician can force reassignment.`,
+          );
+        }
+        if (!['admin', 'physician'].includes(actor?.role ?? '')) {
+          throw new ForbiddenException(
+            'Only a physician or administrator can force a room reassignment.',
+          );
+        }
+      }
       await this.dataSource.query(
         `INSERT INTO patient_care_assignment (pid, room, updated_at)
          VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -5246,6 +5449,42 @@ export class StrokeCareService implements OnModuleInit {
       'assessmentType',
     );
     const score = optionalInteger(dto.score, 'score', 0, 1000);
+    const data =
+      dto.data && typeof dto.data === 'object' && !Array.isArray(dto.data)
+        ? dto.data
+        : {};
+    const oneOfData = (key: string, allowed: string[]) => {
+      const value = data[key];
+      if (typeof value !== 'string' || !allowed.includes(value)) {
+        throw new BadRequestException(
+          `${assessmentType} requires ${key} to be one of: ${allowed.join(', ')}.`,
+        );
+      }
+      return value;
+    };
+    if (assessmentType === 'swallow') {
+      oneOfData('result', ['pass', 'fail', 'declined']);
+    }
+    if (assessmentType === 'neuro') {
+      oneOfData('consciousness', ['alert', 'voice', 'pain', 'unresponsive']);
+    }
+    if (assessmentType === 'mobility') {
+      oneOfData('mobilityLevel', [
+        'independent',
+        'assisted',
+        'supervised',
+        'bedbound',
+      ]);
+    }
+    if (
+      assessmentType === 'fall_risk' &&
+      score === null &&
+      !optionalText(dto.riskLevel, 'riskLevel', 20)
+    ) {
+      throw new BadRequestException(
+        'A fall-risk assessment requires a score or risk level.',
+      );
+    }
     const result = await this.dataSource.query<AffectedRowsResult>(
       `INSERT INTO stroke_inpatient_assessments
          (stay_id, activation_id, pid, assessment_type, data_json, score,
@@ -5256,7 +5495,7 @@ export class StrokeCareService implements OnModuleInit {
         Number(stay.activation_id),
         Number(stay.pid),
         assessmentType,
-        JSON.stringify(dto.data ?? {}),
+        JSON.stringify(data),
         score,
         optionalText(dto.riskLevel, 'riskLevel', 20),
         optionalText(dto.notes, 'notes', 4000),
@@ -5533,9 +5772,33 @@ export class StrokeCareService implements OnModuleInit {
             AND next_due_at <= DATE_ADD(NOW(), INTERVAL 1 HOUR)`,
         [pid],
       );
-      const tasks = await this.dataSource.query<Array<{ total: number }>>(
-        `SELECT COUNT(*) AS total FROM stroke_care_tasks
+      const tasks = await this.dataSource.query<
+        Array<{ total: number; overdue: number | null }>
+      >(
+        `SELECT COUNT(*) AS total,
+                SUM(due_at IS NOT NULL AND due_at < NOW()) AS overdue
+           FROM stroke_care_tasks
           WHERE activation_id = ? AND status <> 'completed'`,
+        [activationId],
+      );
+      const taskList = await this.dataSource.query<
+        Array<Record<string, unknown>>
+      >(
+        `SELECT id, discipline, task, status, assigned_to,
+                DATE_FORMAT(due_at, '%Y-%m-%dT%H:%i:%s') AS due_at,
+                (due_at IS NOT NULL AND due_at < NOW()) AS overdue
+           FROM stroke_care_tasks
+          WHERE activation_id = ? AND status <> 'completed'
+          ORDER BY overdue DESC, COALESCE(due_at, created_at) ASC
+          LIMIT 5`,
+        [activationId],
+      );
+      const carePlanReviews = await this.dataSource.query<
+        Array<{ total: number }>
+      >(
+        `SELECT COUNT(*) AS total FROM stroke_care_plans
+          WHERE activation_id = ? AND status = 'active'
+            AND review_at IS NOT NULL AND review_at <= NOW()`,
         [activationId],
       );
       const assessments = await this.listInpatientAssessments(stayId);
@@ -5554,6 +5817,9 @@ export class StrokeCareService implements OnModuleInit {
         labsReported24h: Number(labs[0]?.total ?? 0),
         medicationsDueSoon: Number(mar[0]?.total ?? 0),
         outstandingTasks: Number(tasks[0]?.total ?? 0),
+        overdueTasks: Number(tasks[0]?.overdue ?? 0),
+        openTaskDetails: taskList,
+        pendingCarePlanReviews: Number(carePlanReviews[0]?.total ?? 0),
         latestNeuroAssessment: latestNeuro,
         unresolvedComplications: Number(complications[0]?.total ?? 0),
         dischargePlan: await this.getDischargePlan(stayId),

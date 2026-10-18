@@ -1113,6 +1113,9 @@ export interface StrokeInpatientDashboard {
       labsReported24h: number;
       medicationsDueSoon: number;
       outstandingTasks: number;
+      overdueTasks: number;
+      openTaskDetails: Array<Record<string, unknown>>;
+      pendingCarePlanReviews: number;
       latestNeuroAssessment: Record<string, unknown> | null;
       unresolvedComplications: number;
       dischargePlan: Record<string, unknown> | null;
@@ -1647,6 +1650,38 @@ export async function updateStrokeClinicVisit(
 export async function getStrokeTransferSummaryFhir(transferId: number) {
   const r = await nestClient.get(
     `/stroke-care/transfers/${transferId}/summary-fhir`,
+  );
+  return r.data;
+}
+
+export interface StrokeFacilitySettings {
+  facilityId: number;
+  alertEscalationMinutes: number;
+  transferAcceptanceMinutes: number;
+  updatedBy: number | null;
+  updatedAt: string | null;
+  defaults: string;
+}
+
+export async function getFacilityStrokeSettings(
+  facilityId: number,
+): Promise<StrokeFacilitySettings> {
+  const r = await nestClient.get(
+    `/stroke-care/facilities/${facilityId}/settings`,
+  );
+  return r.data;
+}
+
+export async function setFacilityStrokeSettings(
+  facilityId: number,
+  input: {
+    alertEscalationMinutes: number;
+    transferAcceptanceMinutes: number;
+  },
+): Promise<StrokeFacilitySettings> {
+  const r = await nestClient.put(
+    `/stroke-care/facilities/${facilityId}/settings`,
+    input,
   );
   return r.data;
 }

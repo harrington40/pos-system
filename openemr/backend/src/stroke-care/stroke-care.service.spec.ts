@@ -86,7 +86,7 @@ describe('StrokeCareService', () => {
     const creates = queries.filter((q) =>
       q.sql.includes('CREATE TABLE IF NOT EXISTS stroke_'),
     );
-    expect(creates).toHaveLength(29);
+    expect(creates).toHaveLength(30);
     expect(queries.some((q) => q.sql.includes('ALTER TABLE'))).toBe(false);
   });
 
@@ -1440,6 +1440,106 @@ describe('StrokeCareService', () => {
       expect(update?.sql).toContain('next_followup_date');
       expect(update?.sql).toContain('appointment_id');
       expect(update?.params).toContain('Continue secondary prevention');
+    });
+  });
+
+  describe('acute and inpatient hardening', () => {
+    it('uses default facility SLAs and validates configured thresholds', async () => {
+      const defaults = build((sql) => {
+        if (sql.includes('FROM stroke_facility_settings')) return [];
+        return { affectedRows: 1 };
+      });
+      const settings = await (
+        await service(defaults.dataSource)
+      ).getFacilitySettings(1);
+      expect(settings.alertEscalationMinutes).toBe(5);
+      expect(settings.transferAcceptanceMinutes).toBe(30);
+
+      const invalid = build(() => []);
+      await expect(
+        (await service(invalid.dataSource)).setFacilitySettings(1, {
+          alertEscalationMinutes: 0,
+          transferAcceptanceMinutes: 30,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('enforces transfer state transitions and acceptance identity', async () => {
+      const requested = {
+        id: 12,
+        activation_id: 5,
+        pid: 17,
+        status: 'requested',
+        accepted_by_name: null,
+        accepting_clinician_name: null,
+      };
+      const transition = build((sql) => {
+        if (sql.includes('FROM stroke_transfers')) return [requested];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(transition.dataSource)).updateTransfer(12, {
+          status: 'arrived',
+          arrivalAt: '2026-05-01T11:00:00Z',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      const identity = build((sql) => {
+        if (sql.includes('FROM stroke_transfers')) return [requested];
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(identity.dataSource)).updateTransfer(12, {
+          status: 'accepted',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('prevents assigning an occupied bed without physician override', async () => {
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM stroke_activations a')) return [ACTIVATION];
+        if (sql.includes('FROM patient_care_assignment'))
+          return [{ pid: 99, room: '101' }];
+        if (sql.includes('INSERT INTO stroke_inpatient_stays'))
+          return { affectedRows: 1, insertId: 1 };
+        return { affectedRows: 1 };
+      });
+      await expect(
+        (await service(dataSource)).admitInpatient(
+          5,
+          { room: '101' },
+          { id: 42, role: 'nurse' },
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('requires structured swallow, neuro and mobility observations', async () => {
+      const stay = {
+        id: 1,
+        activation_id: 5,
+        pid: 17,
+        facility_id: 1,
+        unit: 'Stroke unit',
+        status: 'admitted',
+        admitted_at: '2026-05-01T10:00:00',
+        discharged_at: null,
+        discharge_disposition: null,
+        attending_name: null,
+        notes: null,
+      };
+      const { dataSource } = build((sql) => {
+        if (sql.includes('FROM stroke_inpatient_stays')) return [stay];
+        if (sql.includes('FROM patient_care_assignment')) return [];
+        return { affectedRows: 1, insertId: 2 };
+      });
+      for (const type of ['swallow', 'neuro', 'mobility']) {
+        await expect(
+          (await service(dataSource)).addInpatientAssessment(1, {
+            assessmentType: type,
+            data: {},
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      }
     });
   });
 });

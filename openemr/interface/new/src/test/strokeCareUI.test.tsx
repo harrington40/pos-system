@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   protocols: vi.fn(),
   quality: vi.fn(),
   modules: vi.fn(),
+  settings: vi.fn(),
   users: vi.fn(),
   trend: vi.fn(),
   sign: vi.fn(),
@@ -65,6 +66,7 @@ vi.mock('../api/endpoints/strokeCare', async () => {
     getStrokeProtocols: api.protocols,
     getStrokeQuality: api.quality,
     getFacilityStrokeModules: api.modules,
+    getFacilityStrokeSettings: api.settings,
     listFacilityStrokeUsers: api.users,
     getNihssTrend: api.trend,
     signStrokeAssessment: api.sign,
@@ -236,6 +238,14 @@ beforeEach(() => {
         enabled: false,
       },
     ],
+  });
+  api.settings.mockResolvedValue({
+    facilityId: 1,
+    alertEscalationMinutes: 5,
+    transferAcceptanceMinutes: 30,
+    updatedBy: null,
+    updatedAt: null,
+    defaults: 'defaults',
   });
   api.users.mockResolvedValue([]);
   api.reconciliation.mockResolvedValue({
