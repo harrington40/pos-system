@@ -30,6 +30,28 @@ bash deploy/openrx.sh                   # interactive control center (deploy/mon
   `/api` (proxied to NestJS `:3002`).
 - **Process manager:** PM2 app name **`openrx-backend`**.
 
+### Stroke frontend-only instance on 185
+
+The Contabo host `185.193.17.10` serves a Stroke frontend at:
+
+```text
+https://vmi3393532.contaboserver.net/stroke
+```
+
+It has **no local OpenRx backend or database**. `/api` and `/messaging` are
+proxied to `https://openrx.transtechologies.com`, so the instance uses the
+existing live API and data.
+
+```bash
+bash deploy/deploy-stroke-185.sh                 # build + deploy frontend
+bash deploy/deploy-stroke-185.sh --skip-build    # existing public/dist
+```
+
+The server-side deployment root is `/var/www/openrx-stroke`, and the Nginx
+configuration is tracked at `deploy/nginx/openrx-stroke-185.conf`. The wrapper
+runs `deploy-local.sh --frontend` with the 185 server, web root, and site URL.
+Do not pass `--backend`; there is intentionally no backend on this host.
+
 ## Deploy model (tarball swap)
 
 1. `deploy-local.sh` builds backend (`nest build` -> `backend/dist`) and frontend
