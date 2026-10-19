@@ -52,6 +52,27 @@ configuration is tracked at `deploy/nginx/openrx-stroke-185.conf`. The wrapper
 runs `deploy-local.sh --frontend` with the 185 server, web root, and site URL.
 Do not pass `--backend`; there is intentionally no backend on this host.
 
+### Orthanc / DICOMweb bridge
+
+Orthanc with the DICOMweb plugin runs separately on `185.193.17.10`. The
+application backend must define:
+
+```dotenv
+ORTHANC_URL=https://vmi3393532.contaboserver.net/orthanc
+ORTHANC_USERNAME=openrx
+ORTHANC_PASSWORD=<server-only secret>
+ORTHANC_TIMEOUT_MS=15000
+ORTHANC_DICOMWEB_ENABLED=true
+```
+
+The Nginx `/orthanc/` location is allowlisted to the OpenRx application and
+operations hosts. DICOM port 4242 is likewise restricted by UFW. Deployment,
+backup, monitoring, AET and restore details are in
+`deploy/orthanc/README.md`.
+
+The viewer uses authenticated backend endpoints under
+`/api/imaging/orthanc/*`; Orthanc credentials are never sent to the browser.
+
 ## Deploy model (tarball swap)
 
 1. `deploy-local.sh` builds backend (`nest build` -> `backend/dist`) and frontend

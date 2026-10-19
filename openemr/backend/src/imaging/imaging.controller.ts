@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ImagingService } from './imaging.service';
+import { OrthancService } from './orthanc.service';
 import type { UploadedImagingFile } from './imaging.service';
 
 /** Authenticated request used by the imaging endpoints. */
@@ -34,7 +35,10 @@ import type { ImagingType } from './imaging.entity';
 @Controller('imaging')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ImagingController {
-    constructor(private readonly imagingService: ImagingService) {}
+    constructor(
+        private readonly imagingService: ImagingService,
+        private readonly orthancService: OrthancService,
+    ) {}
 
     @Post('upload')
     @Roles('admin', 'physician', 'nurse', 'lab_tech', 'radiologist')
@@ -79,6 +83,50 @@ export class ImagingController {
         @Query('type') type?: ImagingType,
     ) {
         return this.imagingService.listByPatient(parseInt(pid, 10), type);
+    }
+
+    /** Whether the optional Orthanc DICOMweb bridge is configured. */
+    @Get('orthanc/status')
+    @Roles('admin', 'physician', 'nurse', 'lab_tech', 'radiologist')
+    orthancStatus() {
+        return this.orthancService.status();
+    }
+
+    /**
+     * QIDO-RS discovery through the backend. The viewer supplies the OpenEMR
+     * patient id; Orthanc DICOM PatientID must use the same value.
+     */
+    @Get('orthanc/studies')
+    @Roles('admin', 'physician', 'nurse', 'lab_tech', 'radiologist')
+    async orthancStudies(@Query('patientId') patientId?: string) {
+        if (!patientId) throw new BadRequestException('patientId is required');
+        return this.orthancService.listStudies(patientId);
+    }
+
+    /** WADO-RS bytes proxied so Orthanc credentials never reach the browser. */
+    @Get(
+        'orthanc/studies/:studyUid/series/:seriesUid/instances/:instanceUid/file',
+    )
+    @Roles('admin', 'physician', 'nurse', 'lab_tech', 'radiologist')
+    async orthancFile(
+        @Param('studyUid') studyUid: string,
+        @Param('seriesUid') seriesUid: string,
+        @Param('instanceUid') instanceUid: string,
+        @Res() res: Response,
+    ) {
+        const { buffer, contentType } =
+            await this.orthancService.getInstanceFile(
+                studyUid,
+                seriesUid,
+                instanceUid,
+            );
+        res.setHeader('Content-Type', contentType || 'application/dicom');
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${encodeURIComponent(instanceUid)}.dcm"`,
+        );
+        res.end(buffer);
     }
 
     @Get(':id')

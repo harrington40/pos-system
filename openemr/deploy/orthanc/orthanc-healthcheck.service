@@ -1,0 +1,9 @@
+[Unit]
+Description=Orthanc health check
+After=orthanc.service
+Wants=orthanc.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/orthanc/healthcheck.env
+ExecStart=/opt/orthanc/bin/healthcheck.sh

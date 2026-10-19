@@ -6,7 +6,7 @@ Status as of the Phase 7 release-preparation pass.
 
 - [x] Branch confirmed: `feature/stroke-care`
 - [x] Backend stroke suite: 5 suites, 107 tests
-- [x] Backend full regression: 34 suites, 526 tests
+- [x] Backend full regression: 35 suites, 530 tests
 - [x] Frontend full regression: 9 files, 121 tests
 - [x] Backend TypeScript/build passes
 - [x] Frontend TypeScript/build passes

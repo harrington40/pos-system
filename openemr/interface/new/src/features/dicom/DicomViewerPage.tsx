@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ImagingUpload from '../../components/common/ImagingUpload';
 import nestClient from '../../api/nest-client';
@@ -22,6 +22,21 @@ interface ImagingItem {
   description: string;
   uploadedBy: string;
   createdAt: string;
+  /** B2-backed rows omit this; Orthanc rows set it to 'orthanc'. */
+  source?: 'b2' | 'orthanc';
+  studyInstanceUid?: string;
+  seriesInstanceUid?: string;
+  sopInstanceUid?: string;
+  modality?: string;
+  seriesDescription?: string;
+  instanceNumber?: string;
+}
+
+/** Response from the authenticated Orthanc DICOMweb bridge. */
+interface OrthancStudyResponse {
+  configured: boolean;
+  items: ImagingItem[];
+  warnings: string[];
 }
 
 type ToolName = 'wl' | 'pan' | 'zoom' | 'length' | 'angle' | 'roi' | 'crosshair';
@@ -105,7 +120,27 @@ export default function DicomViewerPage() {
       return r.data;
     },
   });
-  const sliceCount = studies.length;
+  // PACS studies discovered through the backend's authenticated Orthanc bridge.
+  const { data: orthancData } = useQuery<OrthancStudyResponse>({
+    queryKey: ['imaging-orthanc', viewerPid],
+    queryFn: async () => {
+      const r = await nestClient.get('/imaging/orthanc/studies', {
+        params: { patientId: viewerPid },
+      });
+      return r.data;
+    },
+    retry: false,
+    enabled: !!viewerPid,
+  });
+  const orthancStudies = useMemo(
+    () => orthancData?.items ?? [],
+    [orthancData],
+  );
+  const allStudies = useMemo(
+    () => [...studies, ...orthancStudies],
+    [studies, orthancStudies],
+  );
+  const sliceCount = allStudies.length;
 
   // Load Cornerstone from CDN
   useEffect(() => {
@@ -273,10 +308,27 @@ export default function DicomViewerPage() {
   const fetchStudyImageId = useCallback(async (item: ImagingItem): Promise<string | null> => {
     const cached = cacheRef.current.get(item.id);
     if (cached) return cached;
-    const r = await nestClient.get(`/imaging/${item.id}/file`, { responseType: 'arraybuffer' });
+    const r = item.source === 'orthanc'
+      ? await nestClient.get(
+          `/imaging/orthanc/studies/${encodeURIComponent(item.studyInstanceUid || '')}` +
+            `/series/${encodeURIComponent(item.seriesInstanceUid || '')}` +
+            `/instances/${encodeURIComponent(item.sopInstanceUid || '')}/file`,
+          { responseType: 'arraybuffer' },
+        )
+      : await nestClient.get(`/imaging/${item.id}/file`, { responseType: 'arraybuffer' });
     const blob = new Blob([r.data], { type: item.mimeType || 'application/dicom' });
-    const file = new File([blob], item.originalName, { type: blob.type });
-    if (!/\.(dcm|dicom)$/i.test(item.originalName) && !/dicom/i.test(blob.type)) return null;
+    const file = new File(
+      [blob],
+      item.source === 'orthanc'
+        ? `${item.sopInstanceUid || item.id}.dcm`
+        : item.originalName,
+      { type: blob.type },
+    );
+    if (
+      item.source !== 'orthanc' &&
+      !/\.(dcm|dicom)$/i.test(item.originalName) &&
+      !/dicom/i.test(blob.type)
+    ) return null;
     try { applyDataSet(window.dicomParser.parseDicom(new Uint8Array(await file.arrayBuffer()))); } catch { /* best-effort */ }
     const imageId = window.cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
     cacheRef.current.set(item.id, imageId);
@@ -291,7 +343,7 @@ export default function DicomViewerPage() {
       if (!imageId) { setError('This study is not a DICOM image.'); return; }
       await renderImage(imageId, item.id);
       measurementsRef.current = []; previewRef.current = null; setMeasurements([]);
-      const idx = studies.findIndex((s) => s.id === item.id);
+      const idx = allStudies.findIndex((s) => s.id === item.id);
       if (idx >= 0) setSliceIndex(idx);
     } catch (e) {
       const apiMessage = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -299,15 +351,15 @@ export default function DicomViewerPage() {
     } finally {
       setLoadingStudy(false);
     }
-  }, [fetchStudyImageId, renderImage, studies]);
+  }, [fetchStudyImageId, renderImage, allStudies]);
 
   /** Jump to a slice (study) by index — used by wheel / keys / slider / cine. */
   const goToSlice = useCallback((idx: number) => {
-    if (!studies.length) return;
-    const i = Math.max(0, Math.min(studies.length - 1, idx));
+    if (!allStudies.length) return;
+    const i = Math.max(0, Math.min(allStudies.length - 1, idx));
     setSliceIndex(i);
-    if (studies[i]?.id !== selectedId) void openStudy(studies[i]);
-  }, [studies, selectedId, openStudy]);
+    if (allStudies[i]?.id !== selectedId) void openStudy(allStudies[i]);
+  }, [allStudies, selectedId, openStudy]);
 
   const applyWindowLevel = (ww: number, wc: number) => {
     setWindowWidth(Math.round(ww)); setWindowCenter(Math.round(wc));
@@ -381,10 +433,10 @@ export default function DicomViewerPage() {
 
   // Cine: advance through slices on a timer while playing.
   useEffect(() => {
-    if (!cine || studies.length < 2) return;
-    const t = window.setInterval(() => goToSlice((sliceIndexRef.current + 1) % studies.length), 700);
+    if (!cine || allStudies.length < 2) return;
+    const t = window.setInterval(() => goToSlice((sliceIndexRef.current + 1) % allStudies.length), 700);
     return () => window.clearInterval(t);
-  }, [cine, goToSlice, studies.length]);
+  }, [cine, goToSlice, allStudies.length]);
 
   // Keyboard slice navigation.
   useEffect(() => {
@@ -479,7 +531,7 @@ export default function DicomViewerPage() {
   };
 
   const onWheel = (e: React.WheelEvent) => {
-    if (!studies.length) return;
+    if (!allStudies.length) return;
     e.preventDefault();
     if (e.ctrlKey) { applyZoom(Math.max(0.1, zoom * (e.deltaY < 0 ? 1.1 : 0.9))); return; }
     goToSlice(sliceIndex + (e.deltaY > 0 ? 1 : -1));
@@ -625,10 +677,17 @@ export default function DicomViewerPage() {
             <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>SERIES / STUDIES ({sliceCount})</div>
             {sliceCount === 0 ? (
               <div style={{ fontSize: 12, opacity: 0.5 }}>No studies for patient {viewerPid}.</div>
-            ) : studies.map((s, i) => (
+            ) : allStudies.map((s, i) => (
               <button key={s.id} onClick={() => goToSlice(i)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', borderRadius: 6, border: `1px solid ${selectedId === s.id ? '#3b82f6' : 'transparent'}`, background: selectedId === s.id ? '#1e3a8a' : 'transparent', color: 'inherit', fontSize: 12, marginBottom: 4 }}>
-                <span style={{ opacity: 0.6, marginRight: 6 }}>{i + 1}.</span>{s.originalName}
+                <span style={{ opacity: 0.6, marginRight: 6 }}>{i + 1}.</span>
+                {s.source === 'orthanc' && (
+                  <span style={{ fontSize: 9, border: '1px solid #38bdf8', borderRadius: 4, padding: '0 3px', marginRight: 5, color: '#7dd3fc' }}>PACS</span>
+                )}
+                {s.originalName}
               </button>
+            ))}
+            {(orthancData?.warnings ?? []).map((warning) => (
+              <div key={warning} style={{ fontSize: 10, color: '#fbbf24', marginTop: 4 }}>{warning}</div>
             ))}
           </div>
 

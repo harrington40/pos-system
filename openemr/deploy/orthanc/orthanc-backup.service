@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up Orthanc SQLite index and DICOM storage
+After=orthanc.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/orthanc/bin/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

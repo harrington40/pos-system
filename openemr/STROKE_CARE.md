@@ -23,7 +23,7 @@ The feature branch is `feature/stroke-care`. Nothing in this module writes to
 | Patients | `patient_data` (`pid`, names, DOB, sex) | Every stroke row stores `pid`; there is no second patient index |
 | Encounters | `form_encounter` (`encounter_id`, `facility_id`) | Optional `encounter_id` on an activation |
 | Auth | `JwtAuthGuard`, `RolesGuard`, `@Roles(...)` | Every endpoint is guarded; role lists are in the controller |
-| Imaging | Existing `imaging` entity + B2 storage; **no Orthanc server is configured in this repository** | Stroke rows link `imaging.id` and/or a DICOM `StudyInstanceUID`; no image bytes are duplicated |
+| Imaging | Existing `imaging` entity + B2 storage; optional authenticated Orthanc DICOMweb bridge | Stroke rows link `imaging.id` and/or a DICOM `StudyInstanceUID`; PACS studies can be viewed through `/api/imaging/orthanc/*` without duplicating bytes |
 | FHIR | Existing `fhir.service.ts` | A stroke-specific R4 collection Bundle export endpoint |
 | Frontend | React 18 + Vite + React Query + Bootstrap under `interface/new/src` | `features/stroke-care/`, `api/endpoints/strokeCare.ts`, routes `/stroke` and `/stroke-care` |
 | Tests | Jest colocated `*.spec.ts`; Vitest in `interface/new/src/test` | Added both |
@@ -307,8 +307,9 @@ patient-match status. `GET /stroke-care/imaging/:id/dicom-metadata` returns the
 stored metadata and viewer path and writes an audit event. `stroke_radiology_reports`
 associates preliminary/final/amended reports with the encounter and imaging link.
 A DICOM PatientID mismatch is rejected unless a clinician explicitly confirms it.
-No DICOM bytes are copied and no second PACS is created; there is no Orthanc
-server in this repository.
+No DICOM bytes are copied. An optional Orthanc PACS can supply the study through
+the authenticated DICOMweb bridge; when it is not configured, the existing B2
+imaging path remains unchanged.
 
 **E — Inpatient care.** Admission/discharge records (`stroke_inpatient_stays`),
 stroke-unit dashboard (`GET /stroke-care/inpatient/dashboard`), neuro/nursing,
@@ -425,7 +426,7 @@ cd interface/new && npx vitest run src/test/strokeCare.test.ts
 cd interface/new && npx vitest run src/test/strokeCareUI.test.tsx
 
 # Full regression (executed 2026-10-17)
-cd backend && npx jest --runInBand        # 526 passed (full regression)
+cd backend && npx jest --runInBand        # 530 passed (full regression)
 cd interface/new && npx vitest run        # 121 passed
 ```
 
@@ -498,10 +499,11 @@ activities finish.**
 
 ## 8. Known limitations / follow-ups
 
-- **No Orthanc/PACS server exists in this repository.** The module stores an
-  `imaging_id` or DICOM `StudyInstanceUID`, retrieves stored metadata and links to
-  the existing authorized `/dicom` viewer. A DICOMweb/WADO-RS bridge is a
-  deployment task, not a second image store.
+- **Orthanc/PACS integration is optional.** The module stores an `imaging_id` or
+  DICOM `StudyInstanceUID` and retrieves stored metadata. When `ORTHANC_URL` and
+  credentials are configured, the authenticated imaging endpoints bridge QIDO-RS
+  and WADO-RS and the `/dicom` viewer lists PACS instances alongside B2 rows.
+  Without that configuration the viewer keeps its existing B2-only behavior.
 - **Reperfusion criteria are a checklist, not a validated medical device.** They
   must be reviewed by the facility's stroke programme before clinical use.
 - **Functional instruments require local validation.** The mRS and Barthel Index
