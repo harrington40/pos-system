@@ -472,7 +472,10 @@ export default function NurseRNDashboardPage() {
                         <span className="fw-semibold small">{formatPatientName(p)}</span>
                         <span className={`badge rounded-pill ${riskBadge(p.risk.level)}`}>{p.risk.level}</span>
                       </div>
-                      <div className="text-muted" style={{ fontSize: '0.7rem' }}>Room {p.room || '—'} · NEWS2 {p.risk.total ?? '—'}</div>
+                      <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                        Room {p.room || '—'} · NEWS2 {p.risk.total ?? '—'}
+                        {p.status === 'pending' && <span className="badge bg-secondary ms-1" style={{ fontSize: '0.6rem' }} title="Awaiting registrar approval">Pending approval</span>}
+                      </div>
                     </button>
                   ))
                 )}

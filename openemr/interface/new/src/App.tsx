@@ -76,6 +76,7 @@ function RoleRedirect() {
   if (user?.main_menu_role === 'registered_nurse') return <Navigate to="/rn-dashboard" replace />;
   if (user?.role === 'nurse') return <Navigate to="/nurse-dashboard" replace />;
   if (user?.role === 'front_desk') return <Navigate to="/registrar-dashboard" replace />;
+  if (user?.role === 'billing') return <Navigate to="/billing" replace />;
   if (user?.role === 'physician') return <Navigate to="/provider-dashboard" replace />;
   if (user?.role === 'midwife') return <Navigate to="/midwife-dashboard" replace />;
   if (user?.role === 'lab_tech') return <Navigate to="/lab-tech-dashboard" replace />;

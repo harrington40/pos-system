@@ -16,6 +16,17 @@ export class SettingsPublicController {
     getPublic() {
         return this.settings.getPublic();
     }
+
+    /**
+     * Role-access flags for the signed-in user's own UI (sidebar visibility).
+     * Any authenticated role may read these; only administrators can change them
+     * via `/admin/settings`.
+     */
+    @Get('access')
+    @UseGuards(JwtAuthGuard)
+    getAccess() {
+        return this.settings.getAccessFlags();
+    }
 }
 
 /** Administrators read and change application settings here. */

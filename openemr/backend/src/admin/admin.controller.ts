@@ -152,8 +152,9 @@ export class AdminController {
         if (!user) throw new ForbiddenException('Not authenticated');
         // Admin always has the privilege
         if (user.role === 'admin') return;
-        // Front desk needs explicit privilege
-        if (user.role === 'front_desk') {
+        // Front desk (and billing, when registrar/billing access is shared) needs
+        // the explicit privilege.
+        if (user.role === 'front_desk' || user.role === 'billing') {
             if (!user.can_edit_providers) {
                 throw new ForbiddenException(
                     'You do not have permission to edit providers. Please contact an administrator.',

@@ -35,6 +35,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_color VARCHAR(20) NULL;
 -- patient_data --------------------------------------------------------------
 -- Sequential patient-facing identifier (e.g. RX-2608-00001) used by the portal.
 ALTER TABLE patient_data ADD COLUMN IF NOT EXISTS public_id VARCHAR(32) NULL;
+-- Address county captured by the nurse-aide intake (Liberia's first-level
+-- administrative division). Part of the upstream schema; repeated here so
+-- reduced test schemas match what the registration INSERT writes.
+ALTER TABLE patient_data ADD COLUMN IF NOT EXISTS county VARCHAR(255) NULL;
 -- Chart approval + sharing state.
 ALTER TABLE patient_data ADD COLUMN IF NOT EXISTS approved_at DATETIME NULL;
 ALTER TABLE patient_data ADD COLUMN IF NOT EXISTS chart_shared TINYINT(1) NOT NULL DEFAULT 0;

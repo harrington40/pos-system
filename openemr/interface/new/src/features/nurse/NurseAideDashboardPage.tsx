@@ -8,6 +8,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import nestClient from '../../api/nest-client';
 import PhoneInput from '../../components/shared/PhoneInput';
 import CitySelect from '../../components/shared/CitySelect';
+import CountySelect from '../../components/shared/CountySelect';
 import {
   assessPatient,
   computeNEWS2,
@@ -80,7 +81,7 @@ export default function NurseAideDashboardPage() {
 
   // New patient intake (triage) — nurse aide collects demographics + vitals for a new patient.
   const [showIntake, setShowIntake] = useState(false);
-  const [intakeForm, setIntakeForm] = useState<any>({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
+  const [intakeForm, setIntakeForm] = useState<any>({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', county: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
   /** Likely-existing patients that blocked this admit. */
   const [intakeDuplicates, setIntakeDuplicates] = useState<any[]>([]);
   /** Deliberate opt-in to create a second chart for a possible duplicate. */
@@ -219,6 +220,7 @@ export default function NurseAideDashboardPage() {
           phone_contact: intakeForm.phone_contact || '',
           street: intakeForm.street || '',
           city: intakeForm.city || '',
+          county: intakeForm.county || '',
           status: 'pending',
         });
         pid = created.data.pid;
@@ -245,7 +247,7 @@ export default function NurseAideDashboardPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['nurse-dashboard'] });
-      setIntakeForm({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
+      setIntakeForm({ fname: '', mname: '', lname: '', suffix: '', DOB: '', sex: '', phone_contact: '', street: '', city: '', county: '', bps: '', bpd: '', pulse: '', temperature: '', respiration: '', oxygen_saturation: '', weight: '', height: '' });
       setIntakeDuplicates([]);
       setIntakeOverride(false);
       setIntakeTarget(null);
@@ -417,9 +419,10 @@ export default function NurseAideDashboardPage() {
                         <div className="col-md-2"><label className="form-label small mb-0">Suffix</label><select className="form-select form-select-sm" value={intakeForm.suffix} onChange={e => setIntakeForm({ ...intakeForm, suffix: e.target.value })}><option value="">—</option><option>Jr</option><option>Sr</option><option>II</option><option>III</option><option>IV</option><option>MD</option><option>PhD</option></select></div>
                         <div className="col-md-2"><label className="form-label small mb-0">DOB</label><input type="date" className="form-control form-control-sm" value={intakeForm.DOB} onChange={e => setIntakeForm({ ...intakeForm, DOB: e.target.value })} /></div>
                         <div className="col-md-2"><label className="form-label small mb-0">Sex</label><select className="form-select form-select-sm" value={intakeForm.sex} onChange={e => setIntakeForm({ ...intakeForm, sex: e.target.value })}><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select></div>
-                        <div className="col-md-4"><label className="form-label small mb-0">Phone</label><PhoneInput value={intakeForm.phone_contact} onChange={v => setIntakeForm({ ...intakeForm, phone_contact: v })} /></div>
-                        <div className="col-md-4"><label className="form-label small mb-0">Street *</label><input className="form-control form-control-sm" placeholder="House no, street" value={intakeForm.street} onChange={e => setIntakeForm({ ...intakeForm, street: e.target.value })} /></div>
+                        <div className="col-md-3"><label className="form-label small mb-0">Phone</label><PhoneInput value={intakeForm.phone_contact} onChange={v => setIntakeForm({ ...intakeForm, phone_contact: v })} /></div>
+                        <div className="col-md-3"><label className="form-label small mb-0">Street *</label><input className="form-control form-control-sm" placeholder="House no, street" value={intakeForm.street} onChange={e => setIntakeForm({ ...intakeForm, street: e.target.value })} /></div>
                         <div className="col-md-3"><label className="form-label small mb-0">City *</label><CitySelect value={intakeForm.city} onChange={v => setIntakeForm({ ...intakeForm, city: v })} className="form-select-sm" /></div>
+                        <div className="col-md-3"><label className="form-label small mb-0">County</label><CountySelect value={intakeForm.county} onChange={v => setIntakeForm({ ...intakeForm, county: v })} className="form-select-sm" /></div>
                       </div>
 
                       {/* Duplicate guard — a second chart is only created when the
@@ -526,8 +529,9 @@ export default function NurseAideDashboardPage() {
                       <div className="text-start">
                         <div className="fw-semibold small">
                           {formatPatientNameLastFirst(p)}
-                          {p.is_assigned && <i className="bi bi-person-check ms-1 text-success" title="Assigned to you"></i>}
-                          {p.awaiting_vitals && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>Awaiting vitals</span>}
+                          {!!p.is_assigned && <i className="bi bi-person-check ms-1 text-success" title="Assigned to you"></i>}
+                          {p.status === 'pending' && <span className="badge bg-secondary ms-1" style={{ fontSize: '0.6rem' }} title="Awaiting registrar approval">Pending approval</span>}
+                          {!!p.awaiting_vitals && <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '0.6rem' }}>Awaiting vitals</span>}
                         </div>
                         <div className={selectedPatient?.pid === p.pid ? 'text-white text-opacity-75' : 'text-muted'} style={{ fontSize: '0.72rem' }}>
                           {p.room ? `Room ${p.room} · ` : ''}DOB {p.DOB ? String(p.DOB).slice(0, 10) : '—'}

@@ -3,6 +3,7 @@ import {
     Logger,
     NotFoundException,
     ForbiddenException,
+    OnModuleInit,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -26,6 +27,7 @@ export interface PatientRow {
     city: string | null;
     state: string | null;
     postal_code: string | null;
+    county: string | null;
     status: string | null;
     public_id: string | null;
     providerID: number | null;
@@ -48,6 +50,8 @@ export interface CreatePatientDto {
     city?: string;
     state?: string;
     postal_code?: string;
+    /** Stored in `patient_data.county` (Liberia's first-level administrative division). */
+    county?: string;
     providerID?: number;
     ref_providerID?: number;
     status?: string;
@@ -122,7 +126,7 @@ interface CalendarEventRow {
 }
 
 @Injectable()
-export class PatientsService {
+export class PatientsService implements OnModuleInit {
     private readonly logger = new Logger(PatientsService.name);
 
     constructor(
@@ -130,6 +134,24 @@ export class PatientsService {
         private dataSource: DataSource,
         private readonly emergency: EmergencyService,
     ) {}
+
+    /**
+     * `county` is the patient's first-level administrative division (Liberia's
+     * counties). Self-heal the column for databases built from a reduced schema
+     * so registration can always store the intake selection. Mirrors
+     * AdminService's column guards.
+     */
+    async onModuleInit(): Promise<void> {
+        try {
+            await this.dataSource.query(
+                `ALTER TABLE patient_data ADD COLUMN IF NOT EXISTS county VARCHAR(255) NULL`,
+            );
+        } catch (err) {
+            this.logger.warn(
+                `Could not ensure patient_data.county: ${(err as Error).message}`,
+            );
+        }
+    }
 
     async findAll(opts?: {
         search?: string;
@@ -145,7 +167,7 @@ export class PatientsService {
 
         let query = `SELECT pd.id, pd.pid, pd.fname, pd.lname, pd.mname, pd.suffix, pd.DOB, pd.sex,
         pd.chart_shared,
-        pd.email, pd.phone_contact, pd.street, pd.city, pd.state, pd.postal_code,
+        pd.email, pd.phone_contact, pd.street, pd.city, pd.state, pd.postal_code, pd.county,
         pd.status, pd.public_id, pd.providerID, pd.ref_providerID, pd.regdate, pd.created_by,
         TIMESTAMPDIFF(YEAR, pd.DOB, CURDATE()) as age,
         CONCAT(u.fname, ' ', u.lname) as providerName
@@ -187,7 +209,7 @@ export class PatientsService {
         const rows = await this.dataSource.query<PatientRow[]>(
             `SELECT pd.id, pd.pid, pd.fname, pd.lname, pd.mname, pd.suffix, pd.DOB, pd.sex,
         pd.chart_shared, pd.insurance_type, pd.patient_responsibility_percent,
-        pd.email, pd.phone_contact, pd.street, pd.city, pd.state, pd.postal_code,
+        pd.email, pd.phone_contact, pd.street, pd.city, pd.state, pd.postal_code, pd.county,
         pd.status, pd.public_id, pd.providerID, pd.ref_providerID,
         pd.regdate, pd.created_by,
         -- Aliases so the SPA can use one naming convention: the Patient type and
@@ -368,9 +390,9 @@ export class PatientsService {
         const nextPid = maxRow.nextPid;
         const result = await this.dataSource.query<AffectedRowsResult>(
             `INSERT INTO patient_data (fname, lname, mname, suffix, DOB, sex, email, phone_contact,
-        street, city, state, postal_code, pid, public_id, providerID, ref_providerID,
+        street, city, state, postal_code, county, pid, public_id, providerID, ref_providerID,
         status, regdate, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
             [
                 dto.fname,
                 dto.lname,
@@ -384,6 +406,7 @@ export class PatientsService {
                 dto.city || '',
                 dto.state || '',
                 dto.postal_code || '',
+                dto.county || '',
                 nextPid,
                 publicId,
                 dto.providerID || null,
@@ -784,6 +807,7 @@ export class PatientsService {
             'city',
             'state',
             'postal_code',
+            'county',
             'providerID',
             'ref_providerID',
         ]);

@@ -9,6 +9,7 @@ const homeForRole = (role?: string, mainMenuRole?: string): string => {
   switch (role) {
     case 'nurse': return '/nurse-dashboard';
     case 'front_desk': return '/registrar-dashboard';
+    case 'billing': return '/billing';
     case 'physician': return '/provider-dashboard';
     case 'midwife': return '/midwife-dashboard';
     case 'lab_tech': return '/lab-tech-dashboard';

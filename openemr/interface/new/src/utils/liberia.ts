@@ -35,6 +35,25 @@ export const LIBERIA_CITIES: string[] = [
   'Red Light',
 ];
 
+/** Liberia's 15 counties (first-level administrative divisions) for address dropdowns. */
+export const LIBERIA_COUNTIES: string[] = [
+  'Bomi',
+  'Bong',
+  'Gbarpolu',
+  'Grand Bassa',
+  'Grand Cape Mount',
+  'Grand Gedeh',
+  'Grand Kru',
+  'Lofa',
+  'Margibi',
+  'Maryland',
+  'Montserrado',
+  'Nimba',
+  'River Cess',
+  'River Gee',
+  'Sinoe',
+];
+
 /** Strip everything but digits from a phone value. */
 export function phoneDigits(value: string | null | undefined): string {
   return (value || '').replace(/\D/g, '');

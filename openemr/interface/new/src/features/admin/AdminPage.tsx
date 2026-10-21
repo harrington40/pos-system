@@ -465,7 +465,7 @@ function loadSettings(): SystemSettings {
 function SettingsTab() {
   const [settings, setSettings] = useState<SystemSettings>(loadSettings);
   const [saved, setSaved] = useState(false);
-  const [activeSection, setActiveSection] = useState<'general' | 'consultations' | 'language' | 'legacy'>('general');
+  const [activeSection, setActiveSection] = useState<'general' | 'consultations' | 'access' | 'language' | 'legacy'>('general');
 
   const update = (patch: Partial<SystemSettings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));
@@ -499,6 +499,7 @@ function SettingsTab() {
           {[
             { id: 'general' as const, label: 'General', icon: 'bi-gear' },
             { id: 'consultations' as const, label: 'Consultations', icon: 'bi-camera-video' },
+            { id: 'access' as const, label: 'Role Access', icon: 'bi-shield-lock' },
             { id: 'language' as const, label: 'Language & Region', icon: 'bi-translate' },
             { id: 'legacy' as const, label: 'Legacy Tools', icon: 'bi-link-45deg' },
           ].map((s) => (
@@ -792,6 +793,7 @@ function SettingsTab() {
 
       {/* ===== Consultations Section (server-backed feature flags) ===== */}
       {activeSection === 'consultations' && <ConsultationsSettings />}
+      {activeSection === 'access' && <AccessSettings />}
 
       {/* ===== Legacy Tools Section ===== */}
       {activeSection === 'legacy' && (
@@ -946,6 +948,128 @@ function ConsultationsSettings() {
               Turned off, the video option and its booking callout disappear, and any video booking
               sent straight to the API is refused — existing video appointments can still be joined
               from the Bookings page.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Server-backed cross-role access flags. Turning sharing on makes every
+ * registrar (front desk) menu/API available to billing and every billing
+ * menu/API available to the registrar. Enforcement lives in RolesGuard, so the
+ * sidebar and the API always agree.
+ */
+function AccessSettings() {
+  const queryClient = useQueryClient();
+  const [saved, setSaved] = useState(false);
+
+  const { data: items = [], isLoading } = useQuery<ServerSettingItem[]>({
+    queryKey: ['server-settings'],
+    queryFn: async () => (await nestClient.get('/admin/settings')).data,
+  });
+
+  const save = useMutation({
+    mutationFn: (patch: Record<string, unknown>) => nestClient.put('/admin/settings', patch),
+    onSuccess: (r: { data: ServerSettingItem[] }) => {
+      queryClient.setQueryData(['server-settings'], r.data);
+      // Refresh the sidebar's effective roles without a full page reload.
+      queryClient.invalidateQueries({ queryKey: ['settings', 'access'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    },
+  });
+
+  const accessItems = items.filter((i) => i.group === 'access');
+
+  return (
+    <div className="row g-4">
+      <div className="col-lg-8">
+        <div className="card shadow-sm">
+          <div className="card-header d-flex align-items-center justify-content-between">
+            <h5 className="mb-0"><i className="bi bi-shield-lock me-2"></i>Registrar &amp; Billing Access</h5>
+            <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary">Role sharing</span>
+          </div>
+          <div className="card-body">
+            <p className="text-muted small mb-3">
+              Control whether the registrar (front desk) and billing roles share each other's
+              features. Changes apply immediately to menus and API permissions.
+            </p>
+
+            {saved && (
+              <div className="alert alert-success py-2 small d-flex align-items-center">
+                <i className="bi bi-check-circle-fill me-2"></i>Setting saved.
+              </div>
+            )}
+            {save.isError && (
+              <div className="alert alert-danger py-2 small d-flex align-items-center">
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>Could not save the setting. Please try again.
+              </div>
+            )}
+
+            {isLoading ? (
+              <div className="text-center py-4"><div className="spinner-border text-primary"></div></div>
+            ) : accessItems.length === 0 ? (
+              <div className="text-muted small py-3">No access settings available.</div>
+            ) : (
+              accessItems.map((s) => (
+                <div
+                  key={s.key}
+                  className="d-flex align-items-start justify-content-between gap-3 p-3 rounded-3 border mb-3"
+                  style={{ background: s.value === true ? 'rgba(0,201,167,0.07)' : 'rgba(108,117,125,0.07)' }}
+                >
+                  <div className="d-flex gap-3">
+                    <div
+                      className={`rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 ${
+                        s.value === true ? 'vc-gradient text-white' : 'bg-secondary bg-opacity-25 text-secondary'
+                      }`}
+                      style={{ width: 46, height: 46 }}
+                    >
+                      <i className="bi bi-arrow-left-right fs-5"></i>
+                    </div>
+                    <div>
+                      <div className="fw-semibold d-flex align-items-center gap-2 flex-wrap">
+                        {s.label}
+                        <span className={`badge rounded-pill ${s.value === true ? 'bg-success' : 'bg-secondary'}`}>
+                          {s.value === true ? 'On' : 'Off'}
+                        </span>
+                      </div>
+                      <div className="small text-muted mt-1">{s.description}</div>
+                    </div>
+                  </div>
+                  <div className="form-check form-switch fs-5 flex-shrink-0" style={{ paddingLeft: '3rem' }}>
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      style={{ cursor: 'pointer' }}
+                      checked={s.value === true}
+                      disabled={save.isPending}
+                      onChange={(e) => save.mutate({ [s.key]: e.target.checked })}
+                      aria-label={`${s.label} enabled`}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="col-lg-4">
+        <div className="card shadow-sm">
+          <div className="card-header"><h5 className="mb-0"><i className="bi bi-info-circle me-2"></i>What changes</h5></div>
+          <div className="card-body small text-muted">
+            <p>
+              <strong>On:</strong> a billing user sees and can use every registrar menu — patient
+              search &amp; registration, appointments, providers, patient flow and the registrar
+              dashboard. A registrar user sees and can use the billing dashboard and medical
+              billing.
+            </p>
+            <p className="mb-0">
+              <strong>Off:</strong> each role is limited to its own menus and endpoints.
             </p>
           </div>
         </div>

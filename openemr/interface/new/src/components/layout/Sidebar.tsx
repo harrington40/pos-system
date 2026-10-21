@@ -2,6 +2,7 @@
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
+import { useRoleAccess } from '../../hooks/useRoleAccess';
 import nestClient from '../../api/nest-client';
 import { useNotificationSummary } from '../../hooks/useNotifications';
 import { useMyAvatar } from '../../hooks/useMyAvatar';
@@ -186,6 +187,8 @@ const menuSections: MenuSection[] = [
 
 export default function Sidebar() {
   const { user } = useAuth();
+  // Registrar ⇄ billing menu sharing is configured server-side.
+  const { hasAnyRole } = useRoleAccess();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     Dashboard: true,
   });
@@ -225,9 +228,10 @@ export default function Sidebar() {
     setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
   };
 
-  // Filter sections by role — only show when user is loaded
+  // Filter sections by role — only show when user is loaded. A billing user
+  // also matches registrar menus (and vice versa) when the sharing setting is on.
   const visibleSections = menuSections.filter(
-    (section) => !section.roles.length || (user ? section.roles.includes(user.role || '') : false),
+    (section) => !section.roles.length || (user ? hasAnyRole(section.roles) : false),
   );
 
   return (
@@ -286,7 +290,7 @@ export default function Sidebar() {
           // Filter sub-items by role
           const visibleChildren = section.children.filter(
             (child) =>
-              (!child.roles.length || !user || child.roles.includes(user.role || 'admin')) &&
+              (!child.roles.length || !user || hasAnyRole(child.roles)) &&
               (!child.mainMenuRoles?.length || !user || child.mainMenuRoles.includes(user.main_menu_role || '')) &&
               (menuPermissions?.[child.to] !== false) &&
               (child.to !== '/db-admin' || dbAdminUnlocked),
@@ -382,7 +386,7 @@ export default function Sidebar() {
           {/* Your own photo is changed on your profile page, which is reached by
               user id — the sidebar is the only place that knows it. Only the
               roles the profile endpoint accepts are offered the link. */}
-          {myUserId && user.role && ['admin', 'physician', 'front_desk'].includes(user.role) ? (
+          {myUserId && user.role && hasAnyRole(['admin', 'physician', 'front_desk']) ? (
             <NavLink
               to={`/providers/${myUserId}`}
               className="d-flex align-items-center gap-1 mt-1 text-decoration-none"

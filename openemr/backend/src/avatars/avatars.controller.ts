@@ -78,7 +78,11 @@ export class AvatarsController {
     private assertMayManageOthers(user: AvatarsUser | undefined): void {
         if (!user) throw new ForbiddenException('Not authenticated');
         if (user.role === 'admin') return;
-        if (user.role === 'front_desk' && user.can_edit_providers) return;
+        if (
+            (user.role === 'front_desk' || user.role === 'billing') &&
+            user.can_edit_providers
+        )
+            return;
         throw new ForbiddenException(
             'You can only change your own photo. Ask an administrator to change this one.',
         );
@@ -107,7 +111,10 @@ export class AvatarsController {
     private mayManageOthers(user: AvatarsUser | undefined): boolean {
         if (!user) return false;
         if (user.role === 'admin') return true;
-        return user.role === 'front_desk' && !!user.can_edit_providers;
+        return (
+            (user.role === 'front_desk' || user.role === 'billing') &&
+            !!user.can_edit_providers
+        );
     }
 
     @Get(':userId')

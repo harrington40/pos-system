@@ -2,17 +2,20 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyAvatar } from '../../hooks/useMyAvatar';
 import { useLicenseStatus } from '../../hooks/useLicenseStatus';
+import { useRoleAccess } from '../../hooks/useRoleAccess';
 
 export default function TopBar() {
   const { user, logout } = useAuth();
   const { data: myAvatar } = useMyAvatar();
   const { data: licenseStatus } = useLicenseStatus();
+  // Same server-side rule the sidebar uses (registrar ⇄ billing sharing).
+  const { hasAnyRole } = useRoleAccess();
   // Same cache entry the layout banner reads, so the two cannot disagree.
   const unlicensed = licenseStatus !== undefined && licenseStatus.valid !== true;
   const myAvatarUrl = myAvatar?.url || undefined;
   // /provider/profile/:id only accepts these roles, so only they get a link.
   const canOpenProfile =
-    !!myAvatar?.userId && !!user?.role && ['admin', 'physician', 'front_desk'].includes(user.role);
+    !!myAvatar?.userId && !!user?.role && hasAnyRole(['admin', 'physician', 'front_desk']);
 
   const avatar = myAvatarUrl ? (
     <img

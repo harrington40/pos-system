@@ -87,12 +87,45 @@ describe('SettingsService', () => {
 
         const items = await svc.update({ video_consultation_enabled: false });
 
-        expect(items).toEqual([
-            expect.objectContaining({ key: 'video_consultation_enabled', value: false }),
-        ]);
+        expect(items).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    key: 'video_consultation_enabled',
+                    value: false,
+                }),
+            ]),
+        );
         const upsert = calls.find((c) => c.sql.includes('INSERT INTO app_settings'));
         expect(upsert?.params).toEqual(['video_consultation_enabled', 'false']);
         expect(await svc.isEnabled('video_consultation_enabled')).toBe(false);
+    });
+
+    it('defaults shared registrar/billing access to on', async () => {
+        const { dataSource } = build();
+        const svc = await service(dataSource);
+
+        expect(await svc.getAccessFlags()).toEqual({
+            registrar_billing_shared_access: true,
+        });
+    });
+
+    it('reflects a persisted shared-access override', async () => {
+        const { dataSource, stored } = build();
+        stored.registrar_billing_shared_access = 'false';
+        const svc = await service(dataSource);
+
+        expect(await svc.getAccessFlags()).toEqual({
+            registrar_billing_shared_access: false,
+        });
+    });
+
+    it('clears the cached flag when a setting is saved', async () => {
+        const { dataSource } = build();
+        const svc = await service(dataSource);
+
+        expect(await svc.isEnabledCached('registrar_billing_shared_access')).toBe(true);
+        await svc.update({ registrar_billing_shared_access: false });
+        expect(await svc.isEnabledCached('registrar_billing_shared_access')).toBe(false);
     });
 
     it('treats a string "true" from a form post as enabled', async () => {

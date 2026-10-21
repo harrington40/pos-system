@@ -66,6 +66,8 @@ export interface WardPatientRow {
     lname: string;
     DOB: string | null;
     sex: string | null;
+    /** `patient_data.status` — a nurse-aide intake stays `pending` until the registrar approves it. */
+    status: string | null;
     room: string | null;
     acuity_level: string | null;
     acuity_score: number | string | null;
@@ -245,8 +247,12 @@ export class NursingService implements OnModuleInit {
 
         // All active patients, enriched with care assignment + latest vitals.
         // The nurse sees every patient on the ward; assigned patients are flagged.
+        // A nurse-aide intake is created as `pending` (the registrar still has to
+        // approve it and assign a provider), so pending charts are included too —
+        // otherwise the patient the aide just registered never appears on their
+        // own dashboard. The `status` column lets the UI flag them for approval.
         const patients = await this.dataSource.query<WardPatientRow[]>(
-            `SELECT pd.id, pd.pid, pd.fname, pd.lname, pd.DOB, pd.sex,
+            `SELECT pd.id, pd.pid, pd.fname, pd.lname, pd.DOB, pd.sex, pd.status,
               ca.room, ca.acuity_level, ca.acuity_score,
               (ca.assigned_nurse_id = ? OR ca.charge_nurse_id = ?) AS is_assigned,
               v.bps, v.bpd, v.pulse, v.temperature, v.respiration, v.oxygen_saturation,
@@ -262,7 +268,7 @@ export class NursingService implements OnModuleInit {
        LEFT JOIN patient_care_assignment ca ON ca.pid = pd.pid
        LEFT JOIN form_vitals v ON v.id = (
           SELECT id FROM form_vitals WHERE pid = pd.pid ORDER BY date DESC, id DESC LIMIT 1)
-       WHERE pd.status = 'active'
+       WHERE pd.status IN ('active', 'pending')
        ORDER BY FIELD(ca.acuity_level, 'stat', 'urgent', 'routine'), pd.lname, pd.fname`,
             [nurseId, nurseId],
         );
